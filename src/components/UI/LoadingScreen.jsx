@@ -12,11 +12,11 @@ export default function LoadingScreen() {
       zIndex: 9999
     }}>
       <div style={{ textAlign: 'center' }}>
-        <div style={{
-          fontSize: '72px',
-          lineHeight: 1,
-          marginBottom: '8px'
-        }}>🐉</div>
+        <img
+          src="/dragons-logo.png"
+          alt="Dragons"
+          style={{ width: '140px', height: 'auto', marginBottom: '8px' }}
+        />
         <h1 style={{
           color: 'white',
           fontSize: '32px',
