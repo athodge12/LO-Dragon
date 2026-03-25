@@ -15,7 +15,7 @@ export default function LoadingScreen() {
         <img
           src="/dragons-logo.png"
           alt="Dragons"
-          style={{ width: '140px', height: 'auto', marginBottom: '8px' }}
+          style={{ width: '140px', height: 'auto', marginBottom: '8px', filter: 'brightness(0) invert(1)' }}
         />
         <h1 style={{
           color: 'white',

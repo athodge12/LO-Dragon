@@ -34,7 +34,7 @@ export default function Login() {
     }}>
       {/* Logo section */}
       <div style={{ textAlign: 'center', paddingTop: '60px', paddingBottom: '32px' }}>
-        <img src="/dragons-logo.png" alt="Dragons" style={{ width: '160px', height: 'auto', marginBottom: '12px' }} />
+        <img src="/dragons-logo.png" alt="Dragons" style={{ width: '160px', height: 'auto', marginBottom: '12px', filter: 'brightness(0) invert(1)' }} />
         <h1 style={{
           color: 'white',
           fontSize: '36px',
