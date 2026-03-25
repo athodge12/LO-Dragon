@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
+import DragonLogo from '../../components/UI/DragonLogo';
 
 export default function Register() {
   const [role, setRole] = useState('parent');
@@ -54,7 +55,7 @@ export default function Register() {
       padding: '0 24px 40px'
     }}>
       <div style={{ textAlign: 'center', paddingTop: '40px', paddingBottom: '24px' }}>
-        <img src="/dragons-logo.png" alt="Dragons" style={{ width: '120px', height: 'auto', marginBottom: '8px' }} />
+        <DragonLogo width={120} style={{ marginBottom: '8px' }} />
         <h1 style={{
           color: 'white', fontSize: '28px', fontWeight: '700',
           textTransform: 'uppercase', letterSpacing: '3px',

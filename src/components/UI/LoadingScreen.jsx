@@ -1,3 +1,5 @@
+import DragonLogo from './DragonLogo';
+
 export default function LoadingScreen() {
   return (
     <div style={{
@@ -12,11 +14,7 @@ export default function LoadingScreen() {
       zIndex: 9999
     }}>
       <div style={{ textAlign: 'center' }}>
-        <img
-          src="/dragons-logo.png"
-          alt="Dragons"
-          style={{ width: '140px', height: 'auto', marginBottom: '8px' }}
-        />
+        <DragonLogo width={140} style={{ marginBottom: '8px' }} />
         <h1 style={{
           color: 'white',
           fontSize: '32px',
