@@ -85,7 +85,7 @@ export default function Header({ title, back, actions }) {
                   {userProfile?.firstName} {userProfile?.lastName}
                 </div>
                 <div style={{ fontSize: '11px', color: 'var(--gray-500)', marginTop: '2px' }}>
-                  {userProfile?.role === 'admin' ? '🛡️ Admin' : userProfile?.role === 'coach' ? '⚾ Coach' : userProfile?.role === 'bookkeeper' ? '💰 Bookkeeper' : userProfile?.role === 'fan' ? '🎉 Fan' : '👤 Parent'}
+                  {(Array.isArray(userProfile?.roles) ? userProfile.roles : [userProfile?.role]).filter(Boolean).map(r => ({admin:'🛡️ Admin',coach:'⚾ Coach',bookkeeper:'📒 Bookkeeper',parent:'👤 Parent',fan:'🎉 Fan'}[r] || r)).join(' · ')}
                 </div>
               </div>
               {(isAdmin || isCoach) && (

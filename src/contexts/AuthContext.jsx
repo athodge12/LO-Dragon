@@ -69,10 +69,14 @@ export function AuthProvider({ children }) {
     login,
     logout,
     fetchUserProfile,
-    isAdmin: userProfile?.role === 'admin',
-    isCoach: userProfile?.role === 'coach' || userProfile?.role === 'admin',
-    isBookkeeper: userProfile?.role === 'bookkeeper' || userProfile?.role === 'admin',
-    isFan: userProfile?.role === 'fan',
+    isAdmin: userProfile?.roles?.includes('admin') || userProfile?.role === 'admin',
+    isCoach: userProfile?.roles?.includes('coach') || userProfile?.role === 'coach' ||
+             userProfile?.roles?.includes('admin') || userProfile?.role === 'admin',
+    isBookkeeper: userProfile?.roles?.includes('bookkeeper') || userProfile?.role === 'bookkeeper' ||
+                  userProfile?.roles?.includes('admin') || userProfile?.role === 'admin',
+    isFan: (userProfile?.roles?.includes('fan') || userProfile?.role === 'fan') &&
+           !userProfile?.roles?.includes('admin') && userProfile?.role !== 'admin' &&
+           !userProfile?.roles?.includes('coach') && userProfile?.role !== 'coach',
   };
 
   return (

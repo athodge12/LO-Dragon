@@ -57,6 +57,7 @@ export default function Register() {
         lastName: form.lastName,
         phone: form.phone,
         role,
+        roles: [role],
         ...(role === 'parent' ? {
           childName: form.childName,
           jerseyNumber: form.jerseyNumber,
