@@ -91,7 +91,7 @@ function MessageList({ messages, currentUser, bottomRef }) {
 }
 
 export default function Chat() {
-  const { currentUser, userProfile, isCoach, isFan } = useAuth();
+  const { currentUser, userProfile, isCoach, isFan, chatDisplayName } = useAuth();
   const [activeTab, setActiveTab] = useState(isFan ? 'fanzone' : 'team');
   const [teamMessages, setTeamMessages] = useState([]);
   const [fanMessages, setFanMessages] = useState([]);
@@ -127,12 +127,11 @@ export default function Chat() {
 
   const sendMessage = async () => {
     if (!text.trim()) return;
-    const name = `${userProfile?.firstName || ''} ${userProfile?.lastName || ''}`.trim();
     const collection_name = activeTab === 'team' ? 'messages' : 'fanMessages';
     await addDoc(collection(db, collection_name), {
       text: text.trim(),
       authorId: currentUser.uid,
-      authorName: name,
+      authorName: chatDisplayName,
       role: userProfile?.role || 'parent',
       createdAt: new Date().toISOString()
     });

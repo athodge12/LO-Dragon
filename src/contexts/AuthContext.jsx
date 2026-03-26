@@ -61,6 +61,18 @@ export function AuthProvider({ children }) {
     return unsubscribe;
   }, []);
 
+  const getChatDisplayName = () => {
+    const firstName = userProfile?.firstName || '';
+    const lastName = userProfile?.lastName || '';
+    const fullName = `${firstName} ${lastName}`.trim();
+    if (!userProfile?.claimedPlayers?.length) return fullName;
+    const claims = userProfile.claimedPlayers.map(cp => {
+      const playerFirst = cp.playerName?.split(' ')[0] || cp.playerName || '';
+      return `${cp.relationship} of ${playerFirst}`;
+    }).join(' · ');
+    return `${firstName} (${claims})`;
+  };
+
   const value = {
     currentUser,
     userProfile,
@@ -69,6 +81,7 @@ export function AuthProvider({ children }) {
     login,
     logout,
     fetchUserProfile,
+    chatDisplayName: getChatDisplayName(),
     isAdmin: userProfile?.roles?.includes('admin') || userProfile?.role === 'admin',
     isCoach: userProfile?.roles?.includes('coach') || userProfile?.role === 'coach' ||
              userProfile?.roles?.includes('admin') || userProfile?.role === 'admin',

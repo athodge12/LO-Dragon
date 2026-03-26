@@ -12,7 +12,7 @@ const defaultPractices = [
 ];
 
 export default function Home() {
-  const { isCoach, userProfile } = useAuth();
+  const { isCoach, userProfile, chatDisplayName } = useAuth();
   const navigate = useNavigate();
   const [nextGame, setNextGame] = useState(null);
   const [record, setRecord] = useState({ wins: 0, losses: 0 });
@@ -72,7 +72,7 @@ export default function Home() {
     if (!announcementText.trim()) return;
     await addDoc(collection(db, 'announcements'), {
       text: announcementText,
-      authorName: `${userProfile.firstName} ${userProfile.lastName}`,
+      authorName: chatDisplayName,
       createdAt: new Date().toISOString()
     });
     setAnnouncementText('');

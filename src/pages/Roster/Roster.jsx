@@ -10,7 +10,7 @@ const positions = ['Pitcher','Catcher','1st Base','2nd Base','3rd Base','Shortst
 const RELATIONSHIPS = ['Mom','Dad','Step-Mom','Step-Dad','Grandparent','Brother','Sister','Aunt','Uncle','Guardian','Family Friend','Other'];
 
 export default function Roster() {
-  const { isCoach, isFan, currentUser, userProfile } = useAuth();
+  const { isCoach, isFan, currentUser, userProfile, fetchUserProfile } = useAuth();
   const canClaim = !isFan;
   const navigate = useNavigate();
   const [players, setPlayers] = useState([]);
@@ -66,6 +66,11 @@ export default function Roster() {
       ...player,
       claimedBy: { ...existing, [currentUser.uid]: { name, relationship: claimRelationship } }
     });
+    // Keep user profile in sync so chatDisplayName is correct
+    const existingClaimed = (userProfile?.claimedPlayers || []).filter(cp => cp.playerId !== player.id);
+    existingClaimed.push({ playerId: player.id, playerName: player.name, relationship: claimRelationship });
+    await setDoc(doc(db, 'users', currentUser.uid), { claimedPlayers: existingClaimed }, { merge: true });
+    await fetchUserProfile(currentUser.uid);
     setToast('Player claimed!');
     setClaimModal(null);
     setClaimRelationship('');
@@ -76,6 +81,10 @@ export default function Roster() {
     const existing = { ...getClaimedBy(player) };
     delete existing[currentUser.uid];
     await setDoc(doc(db, 'roster', player.id), { ...player, claimedBy: existing });
+    // Remove from user profile
+    const updatedClaimed = (userProfile?.claimedPlayers || []).filter(cp => cp.playerId !== player.id);
+    await setDoc(doc(db, 'users', currentUser.uid), { claimedPlayers: updatedClaimed }, { merge: true });
+    await fetchUserProfile(currentUser.uid);
     setToast('Claim removed');
   };
 

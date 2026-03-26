@@ -192,6 +192,13 @@ export default function Admin() {
                       {user.childName && (
                         <div style={{ fontSize: '12px', color: 'var(--gray-500)' }}>Parent of {user.childName}</div>
                       )}
+                      {user.claimedPlayers?.length > 0 && (
+                        <div style={{ fontSize: '12px', color: '#065F46', fontWeight: '600', marginTop: '2px' }}>
+                          ✅ {user.claimedPlayers.map(cp =>
+                            `${cp.relationship} of ${cp.playerName?.split(' ')[0] || cp.playerName}`
+                          ).join(' · ')}
+                        </div>
+                      )}
                     </div>
                     {/* Role badges */}
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', alignItems: 'flex-end' }}>
