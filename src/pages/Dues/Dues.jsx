@@ -6,7 +6,8 @@ import Header from '../../components/Layout/Header';
 import Toast from '../../components/UI/Toast';
 
 export default function Dues() {
-  const { isCoach, currentUser, userProfile } = useAuth();
+  const { isCoach, isBookkeeper, currentUser, userProfile } = useAuth();
+  const canEditDues = isCoach || isBookkeeper;
   const [players, setPlayers] = useState([]);
   const [duesConfig, setDuesConfig] = useState({ amount: 0, description: '' });
   const [payments, setPayments] = useState({});
@@ -43,7 +44,7 @@ export default function Dues() {
   };
 
   const togglePaid = async (playerId) => {
-    if (!isCoach) return;
+    if (!canEditDues) return;
     const newPayments = { ...payments, [playerId]: !payments[playerId] };
     await setDoc(doc(db, 'settings', 'payments'), newPayments);
     setToast(newPayments[playerId] ? '✅ Marked as paid' : 'Marked as unpaid');
@@ -61,7 +62,7 @@ export default function Dues() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
-      <Header title="Dues Tracker" back="/" actions={isCoach && (
+      <Header title="Dues Tracker" back="/" actions={canEditDues && (
         <button onClick={() => setEditConfig(!editConfig)} style={{
           background: 'rgba(255,255,255,0.15)', border: 'none', borderRadius: '8px',
           width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -91,7 +92,7 @@ export default function Dues() {
         )}
 
         {/* Config Editor */}
-        {editConfig && isCoach && (
+        {editConfig && canEditDues && (
           <div className="card" style={{ marginBottom: '14px' }}>
             <h3 style={{ fontFamily: 'Oswald, sans-serif', fontSize: '16px', marginBottom: '12px', textTransform: 'uppercase' }}>
               Dues Settings
@@ -109,7 +110,7 @@ export default function Dues() {
         )}
 
         {/* Summary */}
-        {isCoach && (
+        {canEditDues && (
           <div style={{
             background: 'linear-gradient(135deg, #CC1B1B, #8B0000)',
             borderRadius: '12px', padding: '16px', marginBottom: '14px', color: 'white'
@@ -174,7 +175,7 @@ export default function Dues() {
                       {paid ? 'Paid' : `$${duesConfig.amount || 0} due`}
                     </div>
                   </div>
-                  {isCoach && (
+                  {canEditDues && (
                     <button
                       onClick={() => togglePaid(player.id)}
                       style={{

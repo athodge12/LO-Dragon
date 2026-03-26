@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { collection, doc, onSnapshot, setDoc, addDoc, deleteDoc, query, orderBy } from 'firebase/firestore';
+import { collection, doc, onSnapshot, setDoc, addDoc, deleteDoc, getDoc, query, orderBy } from 'firebase/firestore';
 import { db } from '../../firebase/config';
 import { useAuth } from '../../contexts/AuthContext';
 import Header from '../../components/Layout/Header';
@@ -24,6 +24,7 @@ export default function Home() {
   const [toast, setToast] = useState('');
   const [announcementText, setAnnouncementText] = useState('');
   const [notifText, setNotifText] = useState('');
+  const [accessCodes, setAccessCodes] = useState({ coach: 'DRAGONS-COACH', bookkeeper: 'DRAGONS-BOOKS' });
 
   useEffect(() => {
     const unsubs = [];
@@ -34,6 +35,10 @@ export default function Home() {
 
     unsubs.push(onSnapshot(doc(db, 'settings', 'notification'), snap => {
       if (snap.exists()) setNotification(snap.data());
+    }));
+
+    unsubs.push(onSnapshot(doc(db, 'settings', 'accessCodes'), snap => {
+      if (snap.exists()) setAccessCodes(snap.data());
     }));
 
     const gamesQ = query(collection(db, 'games'), orderBy('date', 'desc'));
@@ -94,6 +99,13 @@ export default function Home() {
     setDismissedNotif(true);
   };
 
+  const saveAccessCodes = async (codes) => {
+    await setDoc(doc(db, 'settings', 'accessCodes'), codes);
+    setAccessCodes(codes);
+    setToast('Access codes updated!');
+    setEditModal(null);
+  };
+
   const winPct = record.wins + record.losses > 0
     ? ((record.wins / (record.wins + record.losses)) * 100).toFixed(0)
     : '--';
@@ -102,6 +114,13 @@ export default function Home() {
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
       <Header title="Dragons Baseball" actions={
         isCoach && (
+          <div style={{ display: 'flex', gap: '6px' }}>
+          <button onClick={() => setEditModal('accessCodes')} style={{
+            background: 'rgba(255,255,255,0.15)', border: 'none',
+            borderRadius: '8px', width: 36, height: 36,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            color: 'white', cursor: 'pointer', fontSize: '16px'
+          }}>🔑</button>
           <button onClick={() => setEditModal('notification')} style={{
             background: 'rgba(255,255,255,0.15)', border: 'none',
             borderRadius: '8px', width: 36, height: 36,
@@ -113,6 +132,7 @@ export default function Home() {
               <path d="M13.73 21a2 2 0 01-3.46 0"/>
             </svg>
           </button>
+          </div>
         )
       } />
 
@@ -390,7 +410,60 @@ export default function Home() {
         </div>
       )}
 
+      {/* Access Codes Modal */}
+      {editModal === 'accessCodes' && (
+        <AccessCodesModal
+          current={accessCodes}
+          onSave={saveAccessCodes}
+          onClose={() => setEditModal(null)}
+        />
+      )}
+
       {toast && <Toast message={toast} onDismiss={() => setToast('')} />}
+    </div>
+  );
+}
+
+function AccessCodesModal({ current, onSave, onClose }) {
+  const [codes, setCodes] = useState({
+    coach: current?.coach || 'DRAGONS-COACH',
+    bookkeeper: current?.bookkeeper || 'DRAGONS-BOOKS'
+  });
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-sheet" onClick={e => e.stopPropagation()}>
+        <div className="modal-handle" />
+        <h3 style={{ fontFamily: 'Oswald, sans-serif', fontSize: '20px', marginBottom: '6px', textTransform: 'uppercase' }}>
+          🔑 Access Codes
+        </h3>
+        <p style={{ fontSize: '13px', color: 'var(--gray-500)', marginBottom: '16px', lineHeight: '1.5' }}>
+          Share these private codes only with people you want to register as Coach or Bookkeeper.
+        </p>
+        <div className="form-group">
+          <label className="form-label">Coach Code</label>
+          <input
+            className="form-input"
+            value={codes.coach}
+            onChange={e => setCodes(c => ({ ...c, coach: e.target.value.toUpperCase() }))}
+            style={{ letterSpacing: '2px', fontWeight: '700', textTransform: 'uppercase' }}
+          />
+        </div>
+        <div className="form-group">
+          <label className="form-label">Bookkeeper Code</label>
+          <input
+            className="form-input"
+            value={codes.bookkeeper}
+            onChange={e => setCodes(c => ({ ...c, bookkeeper: e.target.value.toUpperCase() }))}
+            style={{ letterSpacing: '2px', fontWeight: '700', textTransform: 'uppercase' }}
+          />
+        </div>
+        <div className="card" style={{ background: '#FEF3C7', border: '1px solid #FCD34D', marginBottom: '16px' }}>
+          <p style={{ fontSize: '13px', color: '#92400E' }}>
+            ⚠️ Keep these codes private. Anyone with the code can register with that role.
+          </p>
+        </div>
+        <button className="btn-primary" onClick={() => onSave(codes)}>Save Codes</button>
+      </div>
     </div>
   );
 }

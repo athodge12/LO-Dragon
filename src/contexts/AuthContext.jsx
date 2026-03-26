@@ -69,7 +69,9 @@ export function AuthProvider({ children }) {
     login,
     logout,
     fetchUserProfile,
-    isCoach: userProfile?.role === 'coach'
+    isCoach: userProfile?.role === 'coach',
+    isBookkeeper: userProfile?.role === 'bookkeeper',
+    isFan: userProfile?.role === 'fan',
   };
 
   return (

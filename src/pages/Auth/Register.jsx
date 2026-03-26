@@ -1,9 +1,21 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '../../firebase/config';
 import { useAuth } from '../../contexts/AuthContext';
+
+const ROLES = [
+  { key: 'coach',      label: '⚾ Coach',       desc: 'Full access',         locked: true  },
+  { key: 'parent',     label: '👤 Parent',      desc: 'Player & RSVP',       locked: false },
+  { key: 'bookkeeper', label: '💰 Bookkeeper',  desc: 'Dues management',     locked: true  },
+  { key: 'fan',        label: '🎉 Fan',         desc: 'View only',           locked: false },
+];
+
+const positions = ['Pitcher','Catcher','1st Base','2nd Base','3rd Base','Shortstop','Left Field','Left Center','Right Center','Right Field'];
 
 export default function Register() {
   const [role, setRole] = useState('parent');
+  const [accessCode, setAccessCode] = useState('');
   const [form, setForm] = useState({
     firstName: '', lastName: '', email: '', password: '', confirmPassword: '',
     phone: '', childName: '', jerseyNumber: '', position: ''
@@ -13,14 +25,24 @@ export default function Register() {
   const { register } = useAuth();
   const navigate = useNavigate();
 
-  const positions = ['Pitcher','Catcher','1st Base','2nd Base','3rd Base','Shortstop','Left Field','Left Center','Right Center','Right Field'];
-
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+  const needsCode = role === 'coach' || role === 'bookkeeper';
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (form.password !== form.confirmPassword) return setError('Passwords do not match.');
     if (form.password.length < 6) return setError('Password must be at least 6 characters.');
+
+    // Validate access code for locked roles
+    if (needsCode) {
+      const snap = await getDoc(doc(db, 'settings', 'accessCodes'));
+      const codes = snap.exists() ? snap.data() : {};
+      const correctCode = codes[role] || (role === 'coach' ? 'DRAGONS-COACH' : 'DRAGONS-BOOKS');
+      if (accessCode.trim().toUpperCase() !== correctCode.toUpperCase()) {
+        return setError('Invalid access code. Contact your coach to get the code.');
+      }
+    }
+
     setError('');
     setLoading(true);
     try {
@@ -70,31 +92,68 @@ export default function Register() {
         <div style={{ marginBottom: '20px' }}>
           <label className="form-label" style={{ display: 'block', marginBottom: '8px' }}>I am a</label>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-            {['coach', 'parent'].map(r => (
+            {ROLES.map(r => (
               <button
-                key={r}
+                key={r.key}
                 type="button"
-                onClick={() => setRole(r)}
+                onClick={() => { setRole(r.key); setAccessCode(''); setError(''); }}
                 style={{
-                  padding: '12px',
+                  padding: '12px 8px',
                   borderRadius: '10px',
-                  border: `2px solid ${role === r ? 'var(--red)' : 'var(--gray-200)'}`,
-                  background: role === r ? '#FEF2F2' : 'white',
-                  color: role === r ? 'var(--red)' : 'var(--gray-500)',
+                  border: `2px solid ${role === r.key ? 'var(--red)' : 'var(--gray-200)'}`,
+                  background: role === r.key ? '#FEF2F2' : 'white',
+                  color: role === r.key ? 'var(--red)' : 'var(--gray-500)',
                   fontWeight: '600',
-                  fontSize: '14px',
+                  fontSize: '13px',
                   cursor: 'pointer',
                   fontFamily: 'Oswald, sans-serif',
                   textTransform: 'uppercase',
-                  letterSpacing: '0.5px',
-                  transition: 'all 0.15s'
+                  letterSpacing: '0.3px',
+                  transition: 'all 0.15s',
+                  position: 'relative',
+                  textAlign: 'center'
                 }}
               >
-                {r === 'coach' ? '⚾ Coach' : '👤 Parent'}
+                {r.label}
+                {r.locked && (
+                  <span style={{
+                    position: 'absolute', top: 4, right: 6,
+                    fontSize: '10px', opacity: 0.5
+                  }}>🔒</span>
+                )}
+                <div style={{ fontSize: '10px', fontWeight: '400', marginTop: '2px', opacity: 0.7, fontFamily: 'Source Sans 3, sans-serif', textTransform: 'none' }}>
+                  {r.desc}
+                </div>
               </button>
             ))}
           </div>
         </div>
+
+        {/* Access code for locked roles */}
+        {needsCode && (
+          <div style={{
+            background: '#FFF5F5', border: '1px solid #FECACA',
+            borderRadius: '10px', padding: '12px 14px', marginBottom: '16px'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '8px' }}>
+              <span>🔒</span>
+              <span style={{ fontSize: '13px', fontWeight: '700', color: 'var(--red)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>
+                Access Code Required
+              </span>
+            </div>
+            <p style={{ fontSize: '12px', color: 'var(--gray-500)', marginBottom: '10px' }}>
+              {role === 'coach' ? 'Coach' : 'Bookkeeper'} accounts require a private access code. Contact your coach to get it.
+            </p>
+            <input
+              className="form-input"
+              value={accessCode}
+              onChange={e => setAccessCode(e.target.value)}
+              placeholder="Enter access code..."
+              style={{ letterSpacing: '2px', textTransform: 'uppercase' }}
+              required
+            />
+          </div>
+        )}
 
         {error && (
           <div style={{
@@ -134,7 +193,7 @@ export default function Register() {
               </p>
               <div className="form-group">
                 <label className="form-label">Child's Name</label>
-                <input className="form-input" value={form.childName} onChange={e => set('childName', e.target.value)} placeholder="Player's first name" required={role === 'parent'} />
+                <input className="form-input" value={form.childName} onChange={e => set('childName', e.target.value)} placeholder="Player's first name" required />
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                 <div className="form-group" style={{ marginBottom: 0 }}>
