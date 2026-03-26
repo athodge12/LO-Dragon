@@ -368,7 +368,7 @@ export default function Home() {
               { label: '📅 Schedule', path: '/schedule' },
               { label: '📋 Roster', path: '/roster' },
               { label: '🏟️ Live Score', path: '/live-scoring' },
-              { label: '🍊 Snack Schedule', path: '/snacks' },
+              { label: '🥤 Drinks Schedule', path: '/snacks' },
               { label: '⭐ Awards', path: '/awards' },
               { label: '📋 Attendance', path: '/attendance' }
             ].map(a => (
