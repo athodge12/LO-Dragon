@@ -442,6 +442,7 @@ function DrillModal({ drill, onClose }) {
 function PracticeBuilder({ customPlan, setCustomPlan, setToast }) {
   const [selectedDrills, setSelectedDrills] = useState([]);
   const [duration, setDuration] = useState(75);
+  const [categoryFilter, setCategoryFilter] = useState('All');
 
   const toggleDrill = (drillId) => {
     setSelectedDrills(s => s.includes(drillId) ? s.filter(id => id !== drillId) : [...s, drillId]);
@@ -451,6 +452,8 @@ function PracticeBuilder({ customPlan, setCustomPlan, setToast }) {
     const d = DRILLS.find(dr => dr.id === id);
     return s + (d?.duration || 0);
   }, 0);
+
+  const visibleDrills = DRILLS.filter(d => categoryFilter === 'All' || d.category === categoryFilter);
 
   return (
     <div>
@@ -485,12 +488,28 @@ function PracticeBuilder({ customPlan, setCustomPlan, setToast }) {
         </div>
       </div>
 
+      <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', paddingBottom: '4px', marginBottom: '12px' }}>
+        {['All', ...CATEGORIES].map(cat => (
+          <button
+            key={cat}
+            onClick={() => setCategoryFilter(cat)}
+            style={{
+              flexShrink: 0, padding: '6px 12px', borderRadius: '20px',
+              border: `1.5px solid ${categoryFilter === cat ? 'var(--red)' : 'var(--gray-200)'}`,
+              background: categoryFilter === cat ? '#FEF2F2' : 'white',
+              color: categoryFilter === cat ? 'var(--red)' : 'var(--gray-500)',
+              fontSize: '12px', fontWeight: '600', cursor: 'pointer', whiteSpace: 'nowrap'
+            }}
+          >{cat}</button>
+        ))}
+      </div>
+
       <h4 style={{ fontFamily: 'Oswald, sans-serif', fontSize: '14px', textTransform: 'uppercase', color: 'var(--gray-600)', marginBottom: '10px' }}>
-        Select Drills
+        Select Drills {categoryFilter !== 'All' && `· ${categoryFilter}`}
       </h4>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-        {DRILLS.map(drill => (
+        {visibleDrills.map(drill => (
           <div
             key={drill.id}
             onClick={() => toggleDrill(drill.id)}
