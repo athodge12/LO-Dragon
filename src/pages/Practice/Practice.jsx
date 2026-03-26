@@ -69,10 +69,14 @@ export default function Practice() {
     ? DRILLS
     : DRILLS.filter(d => d.category === categoryFilter);
 
-  const PlanView = ({ plan, progress, slotIndex }) => {
+  const PlanView = ({ plan, progress, slotIndex, slot }) => {
     const planDrills = plan.drills.map(id => getDrill(id)).filter(Boolean);
     const totalTime = planDrills.reduce((s, d) => s + d.duration, 0);
     const completedCount = planDrills.filter(d => progress[d.id]).length;
+    const displayName = slot
+      ? `${slot.day}${slot.focus ? ` — ${slot.focus}` : ''}`
+      : plan.name;
+    const displayTime = slot?.time || plan.time;
 
     return (
       <div>
@@ -80,8 +84,11 @@ export default function Practice() {
           background: 'linear-gradient(135deg, #CC1B1B, #8B0000)',
           borderRadius: '12px', padding: '16px', marginBottom: '14px', color: 'white'
         }}>
-          <h3 style={{ fontFamily: 'Oswald, sans-serif', fontSize: '18px', margin: 0 }}>{plan.name}</h3>
-          <p style={{ opacity: 0.8, fontSize: '14px', marginTop: '4px' }}>{plan.time}</p>
+          <h3 style={{ fontFamily: 'Oswald, sans-serif', fontSize: '18px', margin: 0 }}>{displayName}</h3>
+          <p style={{ opacity: 0.8, fontSize: '14px', marginTop: '4px' }}>{displayTime}</p>
+          {slot?.location && (
+            <p style={{ opacity: 0.8, fontSize: '13px', marginTop: '2px' }}>📍 {slot.location}</p>
+          )}
           <div style={{ display: 'flex', gap: '16px', marginTop: '10px' }}>
             <div style={{ fontSize: '13px', opacity: 0.9 }}>⏱ {totalTime} min</div>
             <div style={{ fontSize: '13px', opacity: 0.9 }}>📋 {planDrills.length} drills</div>
@@ -179,7 +186,7 @@ export default function Practice() {
                 }}>Cancel Practice</button>
               </div>
             )}
-            <PlanView plan={PLANS[i]} progress={progress[i] || {}} slotIndex={i} />
+            <PlanView plan={PLANS[i]} progress={progress[i] || {}} slotIndex={i} slot={practiceSchedule[i]} />
           </div>
         ))}
 

@@ -349,6 +349,7 @@ export default function Home() {
                       )}
                     </div>
                     <div style={{ fontSize: '13px', color: 'var(--gray-500)', textDecoration: cancelled ? 'line-through' : 'none' }}>{p.time}</div>
+                    {p.location && !cancelled && <div style={{ fontSize: '12px', color: 'var(--gray-500)', marginTop: '1px' }}>📍 {p.location}</div>}
                     {p.focus && !cancelled && <div style={{ fontSize: '12px', color: 'var(--red)', fontWeight: '600', marginTop: '2px' }}>{p.focus}</div>}
                   </div>
                 </div>
@@ -520,7 +521,7 @@ function PracticeScheduleModal({ current, onSave, onClose }) {
   };
 
   const addSlot = () => {
-    setSlots(prev => [...prev, { day: '', time: '', focus: '' }]);
+    setSlots(prev => [...prev, { day: '', time: '', focus: '', location: '' }]);
   };
 
   const removeSlot = (i) => {
@@ -551,6 +552,10 @@ function PracticeScheduleModal({ current, onSave, onClose }) {
             <div className="form-group" style={{ marginBottom: '8px' }}>
               <label className="form-label">Time</label>
               <input className="form-input" value={slot.time} onChange={e => updateSlot(i, 'time', e.target.value)} placeholder="e.g. 4:45 – 6:00 PM" />
+            </div>
+            <div className="form-group" style={{ marginBottom: '8px' }}>
+              <label className="form-label">Location (optional)</label>
+              <input className="form-input" value={slot.location || ''} onChange={e => updateSlot(i, 'location', e.target.value)} placeholder="e.g. Riverside Park Field 2" />
             </div>
             <div className="form-group" style={{ marginBottom: 0 }}>
               <label className="form-label">Focus (optional)</label>
