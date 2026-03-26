@@ -187,7 +187,7 @@ export default function Snacks() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
-      <Header title="Team Drinks" back="/" />
+      <Header title="Team Drinks Sign Up" back="/" />
 
       <div className="page-content">
         {/* My assignment banner */}
