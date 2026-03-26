@@ -151,7 +151,7 @@ export default function Schedule() {
               {isCoach && <button onClick={() => deleteGame(game.id)} style={{
                 background: '#FEE2E2', border: 'none', borderRadius: '6px',
                 padding: '4px 8px', fontSize: '11px', cursor: 'pointer', fontWeight: '600', color: 'var(--red)'
-              }}>Del</button>
+              }}>Del</button>}
             </div>
           )}
         </div>
