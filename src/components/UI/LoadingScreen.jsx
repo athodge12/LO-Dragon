@@ -1,5 +1,3 @@
-import DragonLogo from './DragonLogo';
-
 export default function LoadingScreen() {
   return (
     <div style={{
@@ -14,16 +12,16 @@ export default function LoadingScreen() {
       zIndex: 9999
     }}>
       <div style={{ textAlign: 'center' }}>
-        <DragonLogo width={140} style={{ marginBottom: '8px' }} />
         <h1 style={{
           color: 'white',
-          fontSize: '32px',
+          fontSize: '48px',
           fontWeight: '700',
           textTransform: 'uppercase',
-          letterSpacing: '3px',
-          fontFamily: 'Oswald, sans-serif'
+          letterSpacing: '4px',
+          fontFamily: 'Oswald, sans-serif',
+          margin: 0
         }}>Dragons</h1>
-        <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '13px', marginTop: '4px' }}>
+        <p style={{ color: 'rgba(255,255,255,0.7)', fontSize: '14px', marginTop: '6px' }}>
           U8 Baseball
         </p>
       </div>

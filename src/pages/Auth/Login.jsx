@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import DragonLogo from '../../components/UI/DragonLogo';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -35,7 +34,6 @@ export default function Login() {
     }}>
       {/* Logo section */}
       <div style={{ textAlign: 'center', paddingTop: '60px', paddingBottom: '32px' }}>
-        <DragonLogo width={160} style={{ marginBottom: '12px' }} />
         <h1 style={{
           color: 'white',
           fontSize: '36px',
