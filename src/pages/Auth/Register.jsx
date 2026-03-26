@@ -11,14 +11,12 @@ const ROLES = [
   { key: 'fan',        label: '🎉 Fan',         desc: 'View only',           locked: false },
 ];
 
-const positions = ['Pitcher','Catcher','1st Base','2nd Base','3rd Base','Shortstop','Left Field','Left Center','Right Center','Right Field'];
-
 export default function Register() {
   const [role, setRole] = useState('parent');
   const [accessCode, setAccessCode] = useState('');
   const [form, setForm] = useState({
     firstName: '', lastName: '', email: '', password: '', confirmPassword: '',
-    phone: '', childName: '', jerseyNumber: '', position: ''
+    phone: '', childName: ''
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -58,11 +56,7 @@ export default function Register() {
         phone: form.phone,
         role,
         roles: [role],
-        ...(role === 'parent' ? {
-          childName: form.childName,
-          jerseyNumber: form.jerseyNumber,
-          position: form.position
-        } : {})
+        ...(role === 'parent' ? { childName: form.childName } : {})
       };
       await register(form.email, form.password, profileData);
       navigate('/');
@@ -201,19 +195,6 @@ export default function Register() {
               <div className="form-group">
                 <label className="form-label">Child's Name</label>
                 <input className="form-input" value={form.childName} onChange={e => set('childName', e.target.value)} placeholder="Player's first name" required />
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                <div className="form-group" style={{ marginBottom: 0 }}>
-                  <label className="form-label">Jersey #</label>
-                  <input className="form-input" type="number" value={form.jerseyNumber} onChange={e => set('jerseyNumber', e.target.value)} placeholder="00" min="0" max="99" />
-                </div>
-                <div className="form-group" style={{ marginBottom: 0 }}>
-                  <label className="form-label">Position</label>
-                  <select className="form-select" value={form.position} onChange={e => set('position', e.target.value)}>
-                    <option value="">Select...</option>
-                    {positions.map(p => <option key={p} value={p}>{p}</option>)}
-                  </select>
-                </div>
               </div>
             </>
           )}
