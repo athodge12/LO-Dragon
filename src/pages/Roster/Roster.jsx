@@ -24,7 +24,8 @@ export default function Roster() {
     });
   }, []);
 
-  const coaches = members.filter(m => m.role === 'coach');
+  const hasRole = (m, r) => m.role === r || (Array.isArray(m.roles) && m.roles.includes(r));
+  const coaches = members.filter(m => hasRole(m, 'coach') || hasRole(m, 'admin'));
   const players = members.filter(m => m.role === 'parent' || m.role === 'player');
 
   const addPlayer = async () => {
