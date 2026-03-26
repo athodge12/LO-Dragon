@@ -307,10 +307,10 @@ export default function Home() {
             {[
               { label: '💬 Team Chat', path: '/chat' },
               { label: '📊 Stats', path: '/stats' },
-              { label: isCoach ? '🔢 Batting Order' : '📅 Schedule', path: isCoach ? '/batting-order' : '/schedule' },
-              { label: isCoach ? '🗺️ Field Rotation' : '📋 Roster', path: isCoach ? '/defensive-rotation' : '/roster' },
+              { label: '📅 Schedule', path: '/schedule' },
+              { label: '📋 Roster', path: '/roster' },
               { label: '🏟️ Live Score', path: '/live-scoring' },
-              { label: '💰 Dues', path: '/dues' }
+              { label: isCoach ? '🔢 Batting Order' : '🗺️ Field Rotation', path: isCoach ? '/batting-order' : '/defensive-rotation' }
             ].map(a => (
               <button key={a.path} onClick={() => navigate(a.path)} style={{
                 background: 'var(--gray-50)', border: '1px solid var(--gray-200)',

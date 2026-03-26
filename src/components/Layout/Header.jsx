@@ -84,17 +84,10 @@ export default function Header({ title, back, actions }) {
                   {userProfile?.firstName} {userProfile?.lastName}
                 </div>
                 <div style={{ fontSize: '11px', color: 'var(--gray-500)', marginTop: '2px' }}>
-                  {userProfile?.role === 'coach' ? '⚾ Coach' : '👤 Parent'}
+                  {userProfile?.role === 'coach' ? '⚾ Coach' : userProfile?.role === 'bookkeeper' ? '💰 Bookkeeper' : userProfile?.role === 'fan' ? '🎉 Fan' : '👤 Parent'}
                 </div>
               </div>
-              <button onClick={() => { setMenuOpen(false); navigate('/dues'); }} style={{
-                width: '100%', padding: '12px 16px', background: 'none',
-                border: 'none', cursor: 'pointer', textAlign: 'left',
-                fontSize: '14px', color: 'var(--gray-700)', display: 'flex', alignItems: 'center', gap: '8px'
-              }}>
-                💰 Dues
-              </button>
-              <button onClick={() => { setMenuOpen(false); handleLogout(); }} style={{
+<button onClick={() => { setMenuOpen(false); handleLogout(); }} style={{
                 width: '100%', padding: '12px 16px', background: 'none',
                 border: 'none', cursor: 'pointer', textAlign: 'left',
                 fontSize: '14px', color: 'var(--red)', display: 'flex', alignItems: 'center', gap: '8px'

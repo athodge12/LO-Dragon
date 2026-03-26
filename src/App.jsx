@@ -16,7 +16,6 @@ import Chat from './pages/Chat/Chat';
 import BattingOrder from './pages/BattingOrder/BattingOrder';
 import DefensiveRotation from './pages/DefensiveRotation/DefensiveRotation';
 import LiveScoring from './pages/LiveScoring/LiveScoring';
-import Dues from './pages/Dues/Dues';
 
 function PrivateRoute({ children }) {
   const { currentUser } = useAuth();
@@ -51,8 +50,7 @@ function AppContent() {
         <Route path="/batting-order" element={<PrivateRoute><BattingOrder /></PrivateRoute>} />
         <Route path="/defensive-rotation" element={<PrivateRoute><DefensiveRotation /></PrivateRoute>} />
         <Route path="/live-scoring" element={<PrivateRoute><LiveScoring /></PrivateRoute>} />
-        <Route path="/dues" element={<PrivateRoute><Dues /></PrivateRoute>} />
-        <Route path="*" element={<Navigate to="/" replace />} />
+<Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
       {showNav && <BottomNav />}
     </>
