@@ -6,7 +6,8 @@ import Header from '../../components/Layout/Header';
 import Toast from '../../components/UI/Toast';
 
 export default function Schedule() {
-  const { isCoach, currentUser, userProfile } = useAuth();
+  const { isCoach, isBookkeeper, currentUser, userProfile } = useAuth();
+  const canScore = isCoach || isBookkeeper;
   const [games, setGames] = useState([]);
   const [modal, setModal] = useState(null);
   const [scoreModal, setScoreModal] = useState(null);
@@ -139,7 +140,7 @@ export default function Schedule() {
             )}
           </div>
 
-          {isCoach && (
+          {canScore && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flexShrink: 0 }}>
               {!game.result && (
                 <button onClick={() => { setScoreModal(game); setScore({ us: '', them: '', result: 'W' }); }} style={{
@@ -147,7 +148,7 @@ export default function Schedule() {
                   padding: '4px 8px', fontSize: '11px', cursor: 'pointer', fontWeight: '600', color: 'var(--gray-600)'
                 }}>Score</button>
               )}
-              <button onClick={() => deleteGame(game.id)} style={{
+              {isCoach && <button onClick={() => deleteGame(game.id)} style={{
                 background: '#FEE2E2', border: 'none', borderRadius: '6px',
                 padding: '4px 8px', fontSize: '11px', cursor: 'pointer', fontWeight: '600', color: 'var(--red)'
               }}>Del</button>
