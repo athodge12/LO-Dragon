@@ -195,7 +195,7 @@ export default function Admin() {
                       {user.claimedPlayers?.length > 0 && (
                         <div style={{ fontSize: '12px', color: '#065F46', fontWeight: '600', marginTop: '2px' }}>
                           ✅ {user.claimedPlayers.map(cp =>
-                            `${cp.relationship} of ${cp.playerName?.split(' ')[0] || cp.playerName}`
+                            `${cp.playerName?.split(' ')[0] || cp.playerName}'s ${cp.relationship}`
                           ).join(' · ')}
                         </div>
                       )}

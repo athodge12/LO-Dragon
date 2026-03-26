@@ -118,7 +118,7 @@ export function AuthProvider({ children }) {
     if (!rosterClaims.length) return fullName;
     const claims = rosterClaims.map(cp => {
       const playerFirst = cp.playerName?.split(' ')[0] || cp.playerName || '';
-      return `${cp.relationship} of ${playerFirst}`;
+      return `${playerFirst}'s ${cp.relationship}`;
     }).join(' · ');
     return `${firstName || fullName} (${claims})`;
   };
