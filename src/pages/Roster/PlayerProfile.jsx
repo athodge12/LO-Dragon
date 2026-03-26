@@ -7,6 +7,33 @@ import Header from '../../components/Layout/Header';
 import Toast from '../../components/UI/Toast';
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, ResponsiveContainer } from 'recharts';
 
+function StatBox({ label, value }) {
+  return (
+    <div style={{ background: 'white', padding: '12px 8px', textAlign: 'center' }}>
+      <div style={{ fontFamily: 'Oswald, sans-serif', fontSize: '22px', fontWeight: '700', color: 'var(--black)' }}>
+        {value}
+      </div>
+      <div style={{ fontSize: '11px', color: 'var(--gray-500)', textTransform: 'uppercase', letterSpacing: '0.5px', marginTop: '2px' }}>
+        {label}
+      </div>
+    </div>
+  );
+}
+
+function StatsGrid({ s = {} }) {
+  const avg = !s.ab ? '.000' : '.' + String(Math.round((s.avg ?? (s.hits / s.ab)) * 1000)).padStart(3, '0');
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1px', background: 'var(--gray-200)', borderRadius: '8px', overflow: 'hidden' }}>
+      <StatBox label="AVG" value={avg} />
+      <StatBox label="HR" value={s.hr || 0} />
+      <StatBox label="RBI" value={s.rbi || 0} />
+      <StatBox label="R" value={s.runs || 0} />
+      <StatBox label="SB" value={s.sb || 0} />
+      <StatBox label="ERA" value={s.era ? s.era.toFixed(2) : '--'} />
+    </div>
+  );
+}
+
 const radarCategories = ['Speed', 'Power', 'Contact', 'Fielding', 'Throwing', 'Coachability'];
 const positions = ['Pitcher','Catcher','1st Base','2nd Base','3rd Base','Shortstop','Left Field','Left Center','Right Center','Right Field'];
 
@@ -14,7 +41,9 @@ export default function PlayerProfile() {
   const { id } = useParams();
   const { isCoach } = useAuth();
   const [player, setPlayer] = useState(null);
-  const [stats, setStats] = useState(null);
+  const [career, setCareer] = useState({});
+  const [currentSeason, setCurrentSeason] = useState({});
+  const [seasonYear, setSeasonYear] = useState('2026');
   const [ratings, setRatings] = useState({});
   const [editing, setEditing] = useState(false);
   const [editForm, setEditForm] = useState({});
@@ -23,17 +52,19 @@ export default function PlayerProfile() {
   useEffect(() => {
     const unsubs = [];
     unsubs.push(onSnapshot(doc(db, 'users', id), snap => {
-      if (snap.exists()) {
-        const data = snap.data();
-        setPlayer(data);
-        setEditForm(data);
-      }
+      if (snap.exists()) { setPlayer(snap.data()); setEditForm(snap.data()); }
     }));
     unsubs.push(onSnapshot(doc(db, 'playerStats', id), snap => {
       if (snap.exists()) {
         const data = snap.data();
-        setStats(data.career || {});
+        setCareer(data.career || {});
         setRatings(data.ratings || {});
+        // currentSeason updated below once we know the year
+        unsubs.push(onSnapshot(doc(db, 'settings', 'season'), yearSnap => {
+          const year = yearSnap.exists() ? yearSnap.data().year : '2026';
+          setSeasonYear(year);
+          setCurrentSeason(data.seasons?.[year] || {});
+        }));
       }
     }));
     return () => unsubs.forEach(u => u());
@@ -54,10 +85,7 @@ export default function PlayerProfile() {
     setToast('Ratings saved!');
   };
 
-  const radarData = radarCategories.map(cat => ({
-    category: cat,
-    value: ratings[cat] || 5
-  }));
+  const radarData = radarCategories.map(cat => ({ category: cat, value: ratings[cat] || 5 }));
 
   if (!player) return (
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
@@ -129,30 +157,22 @@ export default function PlayerProfile() {
           </div>
         )}
 
+        {/* Current Season Stats */}
+        <div className="card" style={{ marginBottom: '14px' }}>
+          <div className="section-header">
+            <span className="section-title">⚾ {seasonYear} Season</span>
+            <span style={{ fontSize: '11px', color: 'var(--gray-400)', fontWeight: '600', textTransform: 'uppercase' }}>Current</span>
+          </div>
+          <StatsGrid s={currentSeason} />
+        </div>
+
         {/* Career Stats */}
         <div className="card" style={{ marginBottom: '14px' }}>
           <div className="section-header">
             <span className="section-title">📊 Career Stats</span>
+            <span style={{ fontSize: '11px', color: 'var(--gray-400)', fontWeight: '600', textTransform: 'uppercase' }}>All-Time</span>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1px', background: 'var(--gray-200)', borderRadius: '8px', overflow: 'hidden' }}>
-            {[
-              { label: 'AVG', value: stats?.avg ? `.${String(Math.round(stats.avg * 1000)).padStart(3, '0')}` : '.000' },
-              { label: 'HR', value: stats?.hr || 0 },
-              { label: 'RBI', value: stats?.rbi || 0 },
-              { label: 'R', value: stats?.runs || 0 },
-              { label: 'SB', value: stats?.sb || 0 },
-              { label: 'ERA', value: stats?.era ? stats.era.toFixed(2) : '--' }
-            ].map(s => (
-              <div key={s.label} style={{ background: 'white', padding: '12px 8px', textAlign: 'center' }}>
-                <div style={{ fontFamily: 'Oswald, sans-serif', fontSize: '22px', fontWeight: '700', color: 'var(--black)' }}>
-                  {s.value}
-                </div>
-                <div style={{ fontSize: '11px', color: 'var(--gray-500)', textTransform: 'uppercase', letterSpacing: '0.5px', marginTop: '2px' }}>
-                  {s.label}
-                </div>
-              </div>
-            ))}
-          </div>
+          <StatsGrid s={career} />
         </div>
 
         {/* Radar Chart */}
