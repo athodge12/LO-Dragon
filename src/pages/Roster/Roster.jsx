@@ -75,7 +75,7 @@ export default function Roster() {
     setToast('Claim removed');
   };
 
-  const myClaimedPlayer = players.find(p => p.claimedBy === currentUser?.uid);
+  const myClaimedPlayers = players.filter(p => p.claimedBy === currentUser?.uid);
 
   const getInitials = (name) => name ? name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) : '?';
 
@@ -94,36 +94,42 @@ export default function Roster() {
       )} />
 
       <div className="page-content">
-        {/* My claimed player banner */}
-        {canClaim && myClaimedPlayer && (
+        {/* My claimed players banner */}
+        {canClaim && myClaimedPlayers.length > 0 && (
           <div style={{
             background: 'linear-gradient(135deg, #CC1B1B, #8B0000)',
-            borderRadius: '12px', padding: '12px 16px', marginBottom: '14px',
-            display: 'flex', alignItems: 'center', gap: '12px', color: 'white'
+            borderRadius: '12px', padding: '12px 16px', marginBottom: '14px', color: 'white'
           }}>
-            <div style={{
-              width: 44, height: 44, borderRadius: '50%', background: 'rgba(255,255,255,0.2)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontFamily: 'Oswald, sans-serif', fontWeight: '700', fontSize: '18px', flexShrink: 0
-            }}>
-              {myClaimedPlayer.jerseyNumber || getInitials(myClaimedPlayer.name)}
+            <div style={{ fontSize: '11px', fontWeight: '700', opacity: 0.75, textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '8px' }}>
+              My Player{myClaimedPlayers.length > 1 ? 's' : ''}
             </div>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontWeight: '700', fontSize: '16px' }}>{myClaimedPlayer.name}</div>
-              <div style={{ fontSize: '12px', opacity: 0.8 }}>
-                {myClaimedPlayer.jerseyNumber ? `#${myClaimedPlayer.jerseyNumber}` : ''}
-                {myClaimedPlayer.positions?.length ? ` · ${myClaimedPlayer.positions.join(', ')}` : ''}
+            {myClaimedPlayers.map(p => (
+              <div key={p.id} style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '6px' }}>
+                <div style={{
+                  width: 40, height: 40, borderRadius: '50%', background: 'rgba(255,255,255,0.2)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontFamily: 'Oswald, sans-serif', fontWeight: '700', fontSize: '16px', flexShrink: 0
+                }}>
+                  {p.jerseyNumber || getInitials(p.name)}
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontWeight: '700', fontSize: '15px' }}>{p.name}</div>
+                  <div style={{ fontSize: '12px', opacity: 0.8 }}>
+                    {p.jerseyNumber ? `#${p.jerseyNumber}` : ''}
+                    {p.positions?.length ? ` · ${p.positions.join(', ')}` : ''}
+                  </div>
+                </div>
+                <button
+                  onClick={() => navigate(`/roster/${p.id}`)}
+                  style={{ background: 'rgba(255,255,255,0.2)', border: 'none', borderRadius: '8px', padding: '6px 12px', color: 'white', cursor: 'pointer', fontWeight: '600', fontSize: '13px' }}
+                >Profile →</button>
               </div>
-            </div>
-            <button
-              onClick={() => navigate(`/roster/${myClaimedPlayer.id}`)}
-              style={{ background: 'rgba(255,255,255,0.2)', border: 'none', borderRadius: '8px', padding: '6px 12px', color: 'white', cursor: 'pointer', fontWeight: '600', fontSize: '13px' }}
-            >Profile →</button>
+            ))}
           </div>
         )}
 
         {/* No claim yet */}
-        {canClaim && !myClaimedPlayer && (
+        {canClaim && myClaimedPlayers.length === 0 && (
           <div style={{
             background: '#FFF5F5', border: '1px solid #FECACA',
             borderRadius: '12px', padding: '12px 16px', marginBottom: '14px',
