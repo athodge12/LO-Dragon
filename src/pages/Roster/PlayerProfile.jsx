@@ -175,8 +175,8 @@ export default function PlayerProfile() {
           <StatsGrid s={career} />
         </div>
 
-        {/* Radar Chart */}
-        <div className="card" style={{ marginBottom: '14px' }}>
+        {/* Radar Chart — coach only */}
+        {isCoach && <div className="card" style={{ marginBottom: '14px' }}>
           <div className="section-header">
             <span className="section-title">⚡ Player Ratings</span>
             {isCoach && <span style={{ fontSize: '12px', color: 'var(--gray-400)' }}>Tap to edit</span>}
@@ -213,7 +213,7 @@ export default function PlayerProfile() {
               ))}
             </div>
           )}
-        </div>
+        </div>}
 
         {/* Contact Info */}
         <div className="card" style={{ marginBottom: '14px' }}>
