@@ -33,19 +33,25 @@ export default function Register() {
     if (form.password !== form.confirmPassword) return setError('Passwords do not match.');
     if (form.password.length < 6) return setError('Password must be at least 6 characters.');
 
-    // Validate access code for locked roles
-    if (needsCode) {
-      const snap = await getDoc(doc(db, 'settings', 'accessCodes'));
-      const codes = snap.exists() ? snap.data() : {};
-      const correctCode = codes[role] || (role === 'coach' ? 'DRAGONS-COACH' : 'DRAGONS-BOOKS');
-      if (accessCode.trim().toUpperCase() !== correctCode.toUpperCase()) {
-        return setError('Invalid access code. Contact your coach to get the code.');
-      }
-    }
-
     setError('');
     setLoading(true);
     try {
+      // Validate access code for locked roles
+      if (needsCode) {
+        let correctCode = role === 'coach' ? 'DRAGONS-COACH' : 'DRAGONS-BOOKS';
+        try {
+          const snap = await getDoc(doc(db, 'settings', 'accessCodes'));
+          if (snap.exists() && snap.data()[role]) correctCode = snap.data()[role];
+        } catch {
+          // Firestore read failed — fall back to default codes
+        }
+        if (accessCode.trim().toUpperCase() !== correctCode.toUpperCase()) {
+          setError('Invalid access code. Contact your coach to get the code.');
+          setLoading(false);
+          return;
+        }
+      }
+
       const profileData = {
         firstName: form.firstName,
         lastName: form.lastName,
