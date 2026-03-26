@@ -238,7 +238,7 @@ export default function Chat() {
           position: 'fixed', bottom: 'var(--bottom-nav-height)', left: 0,
           width: '100%', maxWidth: 'var(--max-width)', background: 'white',
           borderTop: '1px solid var(--gray-200)', padding: '10px 16px',
-          display: 'flex', gap: '8px', alignItems: 'flex-end',
+          display: 'flex', gap: '8px', alignItems: 'center',
           boxSizing: 'border-box'
         }}>
           <textarea
@@ -248,18 +248,19 @@ export default function Chat() {
             placeholder={placeholder}
             rows={1}
             style={{
-              flex: 1, padding: '10px 14px', border: '1.5px solid var(--gray-200)',
-              borderRadius: '20px', fontSize: '15px', resize: 'none',
-              maxHeight: '100px', lineHeight: '1.4', outline: 'none', fontFamily: 'Source Sans 3, sans-serif'
+              flex: 1, padding: '12px 16px', border: '1.5px solid var(--gray-200)',
+              borderRadius: '24px', fontSize: '15px', resize: 'none',
+              maxHeight: '100px', lineHeight: '1.4', outline: 'none',
+              fontFamily: 'Source Sans 3, sans-serif', background: 'var(--gray-100)'
             }}
           />
           <button onClick={sendMessage} disabled={!text.trim()} style={{
-            width: 40, height: 40, borderRadius: '50%',
+            width: 48, height: 48, borderRadius: '50%',
             background: text.trim() ? (activeTab === 'fanzone' ? '#065F46' : 'var(--red)') : 'var(--gray-200)',
             border: 'none', cursor: text.trim() ? 'pointer' : 'default',
             display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0
           }}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5">
               <line x1="22" y1="2" x2="11" y2="13"/>
               <polygon points="22,2 15,22 11,13 2,9"/>
             </svg>
