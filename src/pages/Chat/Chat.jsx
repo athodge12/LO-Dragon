@@ -63,14 +63,12 @@ function MessageList({ messages, currentUser, bottomRef }) {
               }}>{(msg.authorName || '?')[0].toUpperCase()}</div>
             )}
             <div style={{ maxWidth: '75%' }}>
-              {!isMe && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '3px', flexWrap: 'wrap' }}>
-                  <span style={{ fontSize: '12px', fontWeight: '600', color: 'var(--gray-600)' }}>
-                    {msg.authorName}
-                  </span>
-                  <RoleBadge role={msg.role} />
-                </div>
-              )}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '3px', flexWrap: 'wrap', justifyContent: isMe ? 'flex-end' : 'flex-start' }}>
+                <span style={{ fontSize: '12px', fontWeight: '600', color: 'var(--gray-600)' }}>
+                  {msg.authorName}
+                </span>
+                {!isMe && <RoleBadge role={msg.role} />}
+              </div>
               <div style={{
                 background: isMe ? 'var(--red)' : 'var(--gray-100)',
                 color: isMe ? 'white' : 'var(--black)',
@@ -239,14 +237,10 @@ export default function Chat() {
         <div style={{
           position: 'fixed', bottom: 'var(--bottom-nav-height)', left: 0,
           width: '100%', maxWidth: 'var(--max-width)', background: 'white',
-          borderTop: '1px solid var(--gray-200)', padding: '6px 16px 10px',
-          display: 'flex', flexDirection: 'column', gap: '6px',
+          borderTop: '1px solid var(--gray-200)', padding: '10px 16px',
+          display: 'flex', gap: '8px', alignItems: 'flex-end',
           boxSizing: 'border-box'
         }}>
-          <div style={{ fontSize: '11px', color: 'var(--gray-400)' }}>
-            Chatting as <strong style={{ color: 'var(--gray-600)' }}>{chatDisplayName}</strong>
-          </div>
-          <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-end' }}>
           <textarea
             value={text}
             onChange={e => setText(e.target.value)}
@@ -270,7 +264,6 @@ export default function Chat() {
               <polygon points="22,2 15,22 11,13 2,9"/>
             </svg>
           </button>
-          </div>
         </div>
       </div>
 
