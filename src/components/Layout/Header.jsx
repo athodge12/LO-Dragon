@@ -4,11 +4,18 @@ import { collection, addDoc, query, where, onSnapshot, orderBy } from 'firebase/
 import { db } from '../../firebase/config';
 import { useAuth } from '../../contexts/AuthContext';
 
+const PREVIEW_ROLES = [
+  { role: 'coach',      emoji: '⚾', label: 'Coach',      color: '#CC1B1B', bg: '#FEE2E2' },
+  { role: 'bookkeeper', emoji: '📒', label: 'Bookkeeper', color: '#1D4ED8', bg: '#DBEAFE' },
+  { role: 'parent',     emoji: '👤', label: 'Parent',     color: '#065F46', bg: '#D1FAE5' },
+  { role: 'fan',        emoji: '🎉', label: 'Fan',        color: '#92400E', bg: '#FEF3C7' },
+];
+
 export default function Header({ title, back, actions }) {
-  const { logout, userProfile, currentUser, isAdmin, isCoach, chatDisplayName } = useAuth();
+  const { logout, userProfile, currentUser, isActualAdmin, isCoach, chatDisplayName, previewRole, setPreviewRole } = useAuth();
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
-  const [modal, setModal] = useState(null); // 'support' | 'suggestion' | 'myMessages'
+  const [modal, setModal] = useState(null); // 'support' | 'suggestion' | 'myMessages' | 'previewRole'
   const [form, setForm] = useState({ subject: '', message: '' });
   const [submitting, setSubmitting] = useState(false);
   const [sent, setSent] = useState(false);
@@ -145,14 +152,26 @@ export default function Header({ title, back, actions }) {
                       {(Array.isArray(userProfile?.roles) ? userProfile.roles : [userProfile?.role]).filter(Boolean).map(r => ({admin:'🛡️ Admin',coach:'⚾ Coach',bookkeeper:'📒 Bookkeeper',parent:'👤 Parent',fan:'🎉 Fan'}[r] || r)).join(' · ')}
                     </div>
                   </div>
-                  {(isAdmin || isCoach) && (
+                  {(isActualAdmin || isCoach) && (
                     <button onClick={() => { setMenuOpen(false); navigate('/admin'); }} style={menuItemStyle}>
                       🛡️ Manage Users
                     </button>
                   )}
-                  {isAdmin && (
+                  {isActualAdmin && (
                     <button onClick={() => { setMenuOpen(false); navigate('/admin?tab=inbox'); }} style={menuItemStyle}>
                       📬 Inbox
+                    </button>
+                  )}
+                  {isActualAdmin && (
+                    <button onClick={() => { setMenuOpen(false); setModal('previewRole'); }} style={menuItemStyle}>
+                      👁 Preview as Role
+                      {previewRole && (
+                        <span style={{
+                          marginLeft: 'auto', fontSize: '10px', fontWeight: '700',
+                          background: '#7C3AED', color: 'white',
+                          borderRadius: '8px', padding: '1px 6px'
+                        }}>ON</span>
+                      )}
                     </button>
                   )}
                   <button onClick={() => { setMenuOpen(false); setModal('myMessages'); }} style={menuItemStyle}>
@@ -182,6 +201,73 @@ export default function Header({ title, back, actions }) {
           </div>
         </div>
       </header>
+
+      {/* Preview Role Banner */}
+      {previewRole && (
+        <div style={{
+          background: 'linear-gradient(135deg, #5B21B6, #7C3AED)',
+          padding: '8px 16px', display: 'flex', alignItems: 'center',
+          justifyContent: 'space-between', gap: '10px', color: 'white',
+          fontSize: '13px', fontWeight: '600'
+        }}>
+          <span>
+            👁 Previewing as{' '}
+            <span style={{ textTransform: 'capitalize' }}>
+              {PREVIEW_ROLES.find(r => r.role === previewRole)?.emoji} {previewRole}
+            </span>
+            {' '}— UI &amp; permissions reflect this role
+          </span>
+          <button onClick={() => setPreviewRole(null)} style={{
+            background: 'rgba(255,255,255,0.2)', border: 'none',
+            borderRadius: '8px', color: 'white', cursor: 'pointer',
+            fontSize: '12px', fontWeight: '700', padding: '4px 10px', flexShrink: 0
+          }}>Exit Preview</button>
+        </div>
+      )}
+
+      {/* Preview Role Picker Modal */}
+      {modal === 'previewRole' && (
+        <div className="modal-overlay" onClick={() => setModal(null)}>
+          <div className="modal-sheet" onClick={e => e.stopPropagation()}>
+            <div className="modal-handle" />
+            <h3 style={{ fontFamily: 'Oswald, sans-serif', fontSize: '20px', marginBottom: '6px', textTransform: 'uppercase' }}>
+              👁 Preview as Role
+            </h3>
+            <p style={{ fontSize: '13px', color: 'var(--gray-500)', marginBottom: '16px', lineHeight: '1.5' }}>
+              Temporarily view the app as another role to check what they see and what they can access. Your data and permissions are unchanged.
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px' }}>
+              {PREVIEW_ROLES.map(({ role, emoji, label, color, bg }) => (
+                <button key={role} onClick={() => { setPreviewRole(role); setModal(null); }} style={{
+                  display: 'flex', alignItems: 'center', gap: '12px',
+                  padding: '14px', borderRadius: '10px', cursor: 'pointer', textAlign: 'left',
+                  border: `2px solid ${previewRole === role ? color : 'var(--gray-200)'}`,
+                  background: previewRole === role ? bg : 'white'
+                }}>
+                  <span style={{ fontSize: '24px' }}>{emoji}</span>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: '700', fontSize: '15px', color: previewRole === role ? color : 'var(--black)' }}>{label}</div>
+                    <div style={{ fontSize: '12px', color: 'var(--gray-400)', marginTop: '2px' }}>
+                      {{ coach: 'Edit roster, schedule, scores, stats', bookkeeper: 'Stats & live scoring', parent: 'RSVP, view team info', fan: 'View only + Fan Zone chat' }[role]}
+                    </div>
+                  </div>
+                  {previewRole === role && <span style={{ color, fontWeight: '700', fontSize: '13px' }}>Active</span>}
+                </button>
+              ))}
+            </div>
+            {previewRole && (
+              <button onClick={() => { setPreviewRole(null); setModal(null); }} style={{
+                width: '100%', padding: '12px', border: '1.5px solid #7C3AED',
+                borderRadius: '10px', background: '#EDE9FE', color: '#7C3AED',
+                fontWeight: '700', fontSize: '14px', cursor: 'pointer', marginBottom: '8px'
+              }}>
+                Exit Preview Mode
+              </button>
+            )}
+            <button className="btn-secondary" onClick={() => setModal(null)}>Cancel</button>
+          </div>
+        </div>
+      )}
 
       {/* My Messages Modal */}
       {modal === 'myMessages' && (

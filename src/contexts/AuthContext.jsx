@@ -19,6 +19,13 @@ export function AuthProvider({ children }) {
   const [userProfile, setUserProfile] = useState(null);
   const [rosterClaims, setRosterClaims] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [previewRole, setPreviewRoleState] = useState(() => sessionStorage.getItem('previewRole') || null);
+
+  const setPreviewRole = (role) => {
+    if (role) sessionStorage.setItem('previewRole', role);
+    else sessionStorage.removeItem('previewRole');
+    setPreviewRoleState(role);
+  };
 
   async function register(email, password, profileData) {
     const result = await createUserWithEmailAndPassword(auth, email, password);
@@ -36,6 +43,7 @@ export function AuthProvider({ children }) {
   }
 
   async function logout() {
+    setPreviewRole(null);
     return signOut(auth);
   }
 
@@ -123,6 +131,10 @@ export function AuthProvider({ children }) {
     return `${firstName || fullName} (${claims})`;
   };
 
+  // When previewing, override all role checks with the preview role
+  const trueIsAdmin = userProfile?.roles?.includes('admin') || userProfile?.role === 'admin';
+  const effectiveRole = previewRole;
+
   const value = {
     currentUser,
     userProfile,
@@ -132,14 +144,23 @@ export function AuthProvider({ children }) {
     logout,
     fetchUserProfile,
     chatDisplayName: getChatDisplayName(),
-    isAdmin: userProfile?.roles?.includes('admin') || userProfile?.role === 'admin',
-    isCoach: userProfile?.roles?.includes('coach') || userProfile?.role === 'coach' ||
-             userProfile?.roles?.includes('admin') || userProfile?.role === 'admin',
-    isBookkeeper: userProfile?.roles?.includes('bookkeeper') || userProfile?.role === 'bookkeeper' ||
-                  userProfile?.roles?.includes('admin') || userProfile?.role === 'admin',
-    isFan: (userProfile?.roles?.includes('fan') || userProfile?.role === 'fan') &&
-           !userProfile?.roles?.includes('admin') && userProfile?.role !== 'admin' &&
-           !userProfile?.roles?.includes('coach') && userProfile?.role !== 'coach',
+    previewRole,
+    setPreviewRole,
+    isActualAdmin: trueIsAdmin,
+    isAdmin: effectiveRole ? effectiveRole === 'admin' : trueIsAdmin,
+    isCoach: effectiveRole
+      ? effectiveRole === 'coach' || effectiveRole === 'admin'
+      : (userProfile?.roles?.includes('coach') || userProfile?.role === 'coach' ||
+         userProfile?.roles?.includes('admin') || userProfile?.role === 'admin'),
+    isBookkeeper: effectiveRole
+      ? effectiveRole === 'bookkeeper' || effectiveRole === 'admin'
+      : (userProfile?.roles?.includes('bookkeeper') || userProfile?.role === 'bookkeeper' ||
+         userProfile?.roles?.includes('admin') || userProfile?.role === 'admin'),
+    isFan: effectiveRole
+      ? effectiveRole === 'fan'
+      : ((userProfile?.roles?.includes('fan') || userProfile?.role === 'fan') &&
+         !userProfile?.roles?.includes('admin') && userProfile?.role !== 'admin' &&
+         !userProfile?.roles?.includes('coach') && userProfile?.role !== 'coach'),
   };
 
   return (
