@@ -7,6 +7,7 @@ import Header from '../../components/Layout/Header';
 import Toast from '../../components/UI/Toast';
 
 const positions = ['Pitcher','Catcher','1st Base','2nd Base','3rd Base','Shortstop','Left Field','Left Center','Right Center','Right Field'];
+const RELATIONSHIPS = ['Mom','Dad','Step-Mom','Step-Dad','Grandparent','Brother','Sister','Aunt','Uncle','Guardian','Family Friend','Other'];
 
 export default function Roster() {
   const { isCoach, isFan, currentUser, userProfile } = useAuth();
@@ -19,6 +20,7 @@ export default function Roster() {
   const [toast, setToast] = useState('');
   const [form, setForm] = useState({ name: '', jerseyNumber: '' });
   const [claimModal, setClaimModal] = useState(null);
+  const [claimRelationship, setClaimRelationship] = useState('');
 
   useEffect(() => {
     const unsubs = [];
@@ -62,10 +64,11 @@ export default function Roster() {
     const existing = getClaimedBy(player);
     await setDoc(doc(db, 'roster', player.id), {
       ...player,
-      claimedBy: { ...existing, [currentUser.uid]: name }
+      claimedBy: { ...existing, [currentUser.uid]: { name, relationship: claimRelationship } }
     });
     setToast('Player claimed!');
     setClaimModal(null);
+    setClaimRelationship('');
   };
 
   const unclaimPlayer = async (player) => {
@@ -76,7 +79,7 @@ export default function Roster() {
     setToast('Claim removed');
   };
 
-  const myClaimedPlayers = players.filter(p => !!getClaimedBy(p)[currentUser?.uid]);
+  const myClaimedPlayers = players.filter(p => currentUser?.uid && getClaimedBy(p)[currentUser.uid] !== undefined);
 
   const getInitials = (name) => name ? name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) : '?';
 
@@ -162,8 +165,11 @@ export default function Roster() {
               players.map(player => {
                 const claimedByMap = getClaimedBy(player);
                 const isMineClaimed = !!claimedByMap[currentUser?.uid];
-                const claimedNames = Object.values(claimedByMap);
-                const isClaimed = claimedNames.length > 0;
+                const claimedEntries = Object.values(claimedByMap);
+                const isClaimed = claimedEntries.length > 0;
+                const claimedLabel = claimedEntries.map(e =>
+                  typeof e === 'object' ? `${e.relationship ? e.relationship + ': ' : ''}${e.name}` : e
+                ).join(', ');
                 return (
                   <div key={player.id} className="card" style={{
                     padding: '12px 14px',
@@ -194,7 +200,7 @@ export default function Roster() {
                         <div style={{ fontSize: '12px', marginTop: '2px' }}>
                           {isClaimed ? (
                             <span style={{ color: '#16A34A', fontWeight: '600' }}>
-                              ✅ {isMineClaimed ? 'Your player' : ''}{claimedNames.length > 0 ? ` · ${claimedNames.join(', ')}` : ''}
+                              ✅ {claimedLabel}
                             </span>
                           ) : (
                             <span style={{ color: 'var(--gray-400)' }}>Unclaimed</span>
@@ -281,17 +287,40 @@ export default function Roster() {
         </div>
       )}
 
-      {/* Claim Confirm Modal */}
+      {/* Claim Modal */}
       {claimModal && (
-        <div className="modal-overlay" onClick={() => setClaimModal(null)}>
+        <div className="modal-overlay" onClick={() => { setClaimModal(null); setClaimRelationship(''); }}>
           <div className="modal-sheet" onClick={e => e.stopPropagation()}>
             <div className="modal-handle" />
-            <h3 style={{ fontFamily: 'Oswald, sans-serif', fontSize: '20px', marginBottom: '8px', textTransform: 'uppercase' }}>Claim Player</h3>
-            <p style={{ fontSize: '15px', color: 'var(--gray-600)', marginBottom: '20px', lineHeight: '1.5' }}>
-              Are you the parent of <strong>{claimModal.name}</strong>? This will link your account to this player.
+            <h3 style={{ fontFamily: 'Oswald, sans-serif', fontSize: '20px', marginBottom: '4px', textTransform: 'uppercase' }}>Claim Player</h3>
+            <p style={{ fontSize: '14px', color: 'var(--gray-500)', marginBottom: '16px' }}>
+              Linking your account to <strong>{claimModal.name}</strong>
             </p>
-            <button className="btn-primary" onClick={() => claimPlayer(claimModal)}>Yes, That's My Player</button>
-            <button className="btn-secondary" onClick={() => setClaimModal(null)} style={{ marginTop: '8px' }}>Cancel</button>
+            <div className="form-group" style={{ marginBottom: '20px' }}>
+              <label className="form-label">Your relationship to {claimModal.name}</label>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '6px' }}>
+                {RELATIONSHIPS.map(r => (
+                  <button
+                    key={r}
+                    type="button"
+                    onClick={() => setClaimRelationship(r)}
+                    style={{
+                      padding: '8px 14px', borderRadius: '20px', cursor: 'pointer',
+                      border: `2px solid ${claimRelationship === r ? 'var(--red)' : 'var(--gray-200)'}`,
+                      background: claimRelationship === r ? '#FEF2F2' : 'white',
+                      color: claimRelationship === r ? 'var(--red)' : 'var(--gray-600)',
+                      fontWeight: claimRelationship === r ? '700' : '400', fontSize: '14px'
+                    }}
+                  >{r}</button>
+                ))}
+              </div>
+            </div>
+            <button
+              className="btn-primary"
+              onClick={() => claimPlayer(claimModal)}
+              disabled={!claimRelationship}
+            >Claim Player</button>
+            <button className="btn-secondary" onClick={() => { setClaimModal(null); setClaimRelationship(''); }} style={{ marginTop: '8px' }}>Cancel</button>
           </div>
         </div>
       )}
