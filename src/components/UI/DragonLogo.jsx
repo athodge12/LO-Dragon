@@ -1,27 +1,56 @@
-export default function DragonLogo({ width = 140, style = {} }) {
+export default function DragonLogo({ width = 200, style = {} }) {
   return (
     <svg
       width={width}
-      height={width}
-      viewBox="0 0 200 200"
+      height={width * 0.5}
+      viewBox="0 0 300 150"
       style={style}
       xmlns="http://www.w3.org/2000/svg"
     >
-      {/* Outer oval swoosh */}
-      <ellipse cx="105" cy="115" rx="88" ry="52" fill="none" stroke="white" strokeWidth="10" />
-
-      {/* Big D shape */}
-      <path
-        d="M55 40 L55 165 Q55 175 65 175 L105 175 Q155 175 175 130 Q190 105 175 75 Q158 40 105 40 Z
-           M80 65 L100 65 Q140 65 152 95 Q162 118 148 142 Q136 162 100 162 L80 162 Z"
+      {/* Outer stroke for "Dragons" text */}
+      <text
+        x="20"
+        y="95"
+        fontFamily="Georgia, 'Times New Roman', serif"
+        fontSize="82"
+        fontWeight="bold"
+        fontStyle="italic"
+        fill="none"
+        stroke="white"
+        strokeWidth="8"
+        strokeLinejoin="round"
+        letterSpacing="-2"
+      >
+        Dragons
+      </text>
+      {/* Fill for "Dragons" text */}
+      <text
+        x="20"
+        y="95"
+        fontFamily="Georgia, 'Times New Roman', serif"
+        fontSize="82"
+        fontWeight="bold"
+        fontStyle="italic"
         fill="white"
+        letterSpacing="-2"
+      >
+        Dragons
+      </text>
+      {/* Dragon tail curl below */}
+      <path
+        d="M195 105 Q210 120 205 135 Q200 148 215 145 Q225 142 220 130"
+        fill="none"
+        stroke="white"
+        strokeWidth="5"
+        strokeLinecap="round"
       />
-
-      {/* Lightning bolt slash */}
+      {/* Tail spikes */}
       <path
-        d="M70 48 L58 98 L78 92 L62 158 L90 100 L70 108 Z"
-        fill="white"
-        opacity="0.9"
+        d="M205 130 L215 125 M208 137 L220 133"
+        fill="none"
+        stroke="white"
+        strokeWidth="3.5"
+        strokeLinecap="round"
       />
     </svg>
   );
