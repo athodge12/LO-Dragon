@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { collection, addDoc } from 'firebase/firestore';
+import { collection, addDoc, query, where, onSnapshot, orderBy } from 'firebase/firestore';
 import { db } from '../../firebase/config';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -8,10 +8,26 @@ export default function Header({ title, back, actions }) {
   const { logout, userProfile, currentUser, isAdmin, isCoach, chatDisplayName } = useAuth();
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
-  const [modal, setModal] = useState(null); // 'support' | 'suggestion'
+  const [modal, setModal] = useState(null); // 'support' | 'suggestion' | 'myMessages'
   const [form, setForm] = useState({ subject: '', message: '' });
   const [submitting, setSubmitting] = useState(false);
   const [sent, setSent] = useState(false);
+  const [myMessages, setMyMessages] = useState([]);
+  const [hasUnread, setHasUnread] = useState(false);
+
+  useEffect(() => {
+    if (!currentUser) return;
+    const q = query(
+      collection(db, 'inbox'),
+      where('authorUid', '==', currentUser.uid),
+      orderBy('createdAt', 'desc')
+    );
+    return onSnapshot(q, snap => {
+      const msgs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      setMyMessages(msgs);
+      setHasUnread(msgs.some(m => m.status === 'replied' && !m.seenByUser));
+    });
+  }, [currentUser?.uid]);
 
   const handleLogout = async () => {
     await logout();
@@ -139,6 +155,16 @@ export default function Header({ title, back, actions }) {
                       📬 Inbox
                     </button>
                   )}
+                  <button onClick={() => { setMenuOpen(false); setModal('myMessages'); }} style={menuItemStyle}>
+                    📬 My Messages
+                    {hasUnread && (
+                      <span style={{
+                        marginLeft: 'auto', background: '#CC1B1B', color: 'white',
+                        fontSize: '10px', fontWeight: '700', borderRadius: '10px',
+                        padding: '1px 6px'
+                      }}>New</span>
+                    )}
+                  </button>
                   <button onClick={() => openModal('support')} style={menuItemStyle}>
                     🛟 Contact Support
                   </button>
@@ -157,8 +183,70 @@ export default function Header({ title, back, actions }) {
         </div>
       </header>
 
+      {/* My Messages Modal */}
+      {modal === 'myMessages' && (
+        <div className="modal-overlay" onClick={() => setModal(null)}>
+          <div className="modal-sheet" onClick={e => e.stopPropagation()} style={{ maxHeight: '80vh', overflowY: 'auto' }}>
+            <div className="modal-handle" />
+            <h3 style={{ fontFamily: 'Oswald, sans-serif', fontSize: '20px', marginBottom: '16px', textTransform: 'uppercase' }}>
+              📬 My Messages
+            </h3>
+            {myMessages.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '30px 0', color: 'var(--gray-400)' }}>
+                <p style={{ fontSize: '14px' }}>No messages sent yet.</p>
+                <p style={{ fontSize: '13px', marginTop: '6px' }}>Use Contact Support or Submit Suggestion to get in touch.</p>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                {myMessages.map(msg => (
+                  <div key={msg.id} style={{
+                    border: `1px solid ${msg.reply ? '#86EFAC' : 'var(--gray-200)'}`,
+                    borderRadius: '12px', padding: '14px',
+                    background: msg.reply ? '#F0FDF4' : 'white'
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px', marginBottom: '6px' }}>
+                      <span style={{
+                        fontSize: '11px', fontWeight: '700', padding: '2px 8px', borderRadius: '10px',
+                        color: msg.type === 'support' ? '#1D4ED8' : '#92400E',
+                        background: msg.type === 'support' ? '#DBEAFE' : '#FEF3C7'
+                      }}>
+                        {msg.type === 'support' ? '🛟 Support' : '💡 Suggestion'}
+                      </span>
+                      <span style={{ fontSize: '11px', color: 'var(--gray-400)' }}>
+                        {new Date(msg.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                      </span>
+                    </div>
+                    <div style={{ fontWeight: '700', fontSize: '14px', marginBottom: '4px' }}>{msg.subject}</div>
+                    <div style={{ fontSize: '13px', color: 'var(--gray-600)', lineHeight: '1.4' }}>{msg.message}</div>
+                    {msg.reply ? (
+                      <div style={{
+                        marginTop: '10px', padding: '10px 12px',
+                        background: '#D1FAE5', borderRadius: '8px',
+                        borderLeft: '3px solid #16A34A'
+                      }}>
+                        <div style={{ fontSize: '11px', fontWeight: '700', color: '#065F46', marginBottom: '4px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                          ↩ Reply from Admin
+                        </div>
+                        <div style={{ fontSize: '13px', color: '#065F46', lineHeight: '1.5' }}>{msg.reply}</div>
+                      </div>
+                    ) : (
+                      <div style={{ marginTop: '8px', fontSize: '12px', color: 'var(--gray-400)', fontStyle: 'italic' }}>
+                        Awaiting reply...
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+            <button className="btn-secondary" onClick={() => setModal(null)} style={{ marginTop: '16px' }}>
+              Close
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Support / Suggestion Modal */}
-      {modal && (
+      {modal && modal !== 'myMessages' && (
         <div className="modal-overlay" onClick={() => setModal(null)}>
           <div className="modal-sheet" onClick={e => e.stopPropagation()}>
             <div className="modal-handle" />

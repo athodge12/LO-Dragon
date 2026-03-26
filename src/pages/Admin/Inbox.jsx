@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { collection, onSnapshot, doc, updateDoc, query, orderBy } from 'firebase/firestore';
+import { collection, onSnapshot, doc, updateDoc, deleteDoc, query, orderBy } from 'firebase/firestore';
 import { db } from '../../firebase/config';
 
 const TYPE_META = {
@@ -47,6 +47,12 @@ export default function Inbox({ setToast }) {
   const markOpen = async (id) => {
     await updateDoc(doc(db, 'inbox', id), { status: 'open', reply: '', repliedAt: null });
     setToast('Marked as open.');
+  };
+
+  const deleteMessage = async (id) => {
+    await deleteDoc(doc(db, 'inbox', id));
+    setSelected(null);
+    setToast('Message deleted.');
   };
 
   const filtered = messages.filter(m => filter === 'all' || m.status === filter);
@@ -192,6 +198,14 @@ export default function Inbox({ setToast }) {
             )}
             <button className="btn-secondary" onClick={() => setSelected(null)} style={{ marginTop: '8px' }}>
               Close
+            </button>
+            <button onClick={() => deleteMessage(selected.id)} style={{
+              marginTop: '8px', width: '100%', padding: '12px',
+              border: '1.5px solid #FECACA', borderRadius: '10px',
+              background: '#FEF2F2', color: 'var(--red)',
+              fontWeight: '600', fontSize: '14px', cursor: 'pointer'
+            }}>
+              🗑 Delete Message
             </button>
           </div>
         </div>
