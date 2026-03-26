@@ -9,8 +9,8 @@ import Toast from '../../components/UI/Toast';
 const positions = ['Pitcher','Catcher','1st Base','2nd Base','3rd Base','Shortstop','Left Field','Left Center','Right Center','Right Field'];
 
 export default function Roster() {
-  const { isCoach, currentUser, userProfile } = useAuth();
-  const isParent = userProfile?.role === 'parent' || userProfile?.roles?.includes('parent');
+  const { isCoach, isFan, currentUser, userProfile } = useAuth();
+  const canClaim = !isFan;
   const navigate = useNavigate();
   const [players, setPlayers] = useState([]);
   const [coaches, setCoaches] = useState([]);
@@ -94,8 +94,8 @@ export default function Roster() {
       )} />
 
       <div className="page-content">
-        {/* Parent: my claimed player banner */}
-        {isParent && myClaimedPlayer && (
+        {/* My claimed player banner */}
+        {canClaim && myClaimedPlayer && (
           <div style={{
             background: 'linear-gradient(135deg, #CC1B1B, #8B0000)',
             borderRadius: '12px', padding: '12px 16px', marginBottom: '14px',
@@ -122,8 +122,8 @@ export default function Roster() {
           </div>
         )}
 
-        {/* Parent: no claim yet */}
-        {isParent && !myClaimedPlayer && (
+        {/* No claim yet */}
+        {canClaim && !myClaimedPlayer && (
           <div style={{
             background: '#FFF5F5', border: '1px solid #FECACA',
             borderRadius: '12px', padding: '12px 16px', marginBottom: '14px',
@@ -194,8 +194,8 @@ export default function Roster() {
                       </div>
 
                       <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
-                        {/* Parent claim/unclaim */}
-                        {isParent && !isCoach && (
+                        {/* Claim/unclaim */}
+                        {canClaim && (
                           isMineClaimed ? (
                             <button onClick={() => unclaimPlayer(player)} style={{
                               padding: '6px 10px', borderRadius: '8px', cursor: 'pointer',
