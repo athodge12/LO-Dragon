@@ -299,7 +299,7 @@ export default function Snacks() {
                 {formatDate(confirmGame.date)}
               </p>
               <p style={{ fontSize: '13px', color: 'var(--gray-600)', lineHeight: '1.6', marginBottom: '20px' }}>
-                You'll be responsible for bringing team drinks for this game. You can remove yourself any time before the game.
+                You'll be responsible for heading to concessions and purchasing team drinks at the ballpark for this game. You can remove yourself any time before the game.
               </p>
             </div>
             <button className="btn-primary" onClick={() => signUpSelf(confirmGame)}>
