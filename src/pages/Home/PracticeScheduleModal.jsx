@@ -1,7 +1,83 @@
 import { useState } from 'react';
 
+const HOURS = ['1','2','3','4','5','6','7','8','9','10','11','12'];
+const MINUTES = ['00','05','10','15','20','25','30','35','40','45','50','55'];
+
+// Parse a time string like "4:45 PM" into { hour, minute, ampm }
+function parseTime(str) {
+  if (!str) return { hour: '', minute: '00', ampm: 'PM' };
+  const m = str.match(/(\d+):(\d+)\s*(AM|PM)/i);
+  if (m) return { hour: m[1], minute: m[2].padStart(2,'0'), ampm: m[3].toUpperCase() };
+  return { hour: '', minute: '00', ampm: 'PM' };
+}
+
+// Build a display string like "4:45 PM"
+function formatTime({ hour, minute, ampm }) {
+  if (!hour) return '';
+  return `${hour}:${minute} ${ampm}`;
+}
+
+// Initialize slot with structured time fields from legacy `time` string if needed
+function initSlot(p) {
+  const slot = { type: 'recurring', ...p };
+  if (!slot.startHour) {
+    // Try to parse legacy time string "4:45 – 6:00 PM" or "4:45 PM – 6:00 PM"
+    const t = slot.time || '';
+    const parts = t.split('–').map(s => s.trim());
+    if (parts.length === 2) {
+      // If second part has AM/PM, first part may not
+      const endParsed = parseTime(parts[1]);
+      const startParsed = parseTime(parts[0] + (parts[0].match(/AM|PM/i) ? '' : ' ' + endParsed.ampm));
+      Object.assign(slot, {
+        startHour: startParsed.hour, startMinute: startParsed.minute, startAmPm: startParsed.ampm,
+        endHour: endParsed.hour, endMinute: endParsed.minute, endAmPm: endParsed.ampm,
+      });
+    } else if (parts.length === 1 && t) {
+      const parsed = parseTime(t);
+      Object.assign(slot, { startHour: parsed.hour, startMinute: parsed.minute, startAmPm: parsed.ampm, endHour: '', endMinute: '00', endAmPm: parsed.ampm });
+    } else {
+      Object.assign(slot, { startHour: '', startMinute: '00', startAmPm: 'PM', endHour: '', endMinute: '00', endAmPm: 'PM' });
+    }
+  }
+  return slot;
+}
+
+function buildTimeString(slot) {
+  const start = formatTime({ hour: slot.startHour, minute: slot.startMinute, ampm: slot.startAmPm });
+  const end = formatTime({ hour: slot.endHour, minute: slot.endMinute, ampm: slot.endAmPm });
+  if (start && end) return `${start} – ${end}`;
+  return start || end || '';
+}
+
+const selectStyle = {
+  padding: '9px 8px', borderRadius: '8px', border: '1.5px solid var(--gray-200)',
+  background: 'white', fontSize: '14px', color: 'var(--black)', cursor: 'pointer',
+  appearance: 'none', WebkitAppearance: 'none', textAlign: 'center'
+};
+
+function TimeRow({ label, hour, minute, ampm, onHour, onMinute, onAmPm }) {
+  return (
+    <div style={{ marginBottom: '8px' }}>
+      <label className="form-label">{label}</label>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 80px', gap: '6px' }}>
+        <select style={selectStyle} value={hour} onChange={e => onHour(e.target.value)}>
+          <option value="">Hr</option>
+          {HOURS.map(h => <option key={h} value={h}>{h}</option>)}
+        </select>
+        <select style={selectStyle} value={minute} onChange={e => onMinute(e.target.value)}>
+          {MINUTES.map(m => <option key={m} value={m}>{m}</option>)}
+        </select>
+        <select style={selectStyle} value={ampm} onChange={e => onAmPm(e.target.value)}>
+          <option value="AM">AM</option>
+          <option value="PM">PM</option>
+        </select>
+      </div>
+    </div>
+  );
+}
+
 export default function PracticeScheduleModal({ current, onSave, onClose }) {
-  const [slots, setSlots] = useState(current.map(p => ({ type: 'recurring', ...p })));
+  const [slots, setSlots] = useState(current.map(initSlot));
 
   const updateSlot = (i, key, val) => {
     setSlots(prev => prev.map((s, idx) => idx === i ? { ...s, [key]: val } : s));
@@ -9,13 +85,21 @@ export default function PracticeScheduleModal({ current, onSave, onClose }) {
 
   const addSlot = (type) => {
     setSlots(prev => [...prev, type === 'recurring'
-      ? { type: 'recurring', day: '', time: '', focus: '', location: '' }
-      : { type: 'onetime', date: '', time: '', focus: '', location: '' }
+      ? { type: 'recurring', day: '', startHour: '', startMinute: '00', startAmPm: 'PM', endHour: '', endMinute: '00', endAmPm: 'PM', focus: '', location: '', endDate: '' }
+      : { type: 'onetime', date: '', startHour: '', startMinute: '00', startAmPm: 'PM', endHour: '', endMinute: '00', endAmPm: 'PM', focus: '', location: '' }
     ]);
   };
 
   const removeSlot = (i) => {
     setSlots(prev => prev.filter((_, idx) => idx !== i));
+  };
+
+  const handleSave = () => {
+    const prepared = slots.map(slot => ({
+      ...slot,
+      time: buildTimeString(slot)
+    }));
+    onSave(prepared);
   };
 
   const SlotCard = ({ slot, i }) => {
@@ -62,10 +146,25 @@ export default function PracticeScheduleModal({ current, onSave, onClose }) {
           </div>
         )}
 
-        <div className="form-group" style={{ marginBottom: '8px' }}>
-          <label className="form-label">Time</label>
-          <input className="form-input" value={slot.time || ''} onChange={e => updateSlot(i, 'time', e.target.value)} placeholder="e.g. 4:45 – 6:00 PM" />
-        </div>
+        <TimeRow
+          label="Start Time"
+          hour={slot.startHour || ''}
+          minute={slot.startMinute || '00'}
+          ampm={slot.startAmPm || 'PM'}
+          onHour={v => updateSlot(i, 'startHour', v)}
+          onMinute={v => updateSlot(i, 'startMinute', v)}
+          onAmPm={v => updateSlot(i, 'startAmPm', v)}
+        />
+        <TimeRow
+          label="End Time"
+          hour={slot.endHour || ''}
+          minute={slot.endMinute || '00'}
+          ampm={slot.endAmPm || 'PM'}
+          onHour={v => updateSlot(i, 'endHour', v)}
+          onMinute={v => updateSlot(i, 'endMinute', v)}
+          onAmPm={v => updateSlot(i, 'endAmPm', v)}
+        />
+
         <div className="form-group" style={{ marginBottom: '8px' }}>
           <label className="form-label">Location</label>
           <input className="form-input" value={slot.location || ''} onChange={e => updateSlot(i, 'location', e.target.value)} placeholder="e.g. Riverside Park Field 2" />
@@ -102,7 +201,7 @@ export default function PracticeScheduleModal({ current, onSave, onClose }) {
           }}>📅 Add One-time</button>
         </div>
 
-        <button className="btn-primary" onClick={() => onSave(slots)}>Save Schedule</button>
+        <button className="btn-primary" onClick={handleSave}>Save Schedule</button>
       </div>
     </div>
   );
