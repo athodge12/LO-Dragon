@@ -157,31 +157,55 @@ export default function Home() {
           </div>
         )}
 
-        {/* Season Record */}
-        <div style={{
-          background: 'linear-gradient(135deg, #CC1B1B, #8B0000)',
-          borderRadius: '14px', padding: '20px', marginBottom: '14px',
-          color: 'white'
-        }}>
-          <p style={{ fontSize: '11px', fontWeight: '600', letterSpacing: '1px', opacity: 0.75, textTransform: 'uppercase', marginBottom: '10px' }}>
-            2026 Season Record
-          </p>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0' }}>
-            <div style={{ flex: 1, textAlign: 'center' }}>
-              <div style={{ fontSize: '48px', fontWeight: '700', fontFamily: 'Oswald, sans-serif', lineHeight: 1 }}>{record.wins}</div>
-              <div style={{ fontSize: '12px', opacity: 0.75, textTransform: 'uppercase', letterSpacing: '1px' }}>Wins</div>
-            </div>
-            <div style={{ width: '1px', height: '60px', background: 'rgba(255,255,255,0.3)' }} />
-            <div style={{ flex: 1, textAlign: 'center' }}>
-              <div style={{ fontSize: '48px', fontWeight: '700', fontFamily: 'Oswald, sans-serif', lineHeight: 1 }}>{record.losses}</div>
-              <div style={{ fontSize: '12px', opacity: 0.75, textTransform: 'uppercase', letterSpacing: '1px' }}>Losses</div>
-            </div>
-            <div style={{ width: '1px', height: '60px', background: 'rgba(255,255,255,0.3)' }} />
-            <div style={{ flex: 1, textAlign: 'center' }}>
-              <div style={{ fontSize: '48px', fontWeight: '700', fontFamily: 'Oswald, sans-serif', lineHeight: 1 }}>{winPct}</div>
-              <div style={{ fontSize: '12px', opacity: 0.75, textTransform: 'uppercase', letterSpacing: '1px' }}>{winPct === '--' ? 'Win %' : 'Win %'}</div>
-            </div>
+        {/* Announcements */}
+        <div className="card" style={{ marginBottom: '14px' }}>
+          <div className="section-header">
+            <span className="section-title">📢 Announcements</span>
           </div>
+          {isCoach && (
+            <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
+              <input
+                className="form-input"
+                value={announcementText}
+                onChange={e => setAnnouncementText(e.target.value)}
+                placeholder="Post an announcement..."
+                style={{ flex: 1 }}
+                onKeyDown={e => e.key === 'Enter' && addAnnouncement()}
+              />
+              <button onClick={addAnnouncement} style={{
+                background: 'var(--red)', color: 'white', border: 'none',
+                borderRadius: '8px', padding: '0 14px', cursor: 'pointer',
+                fontWeight: '600', fontSize: '14px', flexShrink: 0
+              }}>Post</button>
+            </div>
+          )}
+          {announcements.length === 0 ? (
+            <div className="empty-state">
+              <p>No announcements yet</p>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              {announcements.map(ann => (
+                <div key={ann.id} style={{
+                  background: '#FFF5F5', border: '1px solid #FECACA',
+                  borderRadius: '10px', padding: '12px'
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <p style={{ fontSize: '14px', color: 'var(--black)', lineHeight: '1.5', flex: 1 }}>{ann.text}</p>
+                    {isCoach && (
+                      <button onClick={() => deleteAnnouncement(ann.id)} style={{
+                        background: 'none', border: 'none', color: 'var(--gray-400)',
+                        cursor: 'pointer', fontSize: '18px', padding: '0 0 0 8px'
+                      }}>×</button>
+                    )}
+                  </div>
+                  <div style={{ fontSize: '11px', color: 'var(--gray-400)', marginTop: '6px' }}>
+                    {ann.authorName} · {new Date(ann.createdAt).toLocaleDateString()}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Next Game */}
@@ -326,55 +350,31 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Announcements */}
-        <div className="card">
-          <div className="section-header">
-            <span className="section-title">📢 Announcements</span>
+        {/* Season Record */}
+        <div style={{
+          background: 'linear-gradient(135deg, #CC1B1B, #8B0000)',
+          borderRadius: '14px', padding: '20px', marginBottom: '14px',
+          color: 'white'
+        }}>
+          <p style={{ fontSize: '11px', fontWeight: '600', letterSpacing: '1px', opacity: 0.75, textTransform: 'uppercase', marginBottom: '10px' }}>
+            2026 Season Record
+          </p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0' }}>
+            <div style={{ flex: 1, textAlign: 'center' }}>
+              <div style={{ fontSize: '48px', fontWeight: '700', fontFamily: 'Oswald, sans-serif', lineHeight: 1 }}>{record.wins}</div>
+              <div style={{ fontSize: '12px', opacity: 0.75, textTransform: 'uppercase', letterSpacing: '1px' }}>Wins</div>
+            </div>
+            <div style={{ width: '1px', height: '60px', background: 'rgba(255,255,255,0.3)' }} />
+            <div style={{ flex: 1, textAlign: 'center' }}>
+              <div style={{ fontSize: '48px', fontWeight: '700', fontFamily: 'Oswald, sans-serif', lineHeight: 1 }}>{record.losses}</div>
+              <div style={{ fontSize: '12px', opacity: 0.75, textTransform: 'uppercase', letterSpacing: '1px' }}>Losses</div>
+            </div>
+            <div style={{ width: '1px', height: '60px', background: 'rgba(255,255,255,0.3)' }} />
+            <div style={{ flex: 1, textAlign: 'center' }}>
+              <div style={{ fontSize: '48px', fontWeight: '700', fontFamily: 'Oswald, sans-serif', lineHeight: 1 }}>{winPct}</div>
+              <div style={{ fontSize: '12px', opacity: 0.75, textTransform: 'uppercase', letterSpacing: '1px' }}>Win %</div>
+            </div>
           </div>
-          {isCoach && (
-            <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
-              <input
-                className="form-input"
-                value={announcementText}
-                onChange={e => setAnnouncementText(e.target.value)}
-                placeholder="Post an announcement..."
-                style={{ flex: 1 }}
-                onKeyDown={e => e.key === 'Enter' && addAnnouncement()}
-              />
-              <button onClick={addAnnouncement} style={{
-                background: 'var(--red)', color: 'white', border: 'none',
-                borderRadius: '8px', padding: '0 14px', cursor: 'pointer',
-                fontWeight: '600', fontSize: '14px', flexShrink: 0
-              }}>Post</button>
-            </div>
-          )}
-          {announcements.length === 0 ? (
-            <div className="empty-state">
-              <p>No announcements yet</p>
-            </div>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              {announcements.map(ann => (
-                <div key={ann.id} style={{
-                  background: '#FFF5F5', border: '1px solid #FECACA',
-                  borderRadius: '10px', padding: '12px'
-                }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                    <p style={{ fontSize: '14px', color: 'var(--black)', lineHeight: '1.5', flex: 1 }}>{ann.text}</p>
-                    {isCoach && (
-                      <button onClick={() => deleteAnnouncement(ann.id)} style={{
-                        background: 'none', border: 'none', color: 'var(--gray-400)',
-                        cursor: 'pointer', fontSize: '18px', padding: '0 0 0 8px'
-                      }}>×</button>
-                    )}
-                  </div>
-                  <div style={{ fontSize: '11px', color: 'var(--gray-400)', marginTop: '6px' }}>
-                    {ann.authorName} · {new Date(ann.createdAt).toLocaleDateString()}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
         </div>
       </div>
 
