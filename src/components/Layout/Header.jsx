@@ -134,6 +134,11 @@ export default function Header({ title, back, actions }) {
                       🛡️ Manage Users
                     </button>
                   )}
+                  {isAdmin && (
+                    <button onClick={() => { setMenuOpen(false); navigate('/admin?tab=inbox'); }} style={menuItemStyle}>
+                      📬 Inbox
+                    </button>
+                  )}
                   <button onClick={() => openModal('support')} style={menuItemStyle}>
                     🛟 Contact Support
                   </button>

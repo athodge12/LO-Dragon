@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { collection, onSnapshot, doc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '../../firebase/config';
 import { useAuth } from '../../contexts/AuthContext';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import Header from '../../components/Layout/Header';
 import Toast from '../../components/UI/Toast';
 import Inbox from './Inbox';
@@ -26,7 +26,8 @@ function getRoles(user) {
 export default function Admin() {
   const { isAdmin, isCoach, currentUser, userProfile } = useAuth();
   const navigate = useNavigate();
-  const [tab, setTab] = useState('users');
+  const [searchParams] = useSearchParams();
+  const [tab, setTab] = useState(searchParams.get('tab') === 'inbox' && isAdmin ? 'inbox' : 'users');
   const [users, setUsers] = useState([]);
   const [inboxCount, setInboxCount] = useState(0);
   const [search, setSearch] = useState('');
