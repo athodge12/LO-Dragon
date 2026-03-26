@@ -102,7 +102,7 @@ export default function Dues() {
             </div>
             <div className="form-group">
               <label className="form-label">Description</label>
-              <input className="form-input" value={configForm.description} onChange={e => setConfigForm(f => ({ ...f, description: e.target.value }))} placeholder="2025 Season Registration" />
+              <input className="form-input" value={configForm.description} onChange={e => setConfigForm(f => ({ ...f, description: e.target.value }))} placeholder="2026 Season Registration" />
             </div>
             <button className="btn-primary" onClick={saveDuesConfig}>Save Settings</button>
           </div>
