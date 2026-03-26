@@ -2,8 +2,9 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 
+
 export default function Header({ title, back, actions }) {
-  const { logout, userProfile } = useAuth();
+  const { logout, userProfile, isAdmin, isCoach } = useAuth();
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -84,10 +85,20 @@ export default function Header({ title, back, actions }) {
                   {userProfile?.firstName} {userProfile?.lastName}
                 </div>
                 <div style={{ fontSize: '11px', color: 'var(--gray-500)', marginTop: '2px' }}>
-                  {userProfile?.role === 'coach' ? '⚾ Coach' : userProfile?.role === 'bookkeeper' ? '💰 Bookkeeper' : userProfile?.role === 'fan' ? '🎉 Fan' : '👤 Parent'}
+                  {userProfile?.role === 'admin' ? '🛡️ Admin' : userProfile?.role === 'coach' ? '⚾ Coach' : userProfile?.role === 'bookkeeper' ? '💰 Bookkeeper' : userProfile?.role === 'fan' ? '🎉 Fan' : '👤 Parent'}
                 </div>
               </div>
-<button onClick={() => { setMenuOpen(false); handleLogout(); }} style={{
+              {(isAdmin || isCoach) && (
+                <button onClick={() => { setMenuOpen(false); navigate('/admin'); }} style={{
+                  width: '100%', padding: '12px 16px', background: 'none',
+                  border: 'none', cursor: 'pointer', textAlign: 'left',
+                  fontSize: '14px', color: 'var(--gray-700)', display: 'flex', alignItems: 'center', gap: '8px',
+                  borderBottom: '1px solid var(--gray-100)'
+                }}>
+                  🛡️ Manage Users
+                </button>
+              )}
+              <button onClick={() => { setMenuOpen(false); handleLogout(); }} style={{
                 width: '100%', padding: '12px 16px', background: 'none',
                 border: 'none', cursor: 'pointer', textAlign: 'left',
                 fontSize: '14px', color: 'var(--red)', display: 'flex', alignItems: 'center', gap: '8px'

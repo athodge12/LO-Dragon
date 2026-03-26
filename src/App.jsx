@@ -19,6 +19,7 @@ import LiveScoring from './pages/LiveScoring/LiveScoring';
 import Snacks from './pages/Snacks/Snacks';
 import Awards from './pages/Awards/Awards';
 import Attendance from './pages/Attendance/Attendance';
+import Admin from './pages/Admin/Admin';
 
 function PrivateRoute({ children }) {
   const { currentUser } = useAuth();
@@ -56,6 +57,7 @@ function AppContent() {
         <Route path="/snacks" element={<PrivateRoute><Snacks /></PrivateRoute>} />
         <Route path="/awards" element={<PrivateRoute><Awards /></PrivateRoute>} />
         <Route path="/attendance" element={<PrivateRoute><Attendance /></PrivateRoute>} />
+        <Route path="/admin" element={<PrivateRoute><Admin /></PrivateRoute>} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
       {showNav && <BottomNav />}
