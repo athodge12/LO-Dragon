@@ -38,10 +38,8 @@ export default function DefensiveRotation() {
 
   useEffect(() => {
     const unsubs = [];
-    const usersQ = query(collection(db, 'users'), orderBy('createdAt'));
-    unsubs.push(onSnapshot(usersQ, snap => {
-      const members = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-      setPlayers(members.filter(m => m.role === 'parent' || m.role === 'player'));
+    unsubs.push(onSnapshot(query(collection(db, 'roster'), orderBy('createdAt')), snap => {
+      setPlayers(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     }));
     const gamesQ = query(collection(db, 'games'), orderBy('date'));
     unsubs.push(onSnapshot(gamesQ, snap => {
@@ -60,7 +58,7 @@ export default function DefensiveRotation() {
     load();
   }, [selectedGame]);
 
-  const getPlayerName = (p) => p?.childName || `${p?.firstName || ''} ${p?.lastName || ''}`.trim() || 'Unknown';
+  const getPlayerName = (p) => p?.name || p?.childName || `${p?.firstName || ''} ${p?.lastName || ''}`.trim() || 'Unknown';
 
   const assignPosition = (rotKey, position, playerId) => {
     setRotation(r => ({

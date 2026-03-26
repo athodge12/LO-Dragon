@@ -22,12 +22,10 @@ export default function Attendance() {
     unsubs.push(onSnapshot(sessQ, snap => {
       setSessions(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     }));
-    unsubs.push(onSnapshot(collection(db, 'users'), snap => {
-      const all = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-      setPlayers(all.filter(u => u.role === 'parent').map(u => ({
-        id: u.id,
-        name: u.childName || `${u.firstName} ${u.lastName}`.trim()
-      })).sort((a, b) => a.name.localeCompare(b.name)));
+    unsubs.push(onSnapshot(collection(db, 'roster'), snap => {
+      setPlayers(snap.docs.map(d => ({ id: d.id, name: d.data().name || d.data().childName || '' }))
+        .filter(p => p.name)
+        .sort((a, b) => a.name.localeCompare(b.name)));
     }));
     return () => unsubs.forEach(u => u());
   }, []);

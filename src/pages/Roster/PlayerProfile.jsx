@@ -51,7 +51,7 @@ export default function PlayerProfile() {
 
   useEffect(() => {
     const unsubs = [];
-    unsubs.push(onSnapshot(doc(db, 'users', id), snap => {
+    unsubs.push(onSnapshot(doc(db, 'roster', id), snap => {
       if (snap.exists()) { setPlayer(snap.data()); setEditForm(snap.data()); }
     }));
     unsubs.push(onSnapshot(doc(db, 'playerStats', id), snap => {
@@ -71,7 +71,7 @@ export default function PlayerProfile() {
   }, [id]);
 
   const saveProfile = async () => {
-    await setDoc(doc(db, 'users', id), editForm, { merge: true });
+    await setDoc(doc(db, 'roster', id), editForm, { merge: true });
     setEditing(false);
     setToast('Profile updated!');
   };
@@ -96,7 +96,7 @@ export default function PlayerProfile() {
     </div>
   );
 
-  const playerName = player.childName || `${player.firstName || ''} ${player.lastName || ''}`.trim();
+  const playerName = player.name || player.childName || `${player.firstName || ''} ${player.lastName || ''}`.trim();
   const initials = playerName.split(' ').map(n => n[0]).join('').toUpperCase();
 
   return (

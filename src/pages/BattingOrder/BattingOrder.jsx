@@ -16,10 +16,8 @@ export default function BattingOrder() {
 
   useEffect(() => {
     const unsubs = [];
-    const usersQ = query(collection(db, 'users'), orderBy('createdAt'));
-    unsubs.push(onSnapshot(usersQ, snap => {
-      const members = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-      setPlayers(members.filter(m => m.role === 'parent' || m.role === 'player'));
+    unsubs.push(onSnapshot(query(collection(db, 'roster'), orderBy('createdAt')), snap => {
+      setPlayers(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     }));
     const gamesQ = query(collection(db, 'games'), orderBy('date'));
     unsubs.push(onSnapshot(gamesQ, snap => {
@@ -42,7 +40,7 @@ export default function BattingOrder() {
   }, [selectedGame, players]);
 
   const getPlayer = (id) => players.find(p => p.id === id);
-  const getPlayerName = (p) => p?.childName || `${p?.firstName || ''} ${p?.lastName || ''}`.trim() || 'Unknown';
+  const getPlayerName = (p) => p?.name || p?.childName || `${p?.firstName || ''} ${p?.lastName || ''}`.trim() || 'Unknown';
 
   const onDragEnd = (result) => {
     if (!result.destination) return;

@@ -21,10 +21,8 @@ export default function Stats() {
   useEffect(() => {
     const unsubs = [];
 
-    const usersQ = query(collection(db, 'users'), orderBy('createdAt'));
-    unsubs.push(onSnapshot(usersQ, snap => {
-      const members = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-      setPlayers(members.filter(m => m.role === 'parent' || m.role === 'player'));
+    unsubs.push(onSnapshot(query(collection(db, 'roster'), orderBy('createdAt')), snap => {
+      setPlayers(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     }));
 
     unsubs.push(onSnapshot(collection(db, 'playerStats'), snap => {
@@ -43,7 +41,7 @@ export default function Stats() {
 
   const currentYear = season?.year || '2026';
 
-  const getPlayerName = (p) => p?.childName || `${p?.firstName || ''} ${p?.lastName || ''}`.trim() || 'Unknown';
+  const getPlayerName = (p) => p?.name || p?.childName || `${p?.firstName || ''} ${p?.lastName || ''}`.trim() || 'Unknown';
 
   // Current season stats stored under playerStats/{id}/seasons/{year}
   const getCurrentSeason = (playerId) => allStats[playerId]?.seasons?.[currentYear] || {};

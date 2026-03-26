@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { collection, onSnapshot, addDoc, deleteDoc, doc, query, orderBy } from 'firebase/firestore';
+import { collection, onSnapshot, addDoc, deleteDoc, doc, setDoc, query, orderBy } from 'firebase/firestore';
 import { db } from '../../firebase/config';
 import { useAuth } from '../../contexts/AuthContext';
 import Header from '../../components/Layout/Header';
@@ -9,45 +9,75 @@ import Toast from '../../components/UI/Toast';
 const positions = ['Pitcher','Catcher','1st Base','2nd Base','3rd Base','Shortstop','Left Field','Left Center','Right Center','Right Field'];
 
 export default function Roster() {
-  const { isCoach, userProfile } = useAuth();
+  const { isCoach, currentUser, userProfile } = useAuth();
+  const isParent = userProfile?.role === 'parent' || userProfile?.roles?.includes('parent');
   const navigate = useNavigate();
-  const [members, setMembers] = useState([]);
+  const [players, setPlayers] = useState([]);
+  const [coaches, setCoaches] = useState([]);
   const [modal, setModal] = useState(false);
   const [tab, setTab] = useState('players');
   const [toast, setToast] = useState('');
-  const [form, setForm] = useState({ childName: '', jerseyNumber: '', position: '', parentName: '', phone: '' });
+  const [form, setForm] = useState({ name: '', jerseyNumber: '', position: '' });
+  const [claimModal, setClaimModal] = useState(null);
 
   useEffect(() => {
-    const q = query(collection(db, 'users'), orderBy('createdAt'));
-    return onSnapshot(q, snap => {
-      setMembers(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-    });
+    const unsubs = [];
+    unsubs.push(onSnapshot(query(collection(db, 'roster'), orderBy('createdAt')), snap => {
+      setPlayers(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    }));
+    unsubs.push(onSnapshot(collection(db, 'users'), snap => {
+      const all = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      const hasRole = (m, r) => m.role === r || (Array.isArray(m.roles) && m.roles.includes(r));
+      setCoaches(all.filter(m => hasRole(m, 'coach') || hasRole(m, 'admin')));
+    }));
+    return () => unsubs.forEach(u => u());
   }, []);
 
-  const hasRole = (m, r) => m.role === r || (Array.isArray(m.roles) && m.roles.includes(r));
-  const coaches = members.filter(m => hasRole(m, 'coach') || hasRole(m, 'admin'));
-  const players = members.filter(m => m.role === 'parent' || m.role === 'player');
-
   const addPlayer = async () => {
-    if (!form.childName) return;
-    await addDoc(collection(db, 'users'), {
-      ...form,
-      role: 'player',
+    if (!form.name.trim()) return;
+    await addDoc(collection(db, 'roster'), {
+      name: form.name.trim(),
+      jerseyNumber: form.jerseyNumber,
+      position: form.position,
+      claimedBy: null,
+      claimedByName: null,
       createdAt: new Date().toISOString()
     });
-    setForm({ childName: '', jerseyNumber: '', position: '', parentName: '', phone: '' });
+    setForm({ name: '', jerseyNumber: '', position: '' });
     setModal(false);
     setToast('Player added!');
   };
 
   const removePlayer = async (id) => {
-    if (!window.confirm('Remove this player?')) return;
-    await deleteDoc(doc(db, 'users', id));
+    if (!window.confirm('Remove this player from the roster?')) return;
+    await deleteDoc(doc(db, 'roster', id));
     setToast('Player removed');
   };
 
-  const getInitials = (name) => name ? name.split(' ').map(n => n[0]).join('').toUpperCase() : '?';
-  const getPlayerName = (m) => m.childName || `${m.firstName || ''} ${m.lastName || ''}`.trim();
+  const claimPlayer = async (player) => {
+    const name = `${userProfile?.firstName || ''} ${userProfile?.lastName || ''}`.trim();
+    await setDoc(doc(db, 'roster', player.id), {
+      ...player,
+      claimedBy: currentUser.uid,
+      claimedByName: name
+    });
+    setToast('Player claimed!');
+    setClaimModal(null);
+  };
+
+  const unclaimPlayer = async (player) => {
+    if (!window.confirm('Remove your claim on this player?')) return;
+    await setDoc(doc(db, 'roster', player.id), {
+      ...player,
+      claimedBy: null,
+      claimedByName: null
+    });
+    setToast('Claim removed');
+  };
+
+  const myClaimedPlayer = players.find(p => p.claimedBy === currentUser?.uid);
+
+  const getInitials = (name) => name ? name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) : '?';
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
@@ -64,7 +94,46 @@ export default function Roster() {
       )} />
 
       <div className="page-content">
-        {!isCoach && <div className="view-only-banner">👁 View Only — Contact your coach for changes</div>}
+        {/* Parent: my claimed player banner */}
+        {isParent && myClaimedPlayer && (
+          <div style={{
+            background: 'linear-gradient(135deg, #CC1B1B, #8B0000)',
+            borderRadius: '12px', padding: '12px 16px', marginBottom: '14px',
+            display: 'flex', alignItems: 'center', gap: '12px', color: 'white'
+          }}>
+            <div style={{
+              width: 44, height: 44, borderRadius: '50%', background: 'rgba(255,255,255,0.2)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontFamily: 'Oswald, sans-serif', fontWeight: '700', fontSize: '18px', flexShrink: 0
+            }}>
+              {myClaimedPlayer.jerseyNumber || getInitials(myClaimedPlayer.name)}
+            </div>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontWeight: '700', fontSize: '16px' }}>{myClaimedPlayer.name}</div>
+              <div style={{ fontSize: '12px', opacity: 0.8 }}>
+                {myClaimedPlayer.position}{myClaimedPlayer.jerseyNumber ? ` · #${myClaimedPlayer.jerseyNumber}` : ''}
+              </div>
+            </div>
+            <button
+              onClick={() => navigate(`/roster/${myClaimedPlayer.id}`)}
+              style={{ background: 'rgba(255,255,255,0.2)', border: 'none', borderRadius: '8px', padding: '6px 12px', color: 'white', cursor: 'pointer', fontWeight: '600', fontSize: '13px' }}
+            >Profile →</button>
+          </div>
+        )}
+
+        {/* Parent: no claim yet */}
+        {isParent && !myClaimedPlayer && (
+          <div style={{
+            background: '#FFF5F5', border: '1px solid #FECACA',
+            borderRadius: '12px', padding: '12px 16px', marginBottom: '14px',
+            display: 'flex', alignItems: 'center', gap: '10px'
+          }}>
+            <span style={{ fontSize: '24px' }}>👆</span>
+            <p style={{ fontSize: '14px', color: '#B91C1C', fontWeight: '600' }}>
+              Tap <strong>Claim</strong> next to your player below to link your account.
+            </p>
+          </div>
+        )}
 
         <div className="tabs">
           <button className={`tab ${tab === 'players' ? 'active' : ''}`} onClick={() => setTab('players')}>
@@ -79,47 +148,78 @@ export default function Roster() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
             {players.length === 0 ? (
               <div className="empty-state">
-                <p>No players yet. Parents register to appear here.</p>
+                <p>{isCoach ? 'No players yet. Tap + to add.' : 'No players on the roster yet.'}</p>
               </div>
             ) : (
-              players.map(player => (
-                <div key={player.id} className="card" style={{ padding: '12px 14px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <button
-                      onClick={() => navigate(`/roster/${player.id}`)}
-                      style={{
-                        width: 48, height: 48, borderRadius: '50%',
-                        background: 'var(--red)', color: 'white',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        fontFamily: 'Oswald, sans-serif', fontSize: '18px', fontWeight: '700',
-                        border: 'none', cursor: 'pointer', flexShrink: 0
-                      }}
-                    >
-                      {player.jerseyNumber || getInitials(getPlayerName(player))}
-                    </button>
-                    <div style={{ flex: 1 }} onClick={() => navigate(`/roster/${player.id}`)} role="button" style={{ flex: 1, cursor: 'pointer' }}>
-                      <div style={{ fontWeight: '700', fontSize: '16px', color: 'var(--black)' }}>
-                        {getPlayerName(player)}
-                      </div>
-                      <div style={{ fontSize: '13px', color: 'var(--gray-500)', marginTop: '2px' }}>
-                        {player.position && `${player.position}`}
-                        {player.jerseyNumber && ` · #${player.jerseyNumber}`}
-                      </div>
-                      {(player.firstName || player.parentName) && (
-                        <div style={{ fontSize: '12px', color: 'var(--gray-400)', marginTop: '2px' }}>
-                          Parent: {player.parentName || `${player.firstName} ${player.lastName}`}
+              players.map(player => {
+                const isMineClaimed = player.claimedBy === currentUser?.uid;
+                const isClaimed = !!player.claimedBy;
+                return (
+                  <div key={player.id} className="card" style={{
+                    padding: '12px 14px',
+                    border: isMineClaimed ? '2px solid var(--red)' : '1px solid var(--gray-200)'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <button
+                        onClick={() => navigate(`/roster/${player.id}`)}
+                        style={{
+                          width: 48, height: 48, borderRadius: '50%',
+                          background: 'var(--red)', color: 'white',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          fontFamily: 'Oswald, sans-serif', fontSize: '18px', fontWeight: '700',
+                          border: 'none', cursor: 'pointer', flexShrink: 0
+                        }}
+                      >
+                        {player.jerseyNumber || getInitials(player.name)}
+                      </button>
+
+                      <div style={{ flex: 1, cursor: 'pointer' }} onClick={() => navigate(`/roster/${player.id}`)}>
+                        <div style={{ fontWeight: '700', fontSize: '16px', color: 'var(--black)' }}>
+                          {player.name}
                         </div>
-                      )}
+                        <div style={{ fontSize: '13px', color: 'var(--gray-500)', marginTop: '2px' }}>
+                          {player.position}{player.jerseyNumber ? ` · #${player.jerseyNumber}` : ''}
+                        </div>
+                        <div style={{ fontSize: '12px', marginTop: '2px' }}>
+                          {isClaimed ? (
+                            <span style={{ color: '#16A34A', fontWeight: '600' }}>
+                              ✅ {isMineClaimed ? 'Your player' : player.claimedByName}
+                            </span>
+                          ) : (
+                            <span style={{ color: 'var(--gray-400)' }}>Unclaimed</span>
+                          )}
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
+                        {/* Parent claim/unclaim */}
+                        {isParent && !isCoach && (
+                          isMineClaimed ? (
+                            <button onClick={() => unclaimPlayer(player)} style={{
+                              padding: '6px 10px', borderRadius: '8px', cursor: 'pointer',
+                              border: '1.5px solid #FECACA', background: '#FEF2F2',
+                              color: 'var(--red)', fontWeight: '600', fontSize: '12px'
+                            }}>Unclaim</button>
+                          ) : !isClaimed ? (
+                            <button onClick={() => setClaimModal(player)} style={{
+                              padding: '6px 10px', borderRadius: '8px', cursor: 'pointer',
+                              border: '1.5px solid var(--red)', background: '#FEF2F2',
+                              color: 'var(--red)', fontWeight: '700', fontSize: '12px'
+                            }}>Claim</button>
+                          ) : null
+                        )}
+                        {/* Coach remove */}
+                        {isCoach && (
+                          <button onClick={() => removePlayer(player.id)} style={{
+                            background: 'none', border: 'none', color: 'var(--gray-400)',
+                            cursor: 'pointer', fontSize: '20px', padding: '4px'
+                          }}>×</button>
+                        )}
+                      </div>
                     </div>
-                    {isCoach && (
-                      <button onClick={() => removePlayer(player.id)} style={{
-                        background: 'none', border: 'none', color: 'var(--gray-400)',
-                        cursor: 'pointer', fontSize: '20px', padding: '4px'
-                      }}>×</button>
-                    )}
                   </div>
-                </div>
-              ))
+                );
+              })
             )}
           </div>
         )}
@@ -133,23 +233,15 @@ export default function Roster() {
                 <div key={coach.id} className="card" style={{ padding: '12px 14px' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                     <div className="avatar" style={{ width: 48, height: 48, fontSize: '18px' }}>
-                      {getInitials(`${coach.firstName} ${coach.lastName}`)}
+                      {getInitials(`${coach.firstName || ''} ${coach.lastName || ''}`)}
                     </div>
                     <div style={{ flex: 1 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <span style={{ fontWeight: '700', fontSize: '16px' }}>
-                          {coach.firstName} {coach.lastName}
-                        </span>
+                        <span style={{ fontWeight: '700', fontSize: '16px' }}>{coach.firstName} {coach.lastName}</span>
                         <span className="badge-coach">Coach</span>
                       </div>
-                      {coach.phone && (
-                        <div style={{ fontSize: '13px', color: 'var(--gray-500)', marginTop: '2px' }}>
-                          📞 {coach.phone}
-                        </div>
-                      )}
-                      <div style={{ fontSize: '12px', color: 'var(--gray-400)', marginTop: '2px' }}>
-                        {coach.email}
-                      </div>
+                      {coach.phone && <div style={{ fontSize: '13px', color: 'var(--gray-500)', marginTop: '2px' }}>📞 {coach.phone}</div>}
+                      {coach.email && <div style={{ fontSize: '12px', color: 'var(--gray-400)', marginTop: '2px' }}>{coach.email}</div>}
                     </div>
                   </div>
                 </div>
@@ -164,12 +256,10 @@ export default function Roster() {
         <div className="modal-overlay" onClick={() => setModal(false)}>
           <div className="modal-sheet" onClick={e => e.stopPropagation()}>
             <div className="modal-handle" />
-            <h3 style={{ fontFamily: 'Oswald, sans-serif', fontSize: '20px', marginBottom: '16px', textTransform: 'uppercase' }}>
-              Add Player
-            </h3>
+            <h3 style={{ fontFamily: 'Oswald, sans-serif', fontSize: '20px', marginBottom: '16px', textTransform: 'uppercase' }}>Add Player</h3>
             <div className="form-group">
               <label className="form-label">Player Name</label>
-              <input className="form-input" value={form.childName} onChange={e => setForm(f => ({ ...f, childName: e.target.value }))} placeholder="First name" />
+              <input className="form-input" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="First and last name" />
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
               <div className="form-group" style={{ marginBottom: 0 }}>
@@ -184,15 +274,22 @@ export default function Roster() {
                 </select>
               </div>
             </div>
-            <div className="form-group" style={{ marginTop: '16px' }}>
-              <label className="form-label">Parent Name</label>
-              <input className="form-input" value={form.parentName} onChange={e => setForm(f => ({ ...f, parentName: e.target.value }))} placeholder="Parent's name" />
-            </div>
-            <div className="form-group">
-              <label className="form-label">Phone</label>
-              <input className="form-input" type="tel" value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} placeholder="(555) 123-4567" />
-            </div>
-            <button className="btn-primary" onClick={addPlayer}>Add Player</button>
+            <button className="btn-primary" onClick={addPlayer} style={{ marginTop: '16px' }}>Add Player</button>
+          </div>
+        </div>
+      )}
+
+      {/* Claim Confirm Modal */}
+      {claimModal && (
+        <div className="modal-overlay" onClick={() => setClaimModal(null)}>
+          <div className="modal-sheet" onClick={e => e.stopPropagation()}>
+            <div className="modal-handle" />
+            <h3 style={{ fontFamily: 'Oswald, sans-serif', fontSize: '20px', marginBottom: '8px', textTransform: 'uppercase' }}>Claim Player</h3>
+            <p style={{ fontSize: '15px', color: 'var(--gray-600)', marginBottom: '20px', lineHeight: '1.5' }}>
+              Are you the parent of <strong>{claimModal.name}</strong>? This will link your account to this player.
+            </p>
+            <button className="btn-primary" onClick={() => claimPlayer(claimModal)}>Yes, That's My Player</button>
+            <button className="btn-secondary" onClick={() => setClaimModal(null)} style={{ marginTop: '8px' }}>Cancel</button>
           </div>
         </div>
       )}
