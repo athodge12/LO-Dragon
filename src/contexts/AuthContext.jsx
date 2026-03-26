@@ -5,7 +5,7 @@ import {
   signOut,
   onAuthStateChanged
 } from 'firebase/auth';
-import { doc, setDoc, getDoc, collection, getDocs } from 'firebase/firestore';
+import { doc, setDoc, getDoc, onSnapshot, collection, getDocs } from 'firebase/firestore';
 import { auth, db } from '../firebase/config';
 
 const AuthContext = createContext();
@@ -38,53 +38,76 @@ export function AuthProvider({ children }) {
     return signOut(auth);
   }
 
+  // Kept for backward compatibility — onSnapshot handles live updates automatically
   async function fetchUserProfile(uid) {
-    const docRef = doc(db, 'users', uid);
-    const docSnap = await getDoc(docRef);
+    const docSnap = await getDoc(doc(db, 'users', uid));
     if (docSnap.exists()) {
-      const data = docSnap.data();
-      // Backfill claimedPlayers from roster if not yet set
-      if (!data.claimedPlayers) {
-        try {
-          const rosterSnap = await getDocs(collection(db, 'roster'));
-          const claimed = [];
-          rosterSnap.forEach(d => {
-            const player = d.data();
-            const cb = player.claimedBy;
-            if (cb && typeof cb === 'object' && cb[uid]) {
-              const entry = cb[uid];
-              claimed.push({
-                playerId: d.id,
-                playerName: player.name || '',
-                relationship: typeof entry === 'object' ? entry.relationship || '' : ''
-              });
-            }
-          });
-          if (claimed.length > 0) {
-            data.claimedPlayers = claimed;
-            await setDoc(docRef, { claimedPlayers: claimed }, { merge: true });
-          }
-        } catch {
-          // Roster read failed — skip backfill
-        }
-      }
-      setUserProfile(data);
-      return data;
+      setUserProfile(docSnap.data());
+      return docSnap.data();
     }
     return null;
   }
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+    let profileUnsub = null;
+
+    const backfillClaimed = async (uid, docRef) => {
+      try {
+        const rosterSnap = await getDocs(collection(db, 'roster'));
+        const claimed = [];
+        rosterSnap.forEach(d => {
+          const player = d.data();
+          const cb = player.claimedBy;
+          if (cb && typeof cb === 'object' && cb[uid]) {
+            const entry = cb[uid];
+            claimed.push({
+              playerId: d.id,
+              playerName: player.name || '',
+              relationship: typeof entry === 'object' ? entry.relationship || '' : ''
+            });
+          }
+        });
+        if (claimed.length > 0) {
+          // Writing triggers the onSnapshot listener to fire again with updated data
+          await setDoc(docRef, { claimedPlayers: claimed }, { merge: true });
+        }
+      } catch {
+        // Roster read failed — skip backfill
+      }
+    };
+
+    const authUnsub = onAuthStateChanged(auth, (user) => {
       setCurrentUser(user);
+      if (profileUnsub) { profileUnsub(); profileUnsub = null; }
+
       if (user) {
-        await fetchUserProfile(user.uid);
+        const docRef = doc(db, 'users', user.uid);
+        let backfillRan = false;
+
+        profileUnsub = onSnapshot(docRef, (snap) => {
+          if (snap.exists()) {
+            const data = snap.data();
+            // Run backfill once if claimedPlayers missing (for users who claimed before this feature)
+            if (!data.claimedPlayers && !backfillRan) {
+              backfillRan = true;
+              backfillClaimed(user.uid, docRef);
+            }
+            setUserProfile(data);
+          } else {
+            setUserProfile(null);
+          }
+          setLoading(false);
+        });
       } else {
         setUserProfile(null);
+        setLoading(false);
       }
-      setLoading(false);
     });
-    return unsubscribe;
+
+    return () => {
+      authUnsub();
+      if (profileUnsub) profileUnsub();
+    };
   }, []);
 
   const getChatDisplayName = () => {
