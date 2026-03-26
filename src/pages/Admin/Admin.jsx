@@ -23,12 +23,13 @@ function getRoles(user) {
 }
 
 export default function Admin() {
-  const { isAdmin, isCoach, currentUser } = useAuth();
+  const { isAdmin, isCoach, currentUser, userProfile } = useAuth();
   const navigate = useNavigate();
   const [users, setUsers] = useState([]);
   const [search, setSearch] = useState('');
   const [editUser, setEditUser] = useState(null);
   const [editRoles, setEditRoles] = useState([]);
+  const [myRoles, setMyRoles] = useState(null); // null = closed, array = editing
   const [toast, setToast] = useState('');
 
   useEffect(() => {
@@ -101,6 +102,28 @@ export default function Admin() {
       <Header title="Manage Users" back="/" />
 
       <div className="page-content">
+        {/* My Roles */}
+        <div style={{ background: 'white', border: '2px solid #7C3AED', borderRadius: '12px', padding: '14px', marginBottom: '14px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+            <div>
+              <div style={{ fontWeight: '700', fontSize: '15px' }}>
+                {userProfile?.firstName} {userProfile?.lastName} <span style={{ fontSize: '12px', color: 'var(--gray-400)', fontStyle: 'italic' }}>you</span>
+              </div>
+              <div style={{ fontSize: '12px', color: 'var(--gray-500)', marginTop: '2px' }}>
+                {getRoles(userProfile || {}).join(', ')}
+              </div>
+            </div>
+            <button
+              onClick={() => setMyRoles(getRoles(userProfile || {}))}
+              style={{
+                padding: '7px 16px', borderRadius: '8px', cursor: 'pointer',
+                border: '1.5px solid #7C3AED', background: '#EDE9FE',
+                fontWeight: '700', fontSize: '13px', color: '#7C3AED'
+              }}
+            >Edit My Roles</button>
+          </div>
+        </div>
+
         {/* Summary */}
         <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '14px' }}>
           {ALL_ROLES.filter(r => counts[r] > 0).map(r => {
@@ -214,6 +237,61 @@ export default function Admin() {
           </div>
         )}
       </div>
+
+      {/* My Roles Modal */}
+      {myRoles !== null && (
+        <div className="modal-overlay" onClick={() => setMyRoles(null)}>
+          <div className="modal-sheet" onClick={e => e.stopPropagation()}>
+            <div className="modal-handle" />
+            <h3 style={{ fontFamily: 'Oswald, sans-serif', fontSize: '20px', marginBottom: '4px', textTransform: 'uppercase' }}>
+              My Roles
+            </h3>
+            <p style={{ fontSize: '13px', color: 'var(--gray-500)', marginBottom: '16px' }}>Select all roles that apply to you</p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '20px' }}>
+              {ALL_ROLES.map(r => {
+                const m = ROLE_META[r];
+                const checked = myRoles.includes(r);
+                return (
+                  <button key={r} type="button"
+                    onClick={() => setMyRoles(prev => prev.includes(r) ? prev.filter(x => x !== r) : [...prev, r])}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: '12px',
+                      padding: '12px 14px', borderRadius: '10px', cursor: 'pointer',
+                      border: `2px solid ${checked ? m.color : 'var(--gray-200)'}`,
+                      background: checked ? m.bg : 'white', textAlign: 'left'
+                    }}
+                  >
+                    <div style={{
+                      width: 22, height: 22, borderRadius: '6px', flexShrink: 0,
+                      border: `2px solid ${checked ? m.color : 'var(--gray-300)'}`,
+                      background: checked ? m.color : 'white',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center'
+                    }}>
+                      {checked && <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3"><polyline points="20,6 9,17 4,12"/></svg>}
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontWeight: '700', fontSize: '14px', color: checked ? m.color : 'var(--gray-700)', textTransform: 'capitalize' }}>{m.emoji} {r}</div>
+                      <div style={{ fontSize: '12px', color: 'var(--gray-400)', marginTop: '1px' }}>{m.desc}</div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+            <button className="btn-primary" disabled={myRoles.length === 0} onClick={async () => {
+              try {
+                const order = ['admin', 'coach', 'bookkeeper', 'parent', 'fan'];
+                const primary = order.find(r => myRoles.includes(r)) || myRoles[0];
+                await updateDoc(doc(db, 'users', currentUser.uid), { roles: myRoles, role: primary });
+                setToast('Your roles updated! Sign out and back in to apply.');
+                setMyRoles(null);
+              } catch (err) {
+                setToast(`Error: ${err.message}`);
+              }
+            }}>Save My Roles</button>
+            <button className="btn-secondary" onClick={() => setMyRoles(null)} style={{ marginTop: '8px' }}>Cancel</button>
+          </div>
+        </div>
+      )}
 
       {/* Edit Roles Modal */}
       {editUser && (
