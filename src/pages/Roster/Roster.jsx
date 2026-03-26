@@ -54,12 +54,15 @@ export default function Roster() {
     setToast('Player removed');
   };
 
+  // claimedBy is a map: { [uid]: displayName }
+  const getClaimedBy = (player) => player.claimedBy && typeof player.claimedBy === 'object' ? player.claimedBy : {};
+
   const claimPlayer = async (player) => {
     const name = `${userProfile?.firstName || ''} ${userProfile?.lastName || ''}`.trim();
+    const existing = getClaimedBy(player);
     await setDoc(doc(db, 'roster', player.id), {
       ...player,
-      claimedBy: currentUser.uid,
-      claimedByName: name
+      claimedBy: { ...existing, [currentUser.uid]: name }
     });
     setToast('Player claimed!');
     setClaimModal(null);
@@ -67,15 +70,13 @@ export default function Roster() {
 
   const unclaimPlayer = async (player) => {
     if (!window.confirm('Remove your claim on this player?')) return;
-    await setDoc(doc(db, 'roster', player.id), {
-      ...player,
-      claimedBy: null,
-      claimedByName: null
-    });
+    const existing = { ...getClaimedBy(player) };
+    delete existing[currentUser.uid];
+    await setDoc(doc(db, 'roster', player.id), { ...player, claimedBy: existing });
     setToast('Claim removed');
   };
 
-  const myClaimedPlayers = players.filter(p => p.claimedBy === currentUser?.uid);
+  const myClaimedPlayers = players.filter(p => !!getClaimedBy(p)[currentUser?.uid]);
 
   const getInitials = (name) => name ? name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) : '?';
 
@@ -159,8 +160,10 @@ export default function Roster() {
               </div>
             ) : (
               players.map(player => {
-                const isMineClaimed = player.claimedBy === currentUser?.uid;
-                const isClaimed = !!player.claimedBy;
+                const claimedByMap = getClaimedBy(player);
+                const isMineClaimed = !!claimedByMap[currentUser?.uid];
+                const claimedNames = Object.values(claimedByMap);
+                const isClaimed = claimedNames.length > 0;
                 return (
                   <div key={player.id} className="card" style={{
                     padding: '12px 14px',
@@ -191,7 +194,7 @@ export default function Roster() {
                         <div style={{ fontSize: '12px', marginTop: '2px' }}>
                           {isClaimed ? (
                             <span style={{ color: '#16A34A', fontWeight: '600' }}>
-                              ✅ {isMineClaimed ? 'Your player' : player.claimedByName}
+                              ✅ {isMineClaimed ? 'Your player' : ''}{claimedNames.length > 0 ? ` · ${claimedNames.join(', ')}` : ''}
                             </span>
                           ) : (
                             <span style={{ color: 'var(--gray-400)' }}>Unclaimed</span>
