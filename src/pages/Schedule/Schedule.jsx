@@ -8,7 +8,7 @@ import PracticeScheduleModal from '../Home/PracticeScheduleModal';
 
 const DAY_MAP = { Sunday: 0, Monday: 1, Tuesday: 2, Wednesday: 3, Thursday: 4, Friday: 5, Saturday: 6 };
 
-function getUpcomingPracticeDates(slot, weeksAhead = 10) {
+function getUpcomingPracticeDates(slot, weeksAhead = 52) {
   const targetDay = DAY_MAP[slot.day];
   if (targetDay === undefined) return [];
   const dates = [];
@@ -17,7 +17,9 @@ function getUpcomingPracticeDates(slot, weeksAhead = 10) {
   const current = new Date(today);
   const daysUntil = (targetDay - current.getDay() + 7) % 7;
   current.setDate(current.getDate() + (daysUntil === 0 ? 0 : daysUntil));
+  const endDate = slot.endDate ? new Date(slot.endDate + 'T23:59:59') : null;
   for (let i = 0; i < weeksAhead; i++) {
+    if (endDate && current > endDate) break;
     dates.push(current.toISOString().split('T')[0]);
     current.setDate(current.getDate() + 7);
   }
@@ -96,6 +98,7 @@ export default function Schedule() {
       time: slot.time,
       location: slot.location,
       focus: slot.focus,
+      endDate: slot.endDate || null,
       cancelled: !!cancelledSlots[i]
     }));
   });

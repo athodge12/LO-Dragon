@@ -34,15 +34,27 @@ export default function PracticeScheduleModal({ current, onSave, onClose }) {
         </div>
 
         {isRecurring ? (
-          <div className="form-group" style={{ marginBottom: '8px' }}>
-            <label className="form-label">Day of Week</label>
-            <select className="form-select" value={slot.day || ''} onChange={e => updateSlot(i, 'day', e.target.value)}>
-              <option value="">— Select day —</option>
-              {['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'].map(d => (
-                <option key={d} value={d}>{d}</option>
-              ))}
-            </select>
-          </div>
+          <>
+            <div className="form-group" style={{ marginBottom: '8px' }}>
+              <label className="form-label">Day of Week</label>
+              <select className="form-select" value={slot.day || ''} onChange={e => updateSlot(i, 'day', e.target.value)}>
+                <option value="">— Select day —</option>
+                {['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'].map(d => (
+                  <option key={d} value={d}>{d}</option>
+                ))}
+              </select>
+            </div>
+            <div className="form-group" style={{ marginBottom: '8px' }}>
+              <label className="form-label">End Date (optional)</label>
+              <input className="form-input" type="date" value={slot.endDate || ''} onChange={e => updateSlot(i, 'endDate', e.target.value)} />
+              {slot.endDate && (
+                <button onClick={() => updateSlot(i, 'endDate', '')} style={{
+                  marginTop: '4px', fontSize: '11px', color: 'var(--gray-400)',
+                  background: 'none', border: 'none', cursor: 'pointer', padding: 0
+                }}>✕ Clear end date</button>
+              )}
+            </div>
+          </>
         ) : (
           <div className="form-group" style={{ marginBottom: '8px' }}>
             <label className="form-label">Date</label>
