@@ -6,7 +6,8 @@ import Header from '../../components/Layout/Header';
 import Toast from '../../components/UI/Toast';
 
 export default function Stats() {
-  const { isCoach } = useAuth();
+  const { isCoach, isBookkeeper } = useAuth();
+  const canEdit = isCoach || isBookkeeper;
   const [players, setPlayers] = useState([]);
   const [allStats, setAllStats] = useState({});
   const [season, setSeason] = useState(null); // current season config
@@ -143,7 +144,7 @@ export default function Stats() {
                 {['AVG','AB','H','HR','RBI','R'].map(h => (
                   <th key={h} style={{ padding: '10px 8px', textAlign: 'center', fontSize: '11px', fontWeight: '700', color: 'var(--gray-500)', textTransform: 'uppercase' }}>{h}</th>
                 ))}
-                {showEdit && isCoach && <th style={{ padding: '10px 8px' }} />}
+                {showEdit && canEdit && <th style={{ padding: '10px 8px' }} />}
               </tr>
             </thead>
             <tbody>
@@ -161,7 +162,7 @@ export default function Stats() {
                     <td style={{ padding: '10px 8px', textAlign: 'center', fontSize: '14px' }}>{s.hr || 0}</td>
                     <td style={{ padding: '10px 8px', textAlign: 'center', fontSize: '14px' }}>{s.rbi || 0}</td>
                     <td style={{ padding: '10px 8px', textAlign: 'center', fontSize: '14px' }}>{s.runs || 0}</td>
-                    {showEdit && isCoach && (
+                    {showEdit && canEdit && (
                       <td style={{ padding: '10px 8px', textAlign: 'center' }}>
                         <button onClick={() => startEdit(player)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '16px', color: 'var(--red)' }}>✏️</button>
                       </td>
@@ -269,7 +270,7 @@ export default function Stats() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
-      <Header title="Stats" actions={isCoach && (
+      <Header title="Stats" actions={canEdit && (
         <button onClick={() => setShowNewSeasonModal(true)} style={{
           background: 'rgba(255,255,255,0.15)', border: 'none', borderRadius: '8px',
           padding: '0 12px', height: 36, color: 'white', cursor: 'pointer',
@@ -279,7 +280,7 @@ export default function Stats() {
       )} />
 
       <div className="page-content">
-        {!isCoach && <div className="view-only-banner">👁 Stats are updated by coaches</div>}
+        {!canEdit && <div className="view-only-banner">👁 Stats are updated by coaches</div>}
 
         {/* Team Stats Banner */}
         <div style={{

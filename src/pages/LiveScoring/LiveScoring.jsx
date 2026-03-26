@@ -8,7 +8,8 @@ import Toast from '../../components/UI/Toast';
 const INNINGS = [1, 2, 3, 4, 5, 6, 7];
 
 export default function LiveScoring() {
-  const { isCoach } = useAuth();
+  const { isCoach, isBookkeeper } = useAuth();
+  const canEdit = isCoach || isBookkeeper;
   const [scoreData, setScoreData] = useState({
     opponent: '',
     dragons: [0, 0, 0, 0, 0, 0, 0],
@@ -29,7 +30,7 @@ export default function LiveScoring() {
   }, []);
 
   const updateScore = async (team, inning, delta) => {
-    if (!isCoach) return;
+    if (!canEdit) return;
     const newData = { ...scoreData };
     const current = newData[team][inning - 1] || 0;
     newData[team][inning - 1] = Math.max(0, current + delta);
@@ -61,9 +62,9 @@ export default function LiveScoring() {
       <Header title="Live Scoring" back="/" />
 
       <div className="page-content">
-        {!isCoach && <div className="view-only-banner">Live score updated by coaches</div>}
+        {!canEdit && <div className="view-only-banner">Live score updated by coaches</div>}
 
-        {isCoach && (
+        {canEdit && (
           <div style={{ display: 'flex', gap: '8px', marginBottom: '14px' }}>
             <input
               className="form-input"
@@ -134,7 +135,7 @@ export default function LiveScoring() {
                     <td style={{ color: team.color, fontSize: '14px', fontWeight: '700', padding: '6px 8px' }}>{team.label}</td>
                     {INNINGS.map(i => (
                       <td key={i} style={{ textAlign: 'center', padding: '6px 2px' }}>
-                        {isCoach ? (
+                        {canEdit ? (
                           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '2px' }}>
                             <button onClick={() => updateScore(team.key, i, 1)} style={{
                               background: 'var(--gray-700)', border: 'none', borderRadius: '3px',
@@ -186,7 +187,7 @@ export default function LiveScoring() {
           )}
         </div>
 
-        {isCoach && (
+        {canEdit && (
           <button className="btn-secondary" onClick={resetScore} style={{ width: '100%' }}>
             🔄 Reset Scoreboard
           </button>
