@@ -332,7 +332,7 @@ export default function Header({ title, back, actions }) {
       )}
 
       {/* Support / Suggestion Modal */}
-      {modal && modal !== 'myMessages' && (
+      {modal && modal !== 'myMessages' && modal !== 'previewRole' && (
         <div className="modal-overlay" onClick={() => setModal(null)}>
           <div className="modal-sheet" onClick={e => e.stopPropagation()}>
             <div className="modal-handle" />
