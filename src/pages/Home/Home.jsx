@@ -558,7 +558,7 @@ function PracticeScheduleModal({ current, onSave, onClose }) {
               <input className="form-input" value={slot.location || ''} onChange={e => updateSlot(i, 'location', e.target.value)} placeholder="e.g. Riverside Park Field 2" />
             </div>
             <div className="form-group" style={{ marginBottom: 0 }}>
-              <label className="form-label">Focus (optional)</label>
+              <label className="form-label">Focus</label>
               <input className="form-input" value={slot.focus} onChange={e => updateSlot(i, 'focus', e.target.value)} placeholder="e.g. Hitting Focus" />
             </div>
           </div>
