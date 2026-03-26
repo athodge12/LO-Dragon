@@ -310,7 +310,9 @@ export default function Home() {
               { label: '📅 Schedule', path: '/schedule' },
               { label: '📋 Roster', path: '/roster' },
               { label: '🏟️ Live Score', path: '/live-scoring' },
-              { label: isCoach ? '🔢 Batting Order' : '🗺️ Field Rotation', path: isCoach ? '/batting-order' : '/defensive-rotation' }
+              { label: '🍊 Snack Schedule', path: '/snacks' },
+              { label: '⭐ Awards', path: '/awards' },
+              { label: '📋 Attendance', path: '/attendance' }
             ].map(a => (
               <button key={a.path} onClick={() => navigate(a.path)} style={{
                 background: 'var(--gray-50)', border: '1px solid var(--gray-200)',
