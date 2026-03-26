@@ -5,6 +5,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import Header from '../../components/Layout/Header';
 import Toast from '../../components/UI/Toast';
+import Inbox from './Inbox';
 
 const ALL_ROLES = ['admin', 'coach', 'bookkeeper', 'parent', 'fan'];
 
@@ -25,7 +26,9 @@ function getRoles(user) {
 export default function Admin() {
   const { isAdmin, isCoach, currentUser, userProfile } = useAuth();
   const navigate = useNavigate();
+  const [tab, setTab] = useState('users');
   const [users, setUsers] = useState([]);
+  const [inboxCount, setInboxCount] = useState(0);
   const [search, setSearch] = useState('');
   const [editUser, setEditUser] = useState(null);
   const [editRoles, setEditRoles] = useState([]);
@@ -37,17 +40,25 @@ export default function Admin() {
   }, [isAdmin, isCoach]);
 
   useEffect(() => {
-    return onSnapshot(collection(db, 'users'), snap => {
-      const all = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-      all.sort((a, b) => {
-        const roleOrder = { admin: 0, coach: 1, bookkeeper: 2, parent: 3, fan: 4 };
-        const aTop = Math.min(...getRoles(a).map(r => roleOrder[r] ?? 5));
-        const bTop = Math.min(...getRoles(b).map(r => roleOrder[r] ?? 5));
-        return aTop - bTop;
-      });
-      setUsers(all);
-    });
-  }, []);
+    const unsubs = [
+      onSnapshot(collection(db, 'users'), snap => {
+        const all = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        all.sort((a, b) => {
+          const roleOrder = { admin: 0, coach: 1, bookkeeper: 2, parent: 3, fan: 4 };
+          const aTop = Math.min(...getRoles(a).map(r => roleOrder[r] ?? 5));
+          const bTop = Math.min(...getRoles(b).map(r => roleOrder[r] ?? 5));
+          return aTop - bTop;
+        });
+        setUsers(all);
+      })
+    ];
+    if (isAdmin) {
+      unsubs.push(onSnapshot(collection(db, 'inbox'), snap => {
+        setInboxCount(snap.docs.filter(d => d.data().status === 'open').length);
+      }));
+    }
+    return () => unsubs.forEach(u => u());
+  }, [isAdmin]);
 
   const openEdit = (user) => {
     setEditUser(user);
@@ -99,9 +110,34 @@ export default function Admin() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
-      <Header title="Manage Users" back="/" />
+      <Header title="Admin" back="/" />
 
       <div className="page-content">
+        {isAdmin && (
+          <div className="tabs" style={{ marginBottom: '14px' }}>
+            <button className={`tab ${tab === 'users' ? 'active' : ''}`} onClick={() => setTab('users')}>
+              Users
+            </button>
+            <button className={`tab ${tab === 'inbox' ? 'active' : ''}`} onClick={() => setTab('inbox')}
+              style={{ position: 'relative' }}>
+              Inbox
+              {inboxCount > 0 && (
+                <span style={{
+                  position: 'absolute', top: 4, right: 4,
+                  background: '#CC1B1B', color: 'white',
+                  fontSize: '10px', fontWeight: '700',
+                  borderRadius: '10px', padding: '1px 5px',
+                  lineHeight: 1.4
+                }}>{inboxCount}</span>
+              )}
+            </button>
+          </div>
+        )}
+
+        {tab === 'inbox' && isAdmin && <Inbox setToast={setToast} />}
+
+        {tab === 'users' && (
+          <>
         {/* My Roles */}
         <div style={{ background: 'white', border: '2px solid #7C3AED', borderRadius: '12px', padding: '14px', marginBottom: '14px' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
@@ -242,6 +278,8 @@ export default function Admin() {
               );
             })}
           </div>
+        )}
+          </>
         )}
       </div>
 
