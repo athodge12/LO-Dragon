@@ -6,9 +6,9 @@ import { useAuth } from '../../contexts/AuthContext';
 import Header from '../../components/Layout/Header';
 import Toast from '../../components/UI/Toast';
 
-const defaultPractices = [
-  { day: 'Tuesday', time: '4:45 – 6:00 PM', focus: 'Fielding Focus', icon: '🧤' },
-  { day: 'Thursday', time: '7:15 – 8:30 PM', focus: 'Hitting Focus', icon: '⚾' }
+const DEFAULT_PRACTICES = [
+  { day: 'Tuesday', time: '4:45 – 6:00 PM', focus: 'Fielding Focus' },
+  { day: 'Thursday', time: '7:15 – 8:30 PM', focus: 'Hitting Focus' }
 ];
 
 export default function Home() {
@@ -25,6 +25,7 @@ export default function Home() {
   const [announcementText, setAnnouncementText] = useState('');
   const [notifText, setNotifText] = useState('');
   const [accessCodes, setAccessCodes] = useState({ coach: 'DRAGONS-COACH', bookkeeper: 'DRAGONS-BOOKS' });
+  const [practices, setPractices] = useState(DEFAULT_PRACTICES);
 
   useEffect(() => {
     const unsubs = [];
@@ -39,6 +40,10 @@ export default function Home() {
 
     unsubs.push(onSnapshot(doc(db, 'settings', 'accessCodes'), snap => {
       if (snap.exists()) setAccessCodes(snap.data());
+    }));
+
+    unsubs.push(onSnapshot(doc(db, 'settings', 'practiceSchedule'), snap => {
+      if (snap.exists() && snap.data().practices) setPractices(snap.data().practices);
     }));
 
     const gamesQ = query(collection(db, 'games'), orderBy('date', 'desc'));
@@ -103,6 +108,12 @@ export default function Home() {
     await setDoc(doc(db, 'settings', 'accessCodes'), codes);
     setAccessCodes(codes);
     setToast('Access codes updated!');
+    setEditModal(null);
+  };
+
+  const savePractices = async (data) => {
+    await setDoc(doc(db, 'settings', 'practiceSchedule'), { practices: data });
+    setToast('Practice schedule updated!');
     setEditModal(null);
   };
 
@@ -305,19 +316,22 @@ export default function Home() {
         <div className="card" style={{ marginBottom: '14px' }}>
           <div className="section-header">
             <span className="section-title">🕐 Practice Schedule</span>
-            <button className="btn-ghost" onClick={() => navigate('/practice')} style={{ fontSize: '12px' }}>Plans →</button>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              {isCoach && <button className="btn-ghost" onClick={() => setEditModal('practices')}>Edit</button>}
+              <button className="btn-ghost" onClick={() => navigate('/practice')} style={{ fontSize: '12px' }}>Plans →</button>
+            </div>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {defaultPractices.map(p => (
-              <div key={p.day} style={{
+            {practices.map((p, i) => (
+              <div key={i} style={{
                 display: 'flex', alignItems: 'center', gap: '12px',
                 background: 'var(--gray-50)', borderRadius: '10px', padding: '12px'
               }}>
-                <span style={{ fontSize: '24px' }}>{p.icon}</span>
+                <span style={{ fontSize: '24px' }}>⚾</span>
                 <div>
                   <div style={{ fontWeight: '700', fontSize: '15px' }}>{p.day}</div>
                   <div style={{ fontSize: '13px', color: 'var(--gray-500)' }}>{p.time}</div>
-                  <div style={{ fontSize: '12px', color: 'var(--red)', fontWeight: '600', marginTop: '2px' }}>{p.focus}</div>
+                  {p.focus && <div style={{ fontSize: '12px', color: 'var(--red)', fontWeight: '600', marginTop: '2px' }}>{p.focus}</div>}
                 </div>
               </div>
             ))}
@@ -421,6 +435,15 @@ export default function Home() {
         />
       )}
 
+      {/* Practice Schedule Modal */}
+      {editModal === 'practices' && (
+        <PracticeScheduleModal
+          current={practices}
+          onSave={savePractices}
+          onClose={() => setEditModal(null)}
+        />
+      )}
+
       {toast && <Toast message={toast} onDismiss={() => setToast('')} />}
     </div>
   );
@@ -465,6 +488,63 @@ function AccessCodesModal({ current, onSave, onClose }) {
           </p>
         </div>
         <button className="btn-primary" onClick={() => onSave(codes)}>Save Codes</button>
+      </div>
+    </div>
+  );
+}
+
+function PracticeScheduleModal({ current, onSave, onClose }) {
+  const [slots, setSlots] = useState(current.map(p => ({ ...p })));
+
+  const updateSlot = (i, key, val) => {
+    setSlots(prev => prev.map((s, idx) => idx === i ? { ...s, [key]: val } : s));
+  };
+
+  const addSlot = () => {
+    setSlots(prev => [...prev, { day: '', time: '', focus: '' }]);
+  };
+
+  const removeSlot = (i) => {
+    setSlots(prev => prev.filter((_, idx) => idx !== i));
+  };
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-sheet" onClick={e => e.stopPropagation()} style={{ maxHeight: '80vh', overflowY: 'auto' }}>
+        <div className="modal-handle" />
+        <h3 style={{ fontFamily: 'Oswald, sans-serif', fontSize: '20px', marginBottom: '16px', textTransform: 'uppercase' }}>
+          Edit Practice Schedule
+        </h3>
+        {slots.map((slot, i) => (
+          <div key={i} style={{ background: 'var(--gray-50)', borderRadius: '10px', padding: '12px', marginBottom: '12px', position: 'relative' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+              <span style={{ fontWeight: '700', fontSize: '13px', color: 'var(--gray-600)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                Practice {i + 1}
+              </span>
+              {slots.length > 1 && (
+                <button onClick={() => removeSlot(i)} style={{ background: 'none', border: 'none', color: 'var(--gray-400)', cursor: 'pointer', fontSize: '18px', padding: 0 }}>×</button>
+              )}
+            </div>
+            <div className="form-group" style={{ marginBottom: '8px' }}>
+              <label className="form-label">Day</label>
+              <input className="form-input" value={slot.day} onChange={e => updateSlot(i, 'day', e.target.value)} placeholder="e.g. Tuesday" />
+            </div>
+            <div className="form-group" style={{ marginBottom: '8px' }}>
+              <label className="form-label">Time</label>
+              <input className="form-input" value={slot.time} onChange={e => updateSlot(i, 'time', e.target.value)} placeholder="e.g. 4:45 – 6:00 PM" />
+            </div>
+            <div className="form-group" style={{ marginBottom: 0 }}>
+              <label className="form-label">Focus (optional)</label>
+              <input className="form-input" value={slot.focus} onChange={e => updateSlot(i, 'focus', e.target.value)} placeholder="e.g. Hitting Focus" />
+            </div>
+          </div>
+        ))}
+        <button onClick={addSlot} style={{
+          width: '100%', padding: '10px', border: '1.5px dashed var(--gray-300)',
+          borderRadius: '10px', background: 'none', color: 'var(--gray-500)',
+          cursor: 'pointer', fontSize: '14px', fontWeight: '600', marginBottom: '16px'
+        }}>+ Add Practice Slot</button>
+        <button className="btn-primary" onClick={() => onSave(slots)}>Save Schedule</button>
       </div>
     </div>
   );
