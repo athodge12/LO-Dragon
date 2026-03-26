@@ -166,10 +166,12 @@ export default function Chat() {
         }}>📌</button>
       )} />
 
-      {/* Tabs */}
+      {/* Tabs — fixed below header so they're always visible */}
       <div style={{
+        position: 'fixed', top: 'var(--header-height)', left: 0,
+        width: '100%', maxWidth: 'var(--max-width)', zIndex: 10,
         display: 'flex', borderBottom: '1px solid var(--gray-200)',
-        background: 'white', flexShrink: 0
+        background: 'white'
       }}>
         {!isFan && (
           <button
@@ -201,7 +203,7 @@ export default function Chat() {
         </button>
       </div>
 
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', paddingTop: '45px' }}>
         {/* Pinned announcement — team chat only */}
         {activeTab === 'team' && pinned?.text && (
           <div style={{
