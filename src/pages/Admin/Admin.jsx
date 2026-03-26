@@ -61,15 +61,18 @@ export default function Admin() {
 
   const saveRoles = async () => {
     if (!editUser || editRoles.length === 0) return;
-    // primary role = admin > coach > bookkeeper > parent > fan
-    const order = ['admin', 'coach', 'bookkeeper', 'parent', 'fan'];
-    const primary = order.find(r => editRoles.includes(r)) || editRoles[0];
-    await updateDoc(doc(db, 'users', editUser.id), {
-      roles: editRoles,
-      role: primary
-    });
-    setToast(`${displayName(editUser)} updated`);
-    setEditUser(null);
+    try {
+      const order = ['admin', 'coach', 'bookkeeper', 'parent', 'fan'];
+      const primary = order.find(r => editRoles.includes(r)) || editRoles[0];
+      await updateDoc(doc(db, 'users', editUser.id), {
+        roles: editRoles,
+        role: primary
+      });
+      setToast(`${displayName(editUser)} updated`);
+      setEditUser(null);
+    } catch (err) {
+      setToast(`Error: ${err.message}`);
+    }
   };
 
   const removeUser = async (user) => {
@@ -183,7 +186,7 @@ export default function Admin() {
                   </div>
 
                   {/* Edit button */}
-                  {(isAdmin || (isCoach && !roles.includes('admin') && !isMe)) && (
+                  {(isAdmin || (!isMe && isCoach && !roles.includes('admin'))) && (
                     <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1px solid var(--gray-100)', display: 'flex', gap: '8px' }}>
                       <button
                         onClick={() => openEdit(user)}
