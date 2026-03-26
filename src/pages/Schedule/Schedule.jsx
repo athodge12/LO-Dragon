@@ -7,6 +7,42 @@ import Toast from '../../components/UI/Toast';
 import PracticeScheduleModal from '../Home/PracticeScheduleModal';
 
 const DAY_MAP = { Sunday: 0, Monday: 1, Tuesday: 2, Wednesday: 3, Thursday: 4, Friday: 5, Saturday: 6 };
+const HOURS = ['1','2','3','4','5','6','7','8','9','10','11','12'];
+const MINUTES = ['00','05','10','15','20','25','30','35','40','45','50','55'];
+
+const selStyle = {
+  padding: '9px 8px', borderRadius: '8px', border: '1.5px solid var(--gray-200)',
+  background: 'white', fontSize: '14px', color: 'var(--black)', cursor: 'pointer',
+  appearance: 'none', WebkitAppearance: 'none', textAlign: 'center'
+};
+
+function TimeRow({ label, hour, minute, ampm, onHour, onMinute, onAmPm }) {
+  return (
+    <div style={{ marginBottom: '8px' }}>
+      <label className="form-label">{label}</label>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 80px', gap: '6px' }}>
+        <select style={selStyle} value={hour} onChange={e => onHour(e.target.value)}>
+          <option value="">Hr</option>
+          {HOURS.map(h => <option key={h} value={h}>{h}</option>)}
+        </select>
+        <select style={selStyle} value={minute} onChange={e => onMinute(e.target.value)}>
+          {MINUTES.map(m => <option key={m} value={m}>{m}</option>)}
+        </select>
+        <select style={selStyle} value={ampm} onChange={e => onAmPm(e.target.value)}>
+          <option value="AM">AM</option>
+          <option value="PM">PM</option>
+        </select>
+      </div>
+    </div>
+  );
+}
+
+function buildTime(f) {
+  const start = f.startHour ? `${f.startHour}:${f.startMinute} ${f.startAmPm}` : '';
+  const end = f.endHour ? `${f.endHour}:${f.endMinute} ${f.endAmPm}` : '';
+  if (start && end) return `${start} – ${end}`;
+  return start || end || '';
+}
 
 function getUpcomingPracticeDates(slot, weeksAhead = 52) {
   const targetDay = DAY_MAP[slot.day];
@@ -36,6 +72,8 @@ export default function Schedule() {
   const [modal, setModal] = useState(null);
   const [editModal, setEditModal] = useState(null);
   const [editForm, setEditForm] = useState({});
+  const [editPracticeModal, setEditPracticeModal] = useState(null);
+  const [editPracticeForm, setEditPracticeForm] = useState({});
   const [practiceModal, setPracticeModal] = useState(false);
   const [scoreModal, setScoreModal] = useState(null);
   const [toast, setToast] = useState('');
@@ -64,7 +102,10 @@ export default function Schedule() {
         const userRsvps = {};
         snap.docs.forEach(d => {
           const data = d.data();
-          if (data.userId === currentUser.uid) userRsvps[data.gameId] = data.status;
+          if (data.userId === currentUser.uid) {
+            if (data.gameId) userRsvps[data.gameId] = data.status;
+            if (data.practiceId) userRsvps[data.practiceId] = data.status;
+          }
         });
         setRsvps(userRsvps);
       }));
@@ -158,10 +199,41 @@ export default function Schedule() {
     setEditModal(null);
   };
 
+  const openEditPractice = (event) => {
+    const slot = practiceSchedule[event.slotIndex] || {};
+    setEditPracticeForm({
+      startHour: slot.startHour || '',
+      startMinute: slot.startMinute || '00',
+      startAmPm: slot.startAmPm || 'PM',
+      endHour: slot.endHour || '',
+      endMinute: slot.endMinute || '00',
+      endAmPm: slot.endAmPm || 'PM',
+      location: slot.location || '',
+      focus: slot.focus || '',
+      day: slot.day || '',
+      endDate: slot.endDate || '',
+      date: slot.date || '',
+      type: slot.type || 'recurring'
+    });
+    setEditPracticeModal(event);
+  };
+
+  const updatePracticeSlot = async () => {
+    if (!editPracticeModal) return;
+    const time = buildTime(editPracticeForm);
+    const updated = practiceSchedule.map((slot, i) =>
+      i === editPracticeModal.slotIndex ? { ...slot, ...editPracticeForm, time } : slot
+    );
+    await setDoc(doc(db, 'settings', 'practiceSchedule'), { practices: updated });
+    setEditPracticeModal(null);
+    setToast('Practice updated!');
+  };
+
   const toggleCancelPractice = async (slotIndex, cancelled) => {
     const updated = { ...cancelledSlots, [slotIndex]: !cancelled };
     await setDoc(doc(db, 'settings', 'cancelledPractices'), updated);
     setToast(cancelled ? 'Practice restored' : 'Practice cancelled');
+    setEditPracticeModal(null);
   };
 
   const saveScore = async () => {
@@ -184,6 +256,19 @@ export default function Schedule() {
       updatedAt: new Date().toISOString()
     });
     setRsvps(r => ({ ...r, [gameId]: status }));
+    setToast(`RSVP: ${status === 'yes' ? '✅ Going' : status === 'no' ? '❌ Not Going' : '🤔 Maybe'}`);
+  };
+
+  const handlePracticeRsvp = async (practiceId, status) => {
+    const rsvpId = `${currentUser.uid}_${practiceId}`;
+    await setDoc(doc(db, 'rsvps', rsvpId), {
+      userId: currentUser.uid,
+      practiceId,
+      status,
+      playerName: userProfile?.childName || `${userProfile?.firstName} ${userProfile?.lastName}`,
+      updatedAt: new Date().toISOString()
+    });
+    setRsvps(r => ({ ...r, [practiceId]: status }));
     setToast(`RSVP: ${status === 'yes' ? '✅ Going' : status === 'no' ? '❌ Not Going' : '🤔 Maybe'}`);
   };
 
@@ -273,56 +358,69 @@ export default function Schedule() {
     );
   };
 
-  const PracticeCard = ({ event }) => (
-    <div className="card" style={{
-      marginBottom: '10px',
-      opacity: event.cancelled ? 0.6 : 1,
-      border: event.cancelled ? '1px solid #FECACA' : undefined,
-      background: event.cancelled ? '#FFF5F5' : undefined
-    }}>
-      <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-        <div style={{
-          background: event.cancelled ? '#FEE2E2' : '#EDE9FE',
-          color: event.cancelled ? '#B91C1C' : '#7C3AED',
-          borderRadius: '10px', padding: '6px 10px', textAlign: 'center', minWidth: '52px', flexShrink: 0
-        }}>
-          <div style={{ fontSize: '10px', fontWeight: '600', textTransform: 'uppercase' }}>
-            {new Date(event.date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short' })}
+  const PracticeCard = ({ event }) => {
+    const myRsvp = rsvps[event.id];
+    return (
+      <div className="card" style={{
+        marginBottom: '10px',
+        opacity: event.cancelled ? 0.6 : 1,
+        border: event.cancelled ? '1px solid #FECACA' : undefined,
+        background: event.cancelled ? '#FFF5F5' : undefined
+      }}>
+        <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
+          <div style={{
+            background: event.cancelled ? '#FEE2E2' : '#EDE9FE',
+            color: event.cancelled ? '#B91C1C' : '#7C3AED',
+            borderRadius: '10px', padding: '6px 10px', textAlign: 'center', minWidth: '52px', flexShrink: 0
+          }}>
+            <div style={{ fontSize: '10px', fontWeight: '600', textTransform: 'uppercase' }}>
+              {new Date(event.date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short' })}
+            </div>
+            <div style={{ fontSize: '24px', fontWeight: '700', fontFamily: 'Oswald, sans-serif', lineHeight: 1 }}>
+              {new Date(event.date + 'T12:00:00').getDate()}
+            </div>
           </div>
-          <div style={{ fontSize: '24px', fontWeight: '700', fontFamily: 'Oswald, sans-serif', lineHeight: 1 }}>
-            {new Date(event.date + 'T12:00:00').getDate()}
-          </div>
-        </div>
-        <div style={{ flex: 1 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-            <span style={{ fontWeight: '700', fontSize: '15px', textDecoration: event.cancelled ? 'line-through' : 'none' }}>Practice</span>
-            <span style={{
-              fontSize: '11px', fontWeight: '700', padding: '2px 7px', borderRadius: '10px',
-              background: event.isOnetime ? '#DBEAFE' : '#EDE9FE',
-              color: event.isOnetime ? '#1D4ED8' : '#7C3AED'
-            }}>{event.isOnetime ? '📅' : '🔁'} {event.day}</span>
-            {event.cancelled && (
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+              <span style={{ fontWeight: '700', fontSize: '15px', textDecoration: event.cancelled ? 'line-through' : 'none' }}>Practice</span>
               <span style={{
                 fontSize: '11px', fontWeight: '700', padding: '2px 7px', borderRadius: '10px',
-                background: '#FEE2E2', color: '#B91C1C'
-              }}>Cancelled</span>
+                background: event.isOnetime ? '#DBEAFE' : '#EDE9FE',
+                color: event.isOnetime ? '#1D4ED8' : '#7C3AED'
+              }}>{event.isOnetime ? '📅' : '🔁'} {event.day}</span>
+              {event.cancelled && (
+                <span style={{
+                  fontSize: '11px', fontWeight: '700', padding: '2px 7px', borderRadius: '10px',
+                  background: '#FEE2E2', color: '#B91C1C'
+                }}>Cancelled</span>
+              )}
+            </div>
+            {event.time && <div style={{ fontSize: '13px', color: 'var(--gray-500)', marginTop: '2px', textDecoration: event.cancelled ? 'line-through' : 'none' }}>{event.time}</div>}
+            {event.location && !event.cancelled && <div style={{ fontSize: '12px', color: 'var(--gray-400)', marginTop: '1px' }}>📍 {event.location}</div>}
+            {event.focus && !event.cancelled && <div style={{ fontSize: '12px', color: '#7C3AED', fontWeight: '600', marginTop: '2px' }}>{event.focus}</div>}
+            {!event.cancelled && (
+              <div style={{ display: 'flex', gap: '6px', marginTop: '10px' }}>
+                {[
+                  { key: 'yes', label: '✅ Going' },
+                  { key: 'no', label: '❌ No' },
+                  { key: 'maybe', label: '🤔 Maybe' }
+                ].map(opt => (
+                  <button key={opt.key} className={`rsvp-btn ${opt.key} ${myRsvp === opt.key ? 'active' : ''}`}
+                    onClick={() => handlePracticeRsvp(event.id, opt.key)}>{opt.label}</button>
+                ))}
+              </div>
             )}
           </div>
-          {event.time && <div style={{ fontSize: '13px', color: 'var(--gray-500)', marginTop: '2px', textDecoration: event.cancelled ? 'line-through' : 'none' }}>{event.time}</div>}
-          {event.location && !event.cancelled && <div style={{ fontSize: '12px', color: 'var(--gray-400)', marginTop: '1px' }}>📍 {event.location}</div>}
-          {event.focus && !event.cancelled && <div style={{ fontSize: '12px', color: '#7C3AED', fontWeight: '600', marginTop: '2px' }}>{event.focus}</div>}
+          {isCoach && (
+            <button onClick={() => openEditPractice(event)} style={{
+              background: 'var(--gray-100)', border: 'none', borderRadius: '6px',
+              padding: '4px 8px', fontSize: '11px', cursor: 'pointer', fontWeight: '600', color: 'var(--gray-600)', flexShrink: 0
+            }}>Edit</button>
+          )}
         </div>
-        {isCoach && (
-          <button onClick={() => toggleCancelPractice(event.slotIndex, event.cancelled)} style={{
-            background: event.cancelled ? '#DCFCE7' : '#FEE2E2',
-            color: event.cancelled ? '#16A34A' : '#B91C1C',
-            border: 'none', borderRadius: '6px',
-            padding: '4px 8px', fontSize: '11px', cursor: 'pointer', fontWeight: '600', flexShrink: 0
-          }}>{event.cancelled ? 'Restore' : 'Cancel'}</button>
-        )}
       </div>
-    </div>
-  );
+    );
+  };
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
@@ -507,6 +605,78 @@ export default function Schedule() {
             <button className="btn-secondary" onClick={() => deleteGame(editModal.id)} style={{ marginTop: '8px', color: 'var(--red)' }}>
               Delete Game
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Practice Modal */}
+      {editPracticeModal && isCoach && (
+        <div className="modal-overlay" onClick={() => setEditPracticeModal(null)}>
+          <div className="modal-sheet" onClick={e => e.stopPropagation()} style={{ maxHeight: '85vh', overflowY: 'auto' }}>
+            <div className="modal-handle" />
+            <h3 style={{ fontFamily: 'Oswald, sans-serif', fontSize: '20px', marginBottom: '4px', textTransform: 'uppercase' }}>Edit Practice</h3>
+            <p style={{ fontSize: '13px', color: 'var(--gray-500)', marginBottom: '16px' }}>
+              {editPracticeModal.day} · {new Date(editPracticeModal.date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+            </p>
+
+            {editPracticeForm.type === 'recurring' ? (
+              <>
+                <div className="form-group" style={{ marginBottom: '8px' }}>
+                  <label className="form-label">Day of Week</label>
+                  <select className="form-select" value={editPracticeForm.day} onChange={e => setEditPracticeForm(f => ({ ...f, day: e.target.value }))}>
+                    <option value="">— Select day —</option>
+                    {['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'].map(d => (
+                      <option key={d} value={d}>{d}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="form-group" style={{ marginBottom: '8px' }}>
+                  <label className="form-label">End Date</label>
+                  <input className="form-input" type="date" value={editPracticeForm.endDate} onChange={e => setEditPracticeForm(f => ({ ...f, endDate: e.target.value }))} />
+                </div>
+              </>
+            ) : (
+              <div className="form-group" style={{ marginBottom: '8px' }}>
+                <label className="form-label">Date</label>
+                <input className="form-input" type="date" value={editPracticeForm.date} onChange={e => setEditPracticeForm(f => ({ ...f, date: e.target.value }))} />
+              </div>
+            )}
+
+            <TimeRow
+              label="Start Time"
+              hour={editPracticeForm.startHour}
+              minute={editPracticeForm.startMinute}
+              ampm={editPracticeForm.startAmPm}
+              onHour={v => setEditPracticeForm(f => ({ ...f, startHour: v }))}
+              onMinute={v => setEditPracticeForm(f => ({ ...f, startMinute: v }))}
+              onAmPm={v => setEditPracticeForm(f => ({ ...f, startAmPm: v }))}
+            />
+            <TimeRow
+              label="End Time"
+              hour={editPracticeForm.endHour}
+              minute={editPracticeForm.endMinute}
+              ampm={editPracticeForm.endAmPm}
+              onHour={v => setEditPracticeForm(f => ({ ...f, endHour: v }))}
+              onMinute={v => setEditPracticeForm(f => ({ ...f, endMinute: v }))}
+              onAmPm={v => setEditPracticeForm(f => ({ ...f, endAmPm: v }))}
+            />
+
+            <div className="form-group" style={{ marginBottom: '8px' }}>
+              <label className="form-label">Location</label>
+              <input className="form-input" value={editPracticeForm.location} onChange={e => setEditPracticeForm(f => ({ ...f, location: e.target.value }))} placeholder="e.g. Riverside Park Field 2" />
+            </div>
+            <div className="form-group" style={{ marginBottom: '16px' }}>
+              <label className="form-label">Focus</label>
+              <input className="form-input" value={editPracticeForm.focus} onChange={e => setEditPracticeForm(f => ({ ...f, focus: e.target.value }))} placeholder="e.g. Hitting Focus" />
+            </div>
+
+            <button className="btn-primary" onClick={updatePracticeSlot}>Save Changes</button>
+            <button onClick={() => toggleCancelPractice(editPracticeModal.slotIndex, editPracticeModal.cancelled)} style={{
+              width: '100%', marginTop: '8px', padding: '12px', borderRadius: '10px', cursor: 'pointer',
+              fontWeight: '700', fontSize: '15px', border: 'none',
+              background: editPracticeModal.cancelled ? '#DCFCE7' : '#FEE2E2',
+              color: editPracticeModal.cancelled ? '#16A34A' : '#B91C1C'
+            }}>{editPracticeModal.cancelled ? 'Restore Practice' : 'Cancel Practice'}</button>
           </div>
         </div>
       )}
