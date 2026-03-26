@@ -6,41 +6,61 @@ import Header from '../../components/Layout/Header';
 import Toast from '../../components/UI/Toast';
 import { DRILLS, CATEGORIES, TUESDAY_PLAN, THURSDAY_PLAN } from '../../data/drills';
 
+const DEFAULT_SCHEDULE = [
+  { day: 'Tuesday', time: '4:45 – 6:00 PM' },
+  { day: 'Thursday', time: '7:15 – 8:30 PM' }
+];
+
+const PLANS = [TUESDAY_PLAN, THURSDAY_PLAN];
+const PROGRESS_KEYS = ['tuesdayProgress', 'thursdayProgress'];
+
 export default function Practice() {
   const { isCoach } = useAuth();
-  const [tab, setTab] = useState('tuesday');
-  const [tuesdayProgress, setTuesdayProgress] = useState({});
-  const [thursdayProgress, setThursdayProgress] = useState({});
+  const [tab, setTab] = useState('slot0');
+  const [progress, setProgress] = useState([{}, {}]);
+  const [practiceSchedule, setPracticeSchedule] = useState(DEFAULT_SCHEDULE);
+  const [cancelledSlots, setCancelledSlots] = useState({});
   const [selectedDrill, setSelectedDrill] = useState(null);
   const [categoryFilter, setCategoryFilter] = useState('All');
   const [toast, setToast] = useState('');
   const [customPlan, setCustomPlan] = useState({ duration: 75, drills: [] });
-  const [buildMode, setBuildMode] = useState(false);
 
   useEffect(() => {
     const unsubs = [
       onSnapshot(doc(db, 'settings', 'tuesdayProgress'), snap => {
-        if (snap.exists()) setTuesdayProgress(snap.data());
+        if (snap.exists()) setProgress(p => { const n = [...p]; n[0] = snap.data(); return n; });
       }),
       onSnapshot(doc(db, 'settings', 'thursdayProgress'), snap => {
-        if (snap.exists()) setThursdayProgress(snap.data());
+        if (snap.exists()) setProgress(p => { const n = [...p]; n[1] = snap.data(); return n; });
+      }),
+      onSnapshot(doc(db, 'settings', 'practiceSchedule'), snap => {
+        if (snap.exists() && snap.data().practices) setPracticeSchedule(snap.data().practices);
+      }),
+      onSnapshot(doc(db, 'settings', 'cancelledPractices'), snap => {
+        setCancelledSlots(snap.exists() ? snap.data() : {});
       })
     ];
     return () => unsubs.forEach(u => u());
   }, []);
 
-  const toggleDrillComplete = async (drillId, day) => {
+  const toggleDrillComplete = async (drillId, slotIndex) => {
     if (!isCoach) return;
-    const key = day === 'tuesday' ? 'tuesdayProgress' : 'thursdayProgress';
-    const current = day === 'tuesday' ? tuesdayProgress : thursdayProgress;
+    const key = PROGRESS_KEYS[slotIndex] || `practice${slotIndex}Progress`;
+    const current = progress[slotIndex] || {};
     const newProgress = { ...current, [drillId]: !current[drillId] };
     await setDoc(doc(db, 'settings', key), newProgress, { merge: true });
   };
 
-  const resetProgress = async (day) => {
-    const key = day === 'tuesday' ? 'tuesdayProgress' : 'thursdayProgress';
+  const resetProgress = async (slotIndex) => {
+    const key = PROGRESS_KEYS[slotIndex] || `practice${slotIndex}Progress`;
     await setDoc(doc(db, 'settings', key), {});
     setToast('Progress reset!');
+  };
+
+  const toggleCancelPractice = async (slotIndex) => {
+    const updated = { ...cancelledSlots, [slotIndex]: !cancelledSlots[slotIndex] };
+    await setDoc(doc(db, 'settings', 'cancelledPractices'), updated);
+    setToast(updated[slotIndex] ? 'Practice cancelled.' : 'Practice cancellation removed.');
   };
 
   const getDrill = (id) => DRILLS.find(d => d.id === id);
@@ -49,7 +69,7 @@ export default function Practice() {
     ? DRILLS
     : DRILLS.filter(d => d.category === categoryFilter);
 
-  const PlanView = ({ plan, progress, day }) => {
+  const PlanView = ({ plan, progress, slotIndex }) => {
     const planDrills = plan.drills.map(id => getDrill(id)).filter(Boolean);
     const totalTime = planDrills.reduce((s, d) => s + d.duration, 0);
     const completedCount = planDrills.filter(d => progress[d.id]).length;
@@ -78,7 +98,7 @@ export default function Practice() {
         </div>
 
         {isCoach && (
-          <button onClick={() => resetProgress(day)} className="btn-secondary" style={{ marginBottom: '12px', width: 'auto', fontSize: '12px', padding: '6px 12px' }}>
+          <button onClick={() => resetProgress(slotIndex)} className="btn-secondary" style={{ marginBottom: '12px', width: 'auto', fontSize: '12px', padding: '6px 12px' }}>
             Reset Progress
           </button>
         )}
@@ -90,7 +110,7 @@ export default function Practice() {
               drill={drill}
               index={index}
               completed={progress[drill.id]}
-              onToggle={() => toggleDrillComplete(drill.id, day)}
+              onToggle={() => toggleDrillComplete(drill.id, slotIndex)}
               onExpand={() => setSelectedDrill(drill)}
             />
           ))}
@@ -99,25 +119,69 @@ export default function Practice() {
     );
   };
 
+  const slotTabs = practiceSchedule.slice(0, PLANS.length).map((slot, i) => ({
+    key: `slot${i}`,
+    label: slot.day || `Practice ${i + 1}`,
+    cancelled: !!cancelledSlots[i]
+  }));
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
       <Header title="Practice" />
 
       <div className="page-content">
         <div className="tabs">
-          <button className={`tab ${tab === 'tuesday' ? 'active' : ''}`} onClick={() => setTab('tuesday')}>Tuesday</button>
-          <button className={`tab ${tab === 'thursday' ? 'active' : ''}`} onClick={() => setTab('thursday')}>Thursday</button>
+          {slotTabs.map(t => (
+            <button key={t.key} className={`tab ${tab === t.key ? 'active' : ''}`} onClick={() => setTab(t.key)}
+              style={{ position: 'relative' }}>
+              {t.label}
+              {t.cancelled && (
+                <span style={{
+                  position: 'absolute', top: 2, right: 2,
+                  width: 8, height: 8, borderRadius: '50%', background: '#B91C1C'
+                }} />
+              )}
+            </button>
+          ))}
           <button className={`tab ${tab === 'drills' ? 'active' : ''}`} onClick={() => setTab('drills')}>Drill Library</button>
           {isCoach && <button className={`tab ${tab === 'build' ? 'active' : ''}`} onClick={() => setTab('build')}>Build</button>}
         </div>
 
-        {tab === 'tuesday' && (
-          <PlanView plan={TUESDAY_PLAN} progress={tuesdayProgress} day="tuesday" />
-        )}
-
-        {tab === 'thursday' && (
-          <PlanView plan={THURSDAY_PLAN} progress={thursdayProgress} day="thursday" />
-        )}
+        {slotTabs.map((t, i) => tab === t.key && (
+          <div key={t.key}>
+            {cancelledSlots[i] && (
+              <div style={{
+                background: '#FEE2E2', border: '1px solid #FECACA', borderRadius: '10px',
+                padding: '12px 16px', marginBottom: '14px',
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ fontSize: '18px' }}>🚫</span>
+                  <span style={{ fontWeight: '700', color: '#B91C1C', fontSize: '15px' }}>
+                    {t.label} Practice Cancelled
+                  </span>
+                </div>
+                {isCoach && (
+                  <button onClick={() => toggleCancelPractice(i)} style={{
+                    fontSize: '12px', fontWeight: '600', color: '#B91C1C',
+                    background: 'none', border: '1px solid #FECACA', borderRadius: '8px',
+                    padding: '4px 10px', cursor: 'pointer'
+                  }}>Uncancel</button>
+                )}
+              </div>
+            )}
+            {isCoach && !cancelledSlots[i] && (
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '10px' }}>
+                <button onClick={() => toggleCancelPractice(i)} style={{
+                  fontSize: '12px', fontWeight: '600', color: '#B91C1C',
+                  background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: '8px',
+                  padding: '6px 12px', cursor: 'pointer'
+                }}>Cancel Practice</button>
+              </div>
+            )}
+            <PlanView plan={PLANS[i]} progress={progress[i] || {}} slotIndex={i} />
+          </div>
+        ))}
 
         {tab === 'drills' && (
           <div>

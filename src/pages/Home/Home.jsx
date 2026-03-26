@@ -26,6 +26,7 @@ export default function Home() {
   const [notifText, setNotifText] = useState('');
   const [accessCodes, setAccessCodes] = useState({ coach: 'DRAGONS-COACH', bookkeeper: 'DRAGONS-BOOKS' });
   const [practices, setPractices] = useState(DEFAULT_PRACTICES);
+  const [cancelledSlots, setCancelledSlots] = useState({});
 
   useEffect(() => {
     const unsubs = [];
@@ -44,6 +45,10 @@ export default function Home() {
 
     unsubs.push(onSnapshot(doc(db, 'settings', 'practiceSchedule'), snap => {
       if (snap.exists() && snap.data().practices) setPractices(snap.data().practices);
+    }));
+
+    unsubs.push(onSnapshot(doc(db, 'settings', 'cancelledPractices'), snap => {
+      setCancelledSlots(snap.exists() ? snap.data() : {});
     }));
 
     const gamesQ = query(collection(db, 'games'), orderBy('date', 'desc'));
@@ -322,19 +327,33 @@ export default function Home() {
             </div>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {practices.map((p, i) => (
-              <div key={i} style={{
-                display: 'flex', alignItems: 'center', gap: '12px',
-                background: 'var(--gray-50)', borderRadius: '10px', padding: '12px'
-              }}>
-                <span style={{ fontSize: '24px' }}>⚾</span>
-                <div>
-                  <div style={{ fontWeight: '700', fontSize: '15px' }}>{p.day}</div>
-                  <div style={{ fontSize: '13px', color: 'var(--gray-500)' }}>{p.time}</div>
-                  {p.focus && <div style={{ fontSize: '12px', color: 'var(--red)', fontWeight: '600', marginTop: '2px' }}>{p.focus}</div>}
+            {practices.map((p, i) => {
+              const cancelled = !!cancelledSlots[i];
+              return (
+                <div key={i} style={{
+                  display: 'flex', alignItems: 'center', gap: '12px',
+                  background: cancelled ? '#FEF2F2' : 'var(--gray-50)',
+                  border: cancelled ? '1px solid #FECACA' : '1px solid transparent',
+                  borderRadius: '10px', padding: '12px'
+                }}>
+                  <span style={{ fontSize: '24px' }}>{cancelled ? '🚫' : '⚾'}</span>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <div style={{ fontWeight: '700', fontSize: '15px', color: cancelled ? '#B91C1C' : 'var(--black)' }}>{p.day}</div>
+                      {cancelled && (
+                        <span style={{
+                          fontSize: '10px', fontWeight: '700', color: '#B91C1C',
+                          background: '#FEE2E2', padding: '2px 7px', borderRadius: '8px',
+                          textTransform: 'uppercase', letterSpacing: '0.5px'
+                        }}>Cancelled</span>
+                      )}
+                    </div>
+                    <div style={{ fontSize: '13px', color: 'var(--gray-500)', textDecoration: cancelled ? 'line-through' : 'none' }}>{p.time}</div>
+                    {p.focus && !cancelled && <div style={{ fontSize: '12px', color: 'var(--red)', fontWeight: '600', marginTop: '2px' }}>{p.focus}</div>}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
 
