@@ -144,7 +144,7 @@ export default function Home() {
           color: 'white'
         }}>
           <p style={{ fontSize: '11px', fontWeight: '600', letterSpacing: '1px', opacity: 0.75, textTransform: 'uppercase', marginBottom: '10px' }}>
-            2025 Season Record
+            2026 Season Record
           </p>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0' }}>
             <div style={{ flex: 1, textAlign: 'center' }}>
