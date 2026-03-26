@@ -3,7 +3,6 @@ import { useState } from 'react';
 const HOURS = ['1','2','3','4','5','6','7','8','9','10','11','12'];
 const MINUTES = ['00','05','10','15','20','25','30','35','40','45','50','55'];
 
-// Parse a time string like "4:45 PM" into { hour, minute, ampm }
 function parseTime(str) {
   if (!str) return { hour: '', minute: '00', ampm: 'PM' };
   const m = str.match(/(\d+):(\d+)\s*(AM|PM)/i);
@@ -11,21 +10,17 @@ function parseTime(str) {
   return { hour: '', minute: '00', ampm: 'PM' };
 }
 
-// Build a display string like "4:45 PM"
 function formatTime({ hour, minute, ampm }) {
   if (!hour) return '';
   return `${hour}:${minute} ${ampm}`;
 }
 
-// Initialize slot with structured time fields from legacy `time` string if needed
 function initSlot(p) {
   const slot = { type: 'recurring', ...p };
   if (!slot.startHour) {
-    // Try to parse legacy time string "4:45 – 6:00 PM" or "4:45 PM – 6:00 PM"
     const t = slot.time || '';
     const parts = t.split('–').map(s => s.trim());
     if (parts.length === 2) {
-      // If second part has AM/PM, first part may not
       const endParsed = parseTime(parts[1]);
       const startParsed = parseTime(parts[0] + (parts[0].match(/AM|PM/i) ? '' : ' ' + endParsed.ampm));
       Object.assign(slot, {
@@ -55,6 +50,7 @@ const selectStyle = {
   appearance: 'none', WebkitAppearance: 'none', textAlign: 'center'
 };
 
+// Defined outside to prevent remount on every keystroke
 function TimeRow({ label, hour, minute, ampm, onHour, onMinute, onAmPm }) {
   return (
     <div style={{ marginBottom: '8px' }}>
@@ -71,6 +67,81 @@ function TimeRow({ label, hour, minute, ampm, onHour, onMinute, onAmPm }) {
           <option value="AM">AM</option>
           <option value="PM">PM</option>
         </select>
+      </div>
+    </div>
+  );
+}
+
+function SlotCard({ slot, i, updateSlot, removeSlot }) {
+  const isRecurring = (slot.type || 'recurring') === 'recurring';
+  return (
+    <div style={{ background: 'var(--gray-50)', borderRadius: '10px', padding: '12px', marginBottom: '12px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+        <span style={{
+          fontSize: '11px', fontWeight: '700', padding: '3px 8px', borderRadius: '8px',
+          background: isRecurring ? '#EDE9FE' : '#DBEAFE',
+          color: isRecurring ? '#7C3AED' : '#1D4ED8'
+        }}>
+          {isRecurring ? '🔁 Recurring' : '📅 One-time'}
+        </span>
+        <button onClick={() => removeSlot(i)} style={{ background: 'none', border: 'none', color: 'var(--gray-400)', cursor: 'pointer', fontSize: '18px', padding: 0 }}>×</button>
+      </div>
+
+      {isRecurring ? (
+        <>
+          <div className="form-group" style={{ marginBottom: '8px' }}>
+            <label className="form-label">Day of Week</label>
+            <select className="form-select" value={slot.day || ''} onChange={e => updateSlot(i, 'day', e.target.value)}>
+              <option value="">— Select day —</option>
+              {['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'].map(d => (
+                <option key={d} value={d}>{d}</option>
+              ))}
+            </select>
+          </div>
+          <div className="form-group" style={{ marginBottom: '8px' }}>
+            <label className="form-label">End Date (optional)</label>
+            <input className="form-input" type="date" value={slot.endDate || ''} onChange={e => updateSlot(i, 'endDate', e.target.value)} />
+            {slot.endDate && (
+              <button onClick={() => updateSlot(i, 'endDate', '')} style={{
+                marginTop: '4px', fontSize: '11px', color: 'var(--gray-400)',
+                background: 'none', border: 'none', cursor: 'pointer', padding: 0
+              }}>✕ Clear end date</button>
+            )}
+          </div>
+        </>
+      ) : (
+        <div className="form-group" style={{ marginBottom: '8px' }}>
+          <label className="form-label">Date</label>
+          <input className="form-input" type="date" value={slot.date || ''} onChange={e => updateSlot(i, 'date', e.target.value)} />
+        </div>
+      )}
+
+      <TimeRow
+        label="Start Time"
+        hour={slot.startHour || ''}
+        minute={slot.startMinute || '00'}
+        ampm={slot.startAmPm || 'PM'}
+        onHour={v => updateSlot(i, 'startHour', v)}
+        onMinute={v => updateSlot(i, 'startMinute', v)}
+        onAmPm={v => updateSlot(i, 'startAmPm', v)}
+      />
+      <TimeRow
+        label="End Time"
+        hour={slot.endHour || ''}
+        minute={slot.endMinute || '00'}
+        ampm={slot.endAmPm || 'PM'}
+        onHour={v => updateSlot(i, 'endHour', v)}
+        onMinute={v => updateSlot(i, 'endMinute', v)}
+        onAmPm={v => updateSlot(i, 'endAmPm', v)}
+      />
+
+      <div className="form-group" style={{ marginBottom: '8px' }}>
+        <label className="form-label">Location</label>
+        <input className="form-input" value={slot.location || ''} onChange={e => updateSlot(i, 'location', e.target.value)} placeholder="e.g. Riverside Park Field 2" />
+      </div>
+      <div className="form-group" style={{ marginBottom: 0 }}>
+        <label className="form-label">Focus</label>
+        <input className="form-input" value={slot.focus || ''} onChange={e => updateSlot(i, 'focus', e.target.value)} placeholder="e.g. Hitting Focus" />
       </div>
     </div>
   );
@@ -95,86 +166,7 @@ export default function PracticeScheduleModal({ current, onSave, onClose }) {
   };
 
   const handleSave = () => {
-    const prepared = slots.map(slot => ({
-      ...slot,
-      time: buildTimeString(slot)
-    }));
-    onSave(prepared);
-  };
-
-  const SlotCard = ({ slot, i }) => {
-    const isRecurring = (slot.type || 'recurring') === 'recurring';
-    return (
-      <div style={{ background: 'var(--gray-50)', borderRadius: '10px', padding: '12px', marginBottom: '12px' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-          <span style={{
-            fontSize: '11px', fontWeight: '700', padding: '3px 8px', borderRadius: '8px',
-            background: isRecurring ? '#EDE9FE' : '#DBEAFE',
-            color: isRecurring ? '#7C3AED' : '#1D4ED8'
-          }}>
-            {isRecurring ? '🔁 Recurring' : '📅 One-time'}
-          </span>
-          <button onClick={() => removeSlot(i)} style={{ background: 'none', border: 'none', color: 'var(--gray-400)', cursor: 'pointer', fontSize: '18px', padding: 0 }}>×</button>
-        </div>
-
-        {isRecurring ? (
-          <>
-            <div className="form-group" style={{ marginBottom: '8px' }}>
-              <label className="form-label">Day of Week</label>
-              <select className="form-select" value={slot.day || ''} onChange={e => updateSlot(i, 'day', e.target.value)}>
-                <option value="">— Select day —</option>
-                {['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'].map(d => (
-                  <option key={d} value={d}>{d}</option>
-                ))}
-              </select>
-            </div>
-            <div className="form-group" style={{ marginBottom: '8px' }}>
-              <label className="form-label">End Date (optional)</label>
-              <input className="form-input" type="date" value={slot.endDate || ''} onChange={e => updateSlot(i, 'endDate', e.target.value)} />
-              {slot.endDate && (
-                <button onClick={() => updateSlot(i, 'endDate', '')} style={{
-                  marginTop: '4px', fontSize: '11px', color: 'var(--gray-400)',
-                  background: 'none', border: 'none', cursor: 'pointer', padding: 0
-                }}>✕ Clear end date</button>
-              )}
-            </div>
-          </>
-        ) : (
-          <div className="form-group" style={{ marginBottom: '8px' }}>
-            <label className="form-label">Date</label>
-            <input className="form-input" type="date" value={slot.date || ''} onChange={e => updateSlot(i, 'date', e.target.value)} />
-          </div>
-        )}
-
-        <TimeRow
-          label="Start Time"
-          hour={slot.startHour || ''}
-          minute={slot.startMinute || '00'}
-          ampm={slot.startAmPm || 'PM'}
-          onHour={v => updateSlot(i, 'startHour', v)}
-          onMinute={v => updateSlot(i, 'startMinute', v)}
-          onAmPm={v => updateSlot(i, 'startAmPm', v)}
-        />
-        <TimeRow
-          label="End Time"
-          hour={slot.endHour || ''}
-          minute={slot.endMinute || '00'}
-          ampm={slot.endAmPm || 'PM'}
-          onHour={v => updateSlot(i, 'endHour', v)}
-          onMinute={v => updateSlot(i, 'endMinute', v)}
-          onAmPm={v => updateSlot(i, 'endAmPm', v)}
-        />
-
-        <div className="form-group" style={{ marginBottom: '8px' }}>
-          <label className="form-label">Location</label>
-          <input className="form-input" value={slot.location || ''} onChange={e => updateSlot(i, 'location', e.target.value)} placeholder="e.g. Riverside Park Field 2" />
-        </div>
-        <div className="form-group" style={{ marginBottom: 0 }}>
-          <label className="form-label">Focus</label>
-          <input className="form-input" value={slot.focus || ''} onChange={e => updateSlot(i, 'focus', e.target.value)} placeholder="e.g. Hitting Focus" />
-        </div>
-      </div>
-    );
+    onSave(slots.map(slot => ({ ...slot, time: buildTimeString(slot) })));
   };
 
   return (
@@ -188,7 +180,9 @@ export default function PracticeScheduleModal({ current, onSave, onClose }) {
           Recurring practices repeat every week on the selected day. One-time practices show on a specific date.
         </p>
 
-        {slots.map((slot, i) => <SlotCard key={i} slot={slot} i={i} />)}
+        {slots.map((slot, i) => (
+          <SlotCard key={i} slot={slot} i={i} updateSlot={updateSlot} removeSlot={removeSlot} />
+        ))}
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '16px' }}>
           <button onClick={() => addSlot('recurring')} style={{
