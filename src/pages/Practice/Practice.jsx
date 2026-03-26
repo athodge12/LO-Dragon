@@ -6,24 +6,35 @@ import Header from '../../components/Layout/Header';
 import Toast from '../../components/UI/Toast';
 import { DRILLS, CATEGORIES, TUESDAY_PLAN, THURSDAY_PLAN } from '../../data/drills';
 
-const DEFAULT_SCHEDULE = [
-  { day: 'Tuesday', time: '4:45 – 6:00 PM' },
-  { day: 'Thursday', time: '7:15 – 8:30 PM' }
-];
-
+const DAY_MAP = { Sunday: 0, Monday: 1, Tuesday: 2, Wednesday: 3, Thursday: 4, Friday: 5, Saturday: 6 };
 const PLANS = [TUESDAY_PLAN, THURSDAY_PLAN];
 const PROGRESS_KEYS = ['tuesdayProgress', 'thursdayProgress'];
 
+function getNextDate(slot) {
+  if (slot.type === 'onetime') return slot.date || null;
+  const targetDay = DAY_MAP[slot.day];
+  if (targetDay === undefined) return null;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const d = new Date(today);
+  const diff = (targetDay - d.getDay() + 7) % 7;
+  d.setDate(d.getDate() + diff);
+  const endDate = slot.endDate ? new Date(slot.endDate + 'T23:59:59') : null;
+  if (endDate && d > endDate) return null;
+  return d.toISOString().split('T')[0];
+}
+
 export default function Practice() {
   const { isCoach } = useAuth();
-  const [tab, setTab] = useState('slot0');
+  const [tab, setTab] = useState('drills');
   const [progress, setProgress] = useState([{}, {}]);
-  const [practiceSchedule, setPracticeSchedule] = useState(DEFAULT_SCHEDULE);
+  const [practiceSchedule, setPracticeSchedule] = useState([]);
   const [cancelledSlots, setCancelledSlots] = useState({});
   const [selectedDrill, setSelectedDrill] = useState(null);
   const [categoryFilter, setCategoryFilter] = useState('All');
   const [toast, setToast] = useState('');
   const [customPlan, setCustomPlan] = useState({ duration: 75, drills: [] });
+  const [practiceDetailModal, setPracticeDetailModal] = useState(null);
 
   useEffect(() => {
     const unsubs = [
@@ -61,140 +72,124 @@ export default function Practice() {
     const updated = { ...cancelledSlots, [slotIndex]: !cancelledSlots[slotIndex] };
     await setDoc(doc(db, 'settings', 'cancelledPractices'), updated);
     setToast(updated[slotIndex] ? 'Practice cancelled.' : 'Practice cancellation removed.');
+    // update modal state so the button label reflects the change immediately
+    if (practiceDetailModal?.slotIndex === slotIndex) {
+      setPracticeDetailModal(m => m ? { ...m } : null);
+    }
   };
 
   const getDrill = (id) => DRILLS.find(d => d.id === id);
 
-  const filteredDrills = CATEGORIES === categoryFilter || categoryFilter === 'All'
-    ? DRILLS
-    : DRILLS.filter(d => d.category === categoryFilter);
+  // Next 2 upcoming practices from schedule
+  const upcomingPractices = practiceSchedule
+    .map((slot, i) => ({ slot, slotIndex: i, date: getNextDate(slot) }))
+    .filter(p => p.date)
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .slice(0, 2);
 
-  const PlanView = ({ plan, progress, slotIndex, slot }) => {
-    const planDrills = plan.drills.map(id => getDrill(id)).filter(Boolean);
-    const totalTime = planDrills.reduce((s, d) => s + d.duration, 0);
-    const completedCount = planDrills.filter(d => progress[d.id]).length;
-    const displayName = slot
-      ? `${slot.day}${slot.focus ? ` — ${slot.focus}` : ''}`
-      : plan.name;
-    const displayTime = slot?.time || plan.time;
-
-    return (
-      <div>
-        <div style={{
-          background: 'linear-gradient(135deg, #CC1B1B, #8B0000)',
-          borderRadius: '12px', padding: '16px', marginBottom: '14px', color: 'white'
-        }}>
-          <h3 style={{ fontFamily: 'Oswald, sans-serif', fontSize: '18px', margin: 0 }}>{displayName}</h3>
-          <p style={{ opacity: 0.8, fontSize: '14px', marginTop: '4px' }}>{displayTime}</p>
-          {slot?.location && (
-            <p style={{ opacity: 0.8, fontSize: '13px', marginTop: '2px' }}>📍 {slot.location}</p>
-          )}
-          <div style={{ display: 'flex', gap: '16px', marginTop: '10px' }}>
-            <div style={{ fontSize: '13px', opacity: 0.9 }}>⏱ {totalTime} min</div>
-            <div style={{ fontSize: '13px', opacity: 0.9 }}>📋 {planDrills.length} drills</div>
-            <div style={{ fontSize: '13px', opacity: 0.9 }}>✅ {completedCount}/{planDrills.length}</div>
-          </div>
-          {/* Progress bar */}
-          <div style={{ background: 'rgba(255,255,255,0.2)', borderRadius: '4px', height: '4px', marginTop: '10px', overflow: 'hidden' }}>
-            <div style={{
-              background: 'white', height: '100%', borderRadius: '4px',
-              width: `${planDrills.length ? (completedCount / planDrills.length) * 100 : 0}%`,
-              transition: 'width 0.3s'
-            }} />
-          </div>
-        </div>
-
-        {isCoach && (
-          <button onClick={() => resetProgress(slotIndex)} className="btn-secondary" style={{ marginBottom: '12px', width: 'auto', fontSize: '12px', padding: '6px 12px' }}>
-            Reset Progress
-          </button>
-        )}
-
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-          {planDrills.map((drill, index) => (
-            <DrillCard
-              key={drill.id}
-              drill={drill}
-              index={index}
-              completed={progress[drill.id]}
-              onToggle={() => toggleDrillComplete(drill.id, slotIndex)}
-              onExpand={() => setSelectedDrill(drill)}
-            />
-          ))}
-        </div>
-      </div>
-    );
+  const openPractice = (item) => {
+    setPracticeDetailModal(item);
   };
-
-  const slotTabs = practiceSchedule
-    .filter(slot => (slot.type || 'recurring') === 'recurring')
-    .slice(0, PLANS.length).map((slot, i) => ({
-    key: `slot${i}`,
-    label: slot.day || `Practice ${i + 1}`,
-    cancelled: !!cancelledSlots[i]
-  }));
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
       <Header title="Practice" />
 
       <div className="page-content">
+
+        {/* Upcoming Practices */}
+        <div style={{ marginBottom: '20px' }}>
+          <div className="section-header" style={{ marginBottom: '10px' }}>
+            <span className="section-title">Upcoming Practices</span>
+          </div>
+
+          {upcomingPractices.length === 0 ? (
+            <div style={{
+              background: 'var(--gray-50)', border: '1px solid var(--gray-200)',
+              borderRadius: '12px', padding: '20px', textAlign: 'center'
+            }}>
+              <p style={{ fontSize: '13px', color: 'var(--gray-400)' }}>
+                No upcoming practices scheduled.
+                {isCoach && ' Go to Schedule → Practices to set up the schedule.'}
+              </p>
+            </div>
+          ) : (
+            upcomingPractices.map(item => {
+              const { slot, slotIndex, date } = item;
+              const cancelled = !!cancelledSlots[slotIndex];
+              const dateObj = new Date(date + 'T12:00:00');
+              const dayLabel = slot.day || dateObj.toLocaleDateString('en-US', { weekday: 'long' });
+              const dateLabel = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+
+              return (
+                <button
+                  key={slotIndex}
+                  onClick={() => openPractice(item)}
+                  style={{
+                    width: '100%', textAlign: 'left', cursor: 'pointer',
+                    background: cancelled ? '#FFF5F5' : 'white',
+                    border: `1px solid ${cancelled ? '#FECACA' : 'var(--gray-200)'}`,
+                    borderRadius: '12px', padding: '14px 16px',
+                    marginBottom: '10px', display: 'flex', gap: '14px', alignItems: 'center'
+                  }}
+                >
+                  {/* Date badge */}
+                  <div style={{
+                    background: cancelled ? '#FEE2E2' : 'linear-gradient(135deg, #CC1B1B, #8B0000)',
+                    color: cancelled ? '#B91C1C' : 'white',
+                    borderRadius: '10px', padding: '6px 10px',
+                    textAlign: 'center', minWidth: '52px', flexShrink: 0
+                  }}>
+                    <div style={{ fontSize: '10px', fontWeight: '600', textTransform: 'uppercase', opacity: 0.85 }}>
+                      {dateObj.toLocaleDateString('en-US', { month: 'short' })}
+                    </div>
+                    <div style={{ fontSize: '24px', fontWeight: '700', fontFamily: 'Oswald, sans-serif', lineHeight: 1 }}>
+                      {dateObj.getDate()}
+                    </div>
+                  </div>
+
+                  {/* Details */}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                      <span style={{
+                        fontWeight: '700', fontSize: '16px',
+                        textDecoration: cancelled ? 'line-through' : 'none',
+                        color: cancelled ? '#B91C1C' : 'var(--black)'
+                      }}>{dayLabel}</span>
+                      {cancelled && (
+                        <span style={{
+                          fontSize: '11px', fontWeight: '700', padding: '2px 7px',
+                          borderRadius: '10px', background: '#FEE2E2', color: '#B91C1C'
+                        }}>Cancelled</span>
+                      )}
+                    </div>
+                    {slot.time && (
+                      <div style={{ fontSize: '13px', color: 'var(--gray-500)', marginTop: '2px' }}>{slot.time}</div>
+                    )}
+                    {slot.location && (
+                      <div style={{ fontSize: '12px', color: 'var(--gray-400)', marginTop: '1px' }}>📍 {slot.location}</div>
+                    )}
+                    {slot.focus && (
+                      <div style={{ fontSize: '12px', color: 'var(--red)', fontWeight: '600', marginTop: '2px' }}>{slot.focus}</div>
+                    )}
+                  </div>
+
+                  {/* Arrow */}
+                  <span style={{ fontSize: '20px', color: 'var(--gray-300)', flexShrink: 0 }}>›</span>
+                </button>
+              );
+            })
+          )}
+        </div>
+
+        {/* Drill Library / Build tabs */}
         <div className="tabs">
-          {slotTabs.map(t => (
-            <button key={t.key} className={`tab ${tab === t.key ? 'active' : ''}`} onClick={() => setTab(t.key)}
-              style={{ position: 'relative' }}>
-              {t.label}
-              {t.cancelled && (
-                <span style={{
-                  position: 'absolute', top: 2, right: 2,
-                  width: 8, height: 8, borderRadius: '50%', background: '#B91C1C'
-                }} />
-              )}
-            </button>
-          ))}
           <button className={`tab ${tab === 'drills' ? 'active' : ''}`} onClick={() => setTab('drills')}>Drill Library</button>
           {isCoach && <button className={`tab ${tab === 'build' ? 'active' : ''}`} onClick={() => setTab('build')}>Build</button>}
         </div>
 
-        {slotTabs.map((t, i) => tab === t.key && (
-          <div key={t.key}>
-            {cancelledSlots[i] && (
-              <div style={{
-                background: '#FEE2E2', border: '1px solid #FECACA', borderRadius: '10px',
-                padding: '12px 16px', marginBottom: '14px',
-                display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '10px'
-              }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <span style={{ fontSize: '18px' }}>🚫</span>
-                  <span style={{ fontWeight: '700', color: '#B91C1C', fontSize: '15px' }}>
-                    {t.label} Practice Cancelled
-                  </span>
-                </div>
-                {isCoach && (
-                  <button onClick={() => toggleCancelPractice(i)} style={{
-                    fontSize: '12px', fontWeight: '600', color: '#B91C1C',
-                    background: 'none', border: '1px solid #FECACA', borderRadius: '8px',
-                    padding: '4px 10px', cursor: 'pointer'
-                  }}>Uncancel</button>
-                )}
-              </div>
-            )}
-            {isCoach && !cancelledSlots[i] && (
-              <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '10px' }}>
-                <button onClick={() => toggleCancelPractice(i)} style={{
-                  fontSize: '12px', fontWeight: '600', color: '#B91C1C',
-                  background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: '8px',
-                  padding: '6px 12px', cursor: 'pointer'
-                }}>Cancel Practice</button>
-              </div>
-            )}
-            <PlanView plan={PLANS[i]} progress={progress[i] || {}} slotIndex={i} slot={practiceSchedule[i]} />
-          </div>
-        ))}
-
         {tab === 'drills' && (
           <div>
-            {/* Category filter */}
             <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', paddingBottom: '4px', marginBottom: '14px' }}>
               {['All', ...CATEGORIES].map(cat => (
                 <button
@@ -205,20 +200,14 @@ export default function Practice() {
                     border: `1.5px solid ${categoryFilter === cat ? 'var(--red)' : 'var(--gray-200)'}`,
                     background: categoryFilter === cat ? '#FEF2F2' : 'white',
                     color: categoryFilter === cat ? 'var(--red)' : 'var(--gray-500)',
-                    fontSize: '12px', fontWeight: '600', cursor: 'pointer',
-                    whiteSpace: 'nowrap'
+                    fontSize: '12px', fontWeight: '600', cursor: 'pointer', whiteSpace: 'nowrap'
                   }}
                 >{cat}</button>
               ))}
             </div>
-
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               {DRILLS.filter(d => categoryFilter === 'All' || d.category === categoryFilter).map(drill => (
-                <DrillCard
-                  key={drill.id}
-                  drill={drill}
-                  onExpand={() => setSelectedDrill(drill)}
-                />
+                <DrillCard key={drill.id} drill={drill} onExpand={() => setSelectedDrill(drill)} />
               ))}
             </div>
           </div>
@@ -228,6 +217,104 @@ export default function Practice() {
           <PracticeBuilder customPlan={customPlan} setCustomPlan={setCustomPlan} setToast={setToast} />
         )}
       </div>
+
+      {/* Practice Detail Modal */}
+      {practiceDetailModal && (() => {
+        const { slot, slotIndex, date } = practiceDetailModal;
+        const cancelled = !!cancelledSlots[slotIndex];
+        const plan = PLANS[slotIndex] || PLANS[0];
+        const planDrills = plan.drills.map(id => getDrill(id)).filter(Boolean);
+        const totalTime = planDrills.reduce((s, d) => s + d.duration, 0);
+        const prog = progress[slotIndex] || {};
+        const completedCount = planDrills.filter(d => prog[d.id]).length;
+        const dateObj = new Date(date + 'T12:00:00');
+        const dateLabel = dateObj.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+        const displayName = slot.day
+          ? `${slot.day}${slot.focus ? ` — ${slot.focus}` : ''}`
+          : dateLabel;
+
+        return (
+          <div className="modal-overlay" onClick={() => setPracticeDetailModal(null)}>
+            <div className="modal-sheet" onClick={e => e.stopPropagation()} style={{ maxHeight: '92vh', overflowY: 'auto' }}>
+              <div className="modal-handle" />
+
+              {/* Cancelled banner */}
+              {cancelled && (
+                <div style={{
+                  background: '#FEE2E2', border: '1px solid #FECACA', borderRadius: '10px',
+                  padding: '10px 14px', marginBottom: '14px',
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px'
+                }}>
+                  <span style={{ fontWeight: '700', color: '#B91C1C', fontSize: '14px' }}>🚫 Practice Cancelled</span>
+                  {isCoach && (
+                    <button onClick={() => toggleCancelPractice(slotIndex)} style={{
+                      fontSize: '12px', fontWeight: '600', color: '#B91C1C',
+                      background: 'none', border: '1px solid #FECACA', borderRadius: '8px',
+                      padding: '4px 10px', cursor: 'pointer'
+                    }}>Uncancel</button>
+                  )}
+                </div>
+              )}
+
+              {/* Header card */}
+              <div style={{
+                background: 'linear-gradient(135deg, #CC1B1B, #8B0000)',
+                borderRadius: '12px', padding: '16px', marginBottom: '14px', color: 'white'
+              }}>
+                <h3 style={{ fontFamily: 'Oswald, sans-serif', fontSize: '18px', margin: 0 }}>{displayName}</h3>
+                <p style={{ opacity: 0.8, fontSize: '13px', marginTop: '3px' }}>{dateLabel}</p>
+                {slot.time && <p style={{ opacity: 0.8, fontSize: '14px', marginTop: '2px' }}>{slot.time}</p>}
+                {slot.location && <p style={{ opacity: 0.8, fontSize: '13px', marginTop: '2px' }}>📍 {slot.location}</p>}
+                <div style={{ display: 'flex', gap: '16px', marginTop: '10px' }}>
+                  <div style={{ fontSize: '13px', opacity: 0.9 }}>⏱ {totalTime} min</div>
+                  <div style={{ fontSize: '13px', opacity: 0.9 }}>📋 {planDrills.length} drills</div>
+                  <div style={{ fontSize: '13px', opacity: 0.9 }}>✅ {completedCount}/{planDrills.length}</div>
+                </div>
+                <div style={{ background: 'rgba(255,255,255,0.2)', borderRadius: '4px', height: '4px', marginTop: '10px', overflow: 'hidden' }}>
+                  <div style={{
+                    background: 'white', height: '100%', borderRadius: '4px',
+                    width: `${planDrills.length ? (completedCount / planDrills.length) * 100 : 0}%`,
+                    transition: 'width 0.3s'
+                  }} />
+                </div>
+              </div>
+
+              {/* Coach actions */}
+              {isCoach && (
+                <div style={{ display: 'flex', gap: '8px', marginBottom: '14px' }}>
+                  <button onClick={() => resetProgress(slotIndex)} className="btn-secondary" style={{ flex: 1, fontSize: '13px', padding: '8px' }}>
+                    Reset Progress
+                  </button>
+                  {!cancelled && (
+                    <button onClick={() => toggleCancelPractice(slotIndex)} style={{
+                      flex: 1, fontSize: '13px', padding: '8px', borderRadius: '10px', cursor: 'pointer',
+                      fontWeight: '700', border: 'none', background: '#FEE2E2', color: '#B91C1C'
+                    }}>Cancel Practice</button>
+                  )}
+                </div>
+              )}
+
+              {/* Drills */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                {planDrills.map((drill, index) => (
+                  <DrillCard
+                    key={drill.id}
+                    drill={drill}
+                    index={index}
+                    completed={prog[drill.id]}
+                    onToggle={isCoach ? () => toggleDrillComplete(drill.id, slotIndex) : undefined}
+                    onExpand={() => setSelectedDrill(drill)}
+                  />
+                ))}
+              </div>
+
+              <button className="btn-secondary" onClick={() => setPracticeDetailModal(null)} style={{ width: '100%', marginTop: '16px' }}>
+                Close
+              </button>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Drill Detail Modal */}
       {selectedDrill && (
@@ -270,7 +357,7 @@ function DrillCard({ drill, index, completed, onToggle, onExpand }) {
           fontFamily: 'Oswald, sans-serif', fontWeight: '700', fontSize: '13px', flexShrink: 0
         }}>{index + 1}</div>
       )}
-      <div style={{ flex: 1, minWidth: 0 }} onClick={onExpand} role="button" style={{ flex: 1, cursor: 'pointer' }}>
+      <div style={{ flex: 1, cursor: 'pointer' }} onClick={onExpand}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
           <span style={{ fontWeight: '700', fontSize: '14px', color: completed ? '#16A34A' : 'var(--black)' }}>
             {drill.title}
