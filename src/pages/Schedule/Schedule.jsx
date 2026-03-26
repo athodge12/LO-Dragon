@@ -4,6 +4,7 @@ import { db } from '../../firebase/config';
 import { useAuth } from '../../contexts/AuthContext';
 import Header from '../../components/Layout/Header';
 import Toast from '../../components/UI/Toast';
+import PracticeScheduleModal from '../Home/PracticeScheduleModal';
 
 const DAY_MAP = { Sunday: 0, Monday: 1, Tuesday: 2, Wednesday: 3, Thursday: 4, Friday: 5, Saturday: 6 };
 
@@ -31,6 +32,7 @@ export default function Schedule() {
   const [practiceSchedule, setPracticeSchedule] = useState([]);
   const [cancelledSlots, setCancelledSlots] = useState({});
   const [modal, setModal] = useState(null);
+  const [practiceModal, setPracticeModal] = useState(false);
   const [scoreModal, setScoreModal] = useState(null);
   const [toast, setToast] = useState('');
   const [form, setForm] = useState({ opponent: '', date: '', time: '', location: '', homeAway: 'Home' });
@@ -111,6 +113,12 @@ export default function Schedule() {
   const visibleUpcoming = tab === 'all' ? allEvents
     : tab === 'games' ? allEvents.filter(e => e.type === 'game')
     : allEvents.filter(e => e.type === 'practice');
+
+  const savePractices = async (data) => {
+    await setDoc(doc(db, 'settings', 'practiceSchedule'), { practices: data });
+    setToast('Practice schedule updated!');
+    setPracticeModal(false);
+  };
 
   const addGame = async () => {
     if (!form.opponent || !form.date) return;
@@ -294,6 +302,17 @@ export default function Schedule() {
           <div className="view-only-banner">Tap Yes / No / Maybe to RSVP to each game</div>
         )}
 
+        {isCoach && tab === 'practices' && (
+          <button onClick={() => setPracticeModal(true)} style={{
+            width: '100%', padding: '11px', marginBottom: '14px',
+            border: '1.5px solid #7C3AED', borderRadius: '10px',
+            background: '#EDE9FE', color: '#7C3AED',
+            fontWeight: '700', fontSize: '14px', cursor: 'pointer'
+          }}>
+            ✏️ Edit Practice Schedule
+          </button>
+        )}
+
         {/* Upcoming events */}
         {visibleUpcoming.length > 0 ? (
           <>
@@ -397,6 +416,14 @@ export default function Schedule() {
             <button className="btn-primary" onClick={saveScore}>Save Score</button>
           </div>
         </div>
+      )}
+
+      {practiceModal && (
+        <PracticeScheduleModal
+          current={practiceSchedule}
+          onSave={savePractices}
+          onClose={() => setPracticeModal(false)}
+        />
       )}
 
       {toast && <Toast message={toast} onDismiss={() => setToast('')} />}
