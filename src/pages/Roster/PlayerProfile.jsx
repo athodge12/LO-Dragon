@@ -125,8 +125,8 @@ export default function PlayerProfile() {
           }}>{player.jerseyNumber ? `#${player.jerseyNumber}` : initials}</div>
           <div style={{ flex: 1 }}>
             <h2 style={{ color: 'white', fontSize: '22px', fontWeight: '700', margin: 0 }}>{playerName}</h2>
-            {player.position && (
-              <p style={{ opacity: 0.85, fontSize: '14px', marginTop: '4px' }}>{player.position}</p>
+            {player.positions?.length > 0 && (
+              <p style={{ opacity: 0.85, fontSize: '14px', marginTop: '4px' }}>{player.positions.join(' · ')}</p>
             )}
             {player.jerseyNumber && (
               <p style={{ opacity: 0.7, fontSize: '13px' }}>Jersey #{player.jerseyNumber}</p>
@@ -140,20 +140,43 @@ export default function PlayerProfile() {
             <h3 style={{ fontFamily: 'Oswald, sans-serif', fontSize: '16px', marginBottom: '12px', textTransform: 'uppercase' }}>
               Edit Player
             </h3>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-              <div className="form-group" style={{ marginBottom: 0 }}>
-                <label className="form-label">Jersey #</label>
-                <input className="form-input" value={editForm.jerseyNumber || ''} onChange={e => setEditForm(f => ({ ...f, jerseyNumber: e.target.value }))} />
-              </div>
-              <div className="form-group" style={{ marginBottom: 0 }}>
-                <label className="form-label">Position</label>
-                <select className="form-select" value={editForm.position || ''} onChange={e => setEditForm(f => ({ ...f, position: e.target.value }))}>
-                  <option value="">Select...</option>
-                  {positions.map(p => <option key={p} value={p}>{p}</option>)}
-                </select>
+            <div className="form-group">
+              <label className="form-label">Jersey #</label>
+              <input className="form-input" value={editForm.jerseyNumber || ''} onChange={e => setEditForm(f => ({ ...f, jerseyNumber: e.target.value }))} />
+            </div>
+            <div className="form-group" style={{ marginBottom: '12px' }}>
+              <label className="form-label">
+                Primary Positions <span style={{ fontWeight: '400', color: 'var(--gray-400)' }}>(pick up to 3)</span>
+              </label>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                {positions.map(pos => {
+                  const selected = (editForm.positions || []).includes(pos);
+                  const atLimit = (editForm.positions || []).length >= 3;
+                  return (
+                    <button
+                      key={pos}
+                      type="button"
+                      onClick={() => {
+                        const cur = editForm.positions || [];
+                        if (selected) {
+                          setEditForm(f => ({ ...f, positions: cur.filter(p => p !== pos) }));
+                        } else if (!atLimit) {
+                          setEditForm(f => ({ ...f, positions: [...cur, pos] }));
+                        }
+                      }}
+                      style={{
+                        padding: '6px 12px', borderRadius: '20px', cursor: selected || !atLimit ? 'pointer' : 'default',
+                        border: `1.5px solid ${selected ? 'var(--red)' : 'var(--gray-200)'}`,
+                        background: selected ? '#FEF2F2' : 'white',
+                        color: selected ? 'var(--red)' : atLimit && !selected ? 'var(--gray-300)' : 'var(--gray-600)',
+                        fontWeight: selected ? '700' : '400', fontSize: '13px'
+                      }}
+                    >{pos}</button>
+                  );
+                })}
               </div>
             </div>
-            <button className="btn-primary" onClick={saveProfile} style={{ marginTop: '12px' }}>Save Changes</button>
+            <button className="btn-primary" onClick={saveProfile}>Save Changes</button>
           </div>
         )}
 

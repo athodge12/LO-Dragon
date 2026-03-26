@@ -17,7 +17,7 @@ export default function Roster() {
   const [modal, setModal] = useState(false);
   const [tab, setTab] = useState('players');
   const [toast, setToast] = useState('');
-  const [form, setForm] = useState({ name: '', jerseyNumber: '', position: '' });
+  const [form, setForm] = useState({ name: '', jerseyNumber: '' });
   const [claimModal, setClaimModal] = useState(null);
 
   useEffect(() => {
@@ -38,12 +38,12 @@ export default function Roster() {
     await addDoc(collection(db, 'roster'), {
       name: form.name.trim(),
       jerseyNumber: form.jerseyNumber,
-      position: form.position,
+      positions: [],
       claimedBy: null,
       claimedByName: null,
       createdAt: new Date().toISOString()
     });
-    setForm({ name: '', jerseyNumber: '', position: '' });
+    setForm({ name: '', jerseyNumber: '' });
     setModal(false);
     setToast('Player added!');
   };
@@ -111,7 +111,8 @@ export default function Roster() {
             <div style={{ flex: 1 }}>
               <div style={{ fontWeight: '700', fontSize: '16px' }}>{myClaimedPlayer.name}</div>
               <div style={{ fontSize: '12px', opacity: 0.8 }}>
-                {myClaimedPlayer.position}{myClaimedPlayer.jerseyNumber ? ` · #${myClaimedPlayer.jerseyNumber}` : ''}
+                {myClaimedPlayer.jerseyNumber ? `#${myClaimedPlayer.jerseyNumber}` : ''}
+                {myClaimedPlayer.positions?.length ? ` · ${myClaimedPlayer.positions.join(', ')}` : ''}
               </div>
             </div>
             <button
@@ -178,7 +179,8 @@ export default function Roster() {
                           {player.name}
                         </div>
                         <div style={{ fontSize: '13px', color: 'var(--gray-500)', marginTop: '2px' }}>
-                          {player.position}{player.jerseyNumber ? ` · #${player.jerseyNumber}` : ''}
+                          {player.jerseyNumber ? `#${player.jerseyNumber}` : ''}
+                          {player.positions?.length ? ` · ${player.positions.slice(0,2).join(', ')}` : ''}
                         </div>
                         <div style={{ fontSize: '12px', marginTop: '2px' }}>
                           {isClaimed ? (
@@ -261,18 +263,9 @@ export default function Roster() {
               <label className="form-label">Player Name</label>
               <input className="form-input" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="First and last name" />
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-              <div className="form-group" style={{ marginBottom: 0 }}>
-                <label className="form-label">Jersey #</label>
-                <input className="form-input" type="number" value={form.jerseyNumber} onChange={e => setForm(f => ({ ...f, jerseyNumber: e.target.value }))} placeholder="00" />
-              </div>
-              <div className="form-group" style={{ marginBottom: 0 }}>
-                <label className="form-label">Position</label>
-                <select className="form-select" value={form.position} onChange={e => setForm(f => ({ ...f, position: e.target.value }))}>
-                  <option value="">Select...</option>
-                  {positions.map(p => <option key={p} value={p}>{p}</option>)}
-                </select>
-              </div>
+            <div className="form-group">
+              <label className="form-label">Jersey #</label>
+              <input className="form-input" type="number" value={form.jerseyNumber} onChange={e => setForm(f => ({ ...f, jerseyNumber: e.target.value }))} placeholder="00" />
             </div>
             <button className="btn-primary" onClick={addPlayer} style={{ marginTop: '16px' }}>Add Player</button>
           </div>
