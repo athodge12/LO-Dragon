@@ -67,9 +67,25 @@ export default function Schedule() {
     return () => unsubs.forEach(u => u());
   }, [currentUser]);
 
-  // Build practice events from recurring schedule
-  const practiceEvents = practiceSchedule.flatMap((slot, i) =>
-    getUpcomingPracticeDates(slot).map(date => ({
+  // Build practice events from schedule (recurring + one-time)
+  const practiceEvents = practiceSchedule.flatMap((slot, i) => {
+    if (slot.type === 'onetime') {
+      if (!slot.date) return [];
+      return [{
+        id: `practice-${i}-${slot.date}`,
+        type: 'practice',
+        date: slot.date,
+        slotIndex: i,
+        day: new Date(slot.date + 'T12:00:00').toLocaleDateString('en-US', { weekday: 'long' }),
+        time: slot.time,
+        location: slot.location,
+        focus: slot.focus,
+        cancelled: !!cancelledSlots[i],
+        isOnetime: true
+      }];
+    }
+    // Recurring
+    return getUpcomingPracticeDates(slot).map(date => ({
       id: `practice-${i}-${date}`,
       type: 'practice',
       date,
@@ -79,8 +95,8 @@ export default function Schedule() {
       location: slot.location,
       focus: slot.focus,
       cancelled: !!cancelledSlots[i]
-    }))
-  );
+    }));
+  });
 
   const today = new Date().toISOString().split('T')[0];
 
@@ -235,8 +251,9 @@ export default function Schedule() {
             <span style={{ fontWeight: '700', fontSize: '15px' }}>Practice</span>
             <span style={{
               fontSize: '11px', fontWeight: '700', padding: '2px 7px', borderRadius: '10px',
-              background: '#EDE9FE', color: '#7C3AED'
-            }}>⚾ {event.day}</span>
+              background: event.isOnetime ? '#DBEAFE' : '#EDE9FE',
+              color: event.isOnetime ? '#1D4ED8' : '#7C3AED'
+            }}>{event.isOnetime ? '📅' : '🔁'} {event.day}</span>
             {event.cancelled && (
               <span style={{
                 fontSize: '11px', fontWeight: '700', padding: '2px 7px', borderRadius: '10px',

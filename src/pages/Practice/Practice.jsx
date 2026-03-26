@@ -126,7 +126,9 @@ export default function Practice() {
     );
   };
 
-  const slotTabs = practiceSchedule.slice(0, PLANS.length).map((slot, i) => ({
+  const slotTabs = practiceSchedule
+    .filter(slot => (slot.type || 'recurring') === 'recurring')
+    .slice(0, PLANS.length).map((slot, i) => ({
     key: `slot${i}`,
     label: slot.day || `Practice ${i + 1}`,
     cancelled: !!cancelledSlots[i]
