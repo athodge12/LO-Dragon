@@ -34,6 +34,8 @@ export default function Schedule() {
   const [practiceSchedule, setPracticeSchedule] = useState([]);
   const [cancelledSlots, setCancelledSlots] = useState({});
   const [modal, setModal] = useState(null);
+  const [editModal, setEditModal] = useState(null);
+  const [editForm, setEditForm] = useState({});
   const [practiceModal, setPracticeModal] = useState(false);
   const [scoreModal, setScoreModal] = useState(null);
   const [toast, setToast] = useState('');
@@ -134,7 +136,32 @@ export default function Schedule() {
   const deleteGame = async (id) => {
     if (!window.confirm('Delete this game?')) return;
     await deleteDoc(doc(db, 'games', id));
+    setEditModal(null);
     setToast('Game deleted');
+  };
+
+  const openEditGame = (game) => {
+    setEditForm({ opponent: game.opponent, date: game.date, time: game.time || '', location: game.location || '', homeAway: game.homeAway || 'Home' });
+    setEditModal(game);
+  };
+
+  const updateGame = async () => {
+    if (!editModal) return;
+    await setDoc(doc(db, 'games', editModal.id), editForm, { merge: true });
+    setEditModal(null);
+    setToast('Game updated!');
+  };
+
+  const toggleCancelGame = async (game) => {
+    await setDoc(doc(db, 'games', game.id), { cancelled: !game.cancelled }, { merge: true });
+    setToast(game.cancelled ? 'Game restored' : 'Game cancelled');
+    setEditModal(null);
+  };
+
+  const toggleCancelPractice = async (slotIndex, cancelled) => {
+    const updated = { ...cancelledSlots, [slotIndex]: !cancelled };
+    await setDoc(doc(db, 'settings', 'cancelledPractices'), updated);
+    setToast(cancelled ? 'Practice restored' : 'Practice cancelled');
   };
 
   const saveScore = async () => {
@@ -186,26 +213,35 @@ export default function Schedule() {
   const GameCard = ({ game }) => {
     const myRsvp = rsvps[game.id];
     return (
-      <div className="card" style={{ marginBottom: '10px' }}>
+      <div className="card" style={{
+        marginBottom: '10px',
+        opacity: game.cancelled ? 0.6 : 1,
+        border: game.cancelled ? '1px solid #FECACA' : undefined,
+        background: game.cancelled ? '#FFF5F5' : undefined
+      }}>
         <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
           <DateBadge date={game.date} result={game.result} />
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-              <span style={{ fontWeight: '700', fontSize: '16px' }}>vs {game.opponent}</span>
-              <span style={{
-                fontSize: '11px', fontWeight: '700', padding: '2px 7px', borderRadius: '10px',
-                background: game.homeAway === 'Home' ? '#DCFCE7' : '#DBEAFE',
-                color: game.homeAway === 'Home' ? '#16A34A' : '#2563EB'
-              }}>{game.homeAway || 'Home'}</span>
+              <span style={{ fontWeight: '700', fontSize: '16px', textDecoration: game.cancelled ? 'line-through' : 'none' }}>vs {game.opponent}</span>
+              {game.cancelled ? (
+                <span style={{ fontSize: '11px', fontWeight: '700', padding: '2px 7px', borderRadius: '10px', background: '#FEE2E2', color: '#B91C1C' }}>Cancelled</span>
+              ) : (
+                <span style={{
+                  fontSize: '11px', fontWeight: '700', padding: '2px 7px', borderRadius: '10px',
+                  background: game.homeAway === 'Home' ? '#DCFCE7' : '#DBEAFE',
+                  color: game.homeAway === 'Home' ? '#16A34A' : '#2563EB'
+                }}>{game.homeAway || 'Home'}</span>
+              )}
               {game.score && (
                 <span style={{ fontFamily: 'Oswald, sans-serif', fontWeight: '700', fontSize: '15px', color: 'var(--gray-700)' }}>
                   {game.score}
                 </span>
               )}
             </div>
-            {game.time && <div style={{ fontSize: '13px', color: 'var(--gray-500)', marginTop: '2px' }}>{game.time}</div>}
-            {game.location && <div style={{ fontSize: '12px', color: 'var(--gray-400)', marginTop: '1px' }}>📍 {game.location}</div>}
-            {!game.result && (
+            {game.time && <div style={{ fontSize: '13px', color: 'var(--gray-500)', marginTop: '2px', textDecoration: game.cancelled ? 'line-through' : 'none' }}>{game.time}</div>}
+            {game.location && !game.cancelled && <div style={{ fontSize: '12px', color: 'var(--gray-400)', marginTop: '1px' }}>📍 {game.location}</div>}
+            {!game.result && !game.cancelled && (
               <div style={{ display: 'flex', gap: '6px', marginTop: '10px' }}>
                 {[
                   { key: 'yes', label: '✅ Going' },
@@ -218,20 +254,20 @@ export default function Schedule() {
               </div>
             )}
           </div>
-          {canScore && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flexShrink: 0 }}>
-              {!game.result && (
-                <button onClick={() => { setScoreModal(game); setScore({ us: '', them: '', result: 'W' }); }} style={{
-                  background: 'var(--gray-100)', border: 'none', borderRadius: '6px',
-                  padding: '4px 8px', fontSize: '11px', cursor: 'pointer', fontWeight: '600', color: 'var(--gray-600)'
-                }}>Score</button>
-              )}
-              {isCoach && <button onClick={() => deleteGame(game.id)} style={{
-                background: '#FEE2E2', border: 'none', borderRadius: '6px',
-                padding: '4px 8px', fontSize: '11px', cursor: 'pointer', fontWeight: '600', color: 'var(--red)'
-              }}>Del</button>}
-            </div>
-          )}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flexShrink: 0 }}>
+            {canScore && !game.result && !game.cancelled && (
+              <button onClick={() => { setScoreModal(game); setScore({ us: '', them: '', result: 'W' }); }} style={{
+                background: 'var(--gray-100)', border: 'none', borderRadius: '6px',
+                padding: '4px 8px', fontSize: '11px', cursor: 'pointer', fontWeight: '600', color: 'var(--gray-600)'
+              }}>Score</button>
+            )}
+            {isCoach && (
+              <button onClick={() => openEditGame(game)} style={{
+                background: 'var(--gray-100)', border: 'none', borderRadius: '6px',
+                padding: '4px 8px', fontSize: '11px', cursor: 'pointer', fontWeight: '600', color: 'var(--gray-600)'
+              }}>Edit</button>
+            )}
+          </div>
         </div>
       </div>
     );
@@ -259,7 +295,7 @@ export default function Schedule() {
         </div>
         <div style={{ flex: 1 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-            <span style={{ fontWeight: '700', fontSize: '15px' }}>Practice</span>
+            <span style={{ fontWeight: '700', fontSize: '15px', textDecoration: event.cancelled ? 'line-through' : 'none' }}>Practice</span>
             <span style={{
               fontSize: '11px', fontWeight: '700', padding: '2px 7px', borderRadius: '10px',
               background: event.isOnetime ? '#DBEAFE' : '#EDE9FE',
@@ -276,6 +312,14 @@ export default function Schedule() {
           {event.location && !event.cancelled && <div style={{ fontSize: '12px', color: 'var(--gray-400)', marginTop: '1px' }}>📍 {event.location}</div>}
           {event.focus && !event.cancelled && <div style={{ fontSize: '12px', color: '#7C3AED', fontWeight: '600', marginTop: '2px' }}>{event.focus}</div>}
         </div>
+        {isCoach && (
+          <button onClick={() => toggleCancelPractice(event.slotIndex, event.cancelled)} style={{
+            background: event.cancelled ? '#DCFCE7' : '#FEE2E2',
+            color: event.cancelled ? '#16A34A' : '#B91C1C',
+            border: 'none', borderRadius: '6px',
+            padding: '4px 8px', fontSize: '11px', cursor: 'pointer', fontWeight: '600', flexShrink: 0
+          }}>{event.cancelled ? 'Restore' : 'Cancel'}</button>
+        )}
       </div>
     </div>
   );
@@ -417,6 +461,52 @@ export default function Schedule() {
               </div>
             </div>
             <button className="btn-primary" onClick={saveScore}>Save Score</button>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Game Modal */}
+      {editModal && isCoach && (
+        <div className="modal-overlay" onClick={() => setEditModal(null)}>
+          <div className="modal-sheet" onClick={e => e.stopPropagation()} style={{ maxHeight: '85vh', overflowY: 'auto' }}>
+            <div className="modal-handle" />
+            <h3 style={{ fontFamily: 'Oswald, sans-serif', fontSize: '20px', marginBottom: '4px', textTransform: 'uppercase' }}>Edit Game</h3>
+            <p style={{ fontSize: '13px', color: 'var(--gray-500)', marginBottom: '16px' }}>vs {editModal.opponent}</p>
+            <div className="form-group">
+              <label className="form-label">Opponent</label>
+              <input className="form-input" value={editForm.opponent} onChange={e => setEditForm(f => ({ ...f, opponent: e.target.value }))} placeholder="Team name" />
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label className="form-label">Date</label>
+                <input className="form-input" type="date" value={editForm.date} onChange={e => setEditForm(f => ({ ...f, date: e.target.value }))} />
+              </div>
+              <div className="form-group" style={{ marginBottom: 0 }}>
+                <label className="form-label">Time</label>
+                <input className="form-input" value={editForm.time} onChange={e => setEditForm(f => ({ ...f, time: e.target.value }))} placeholder="5:30 PM" />
+              </div>
+            </div>
+            <div className="form-group" style={{ marginTop: '16px' }}>
+              <label className="form-label">Location</label>
+              <input className="form-input" value={editForm.location} onChange={e => setEditForm(f => ({ ...f, location: e.target.value }))} placeholder="Field name / address" />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Home / Away</label>
+              <select className="form-select" value={editForm.homeAway} onChange={e => setEditForm(f => ({ ...f, homeAway: e.target.value }))}>
+                <option value="Home">Home</option>
+                <option value="Away">Away</option>
+              </select>
+            </div>
+            <button className="btn-primary" onClick={updateGame}>Save Changes</button>
+            <button onClick={() => toggleCancelGame(editModal)} style={{
+              width: '100%', marginTop: '8px', padding: '12px', borderRadius: '10px', cursor: 'pointer',
+              fontWeight: '700', fontSize: '15px', border: 'none',
+              background: editModal.cancelled ? '#DCFCE7' : '#FEE2E2',
+              color: editModal.cancelled ? '#16A34A' : '#B91C1C'
+            }}>{editModal.cancelled ? 'Restore Game' : 'Cancel Game'}</button>
+            <button className="btn-secondary" onClick={() => deleteGame(editModal.id)} style={{ marginTop: '8px', color: 'var(--red)' }}>
+              Delete Game
+            </button>
           </div>
         </div>
       )}
