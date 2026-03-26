@@ -60,7 +60,7 @@ function MessageList({ messages, currentUser, bottomRef }) {
                 color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center',
                 fontSize: '13px', fontWeight: '700', fontFamily: 'Oswald, sans-serif',
                 flexShrink: 0
-              }}>{msg.authorName?.[0]?.toUpperCase()}</div>
+              }}>{(msg.authorName || '?')[0].toUpperCase()}</div>
             )}
             <div style={{ maxWidth: '75%' }}>
               {!isMe && (

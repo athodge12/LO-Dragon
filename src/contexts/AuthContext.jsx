@@ -64,13 +64,16 @@ export function AuthProvider({ children }) {
   const getChatDisplayName = () => {
     const firstName = userProfile?.firstName || '';
     const lastName = userProfile?.lastName || '';
-    const fullName = `${firstName} ${lastName}`.trim();
+    const fullName = `${firstName} ${lastName}`.trim()
+      || userProfile?.email?.split('@')[0]
+      || currentUser?.email?.split('@')[0]
+      || 'Team Member';
     if (!userProfile?.claimedPlayers?.length) return fullName;
     const claims = userProfile.claimedPlayers.map(cp => {
       const playerFirst = cp.playerName?.split(' ')[0] || cp.playerName || '';
       return `${cp.relationship} of ${playerFirst}`;
     }).join(' · ');
-    return `${firstName} (${claims})`;
+    return `${firstName || fullName} (${claims})`;
   };
 
   const value = {
