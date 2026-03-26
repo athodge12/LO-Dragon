@@ -183,7 +183,7 @@ export default function Admin() {
                   </div>
 
                   {/* Edit button */}
-                  {!isMe && (isAdmin || (isCoach && !roles.includes('admin'))) && (
+                  {(isAdmin || (isCoach && !roles.includes('admin') && !isMe)) && (
                     <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1px solid var(--gray-100)', display: 'flex', gap: '8px' }}>
                       <button
                         onClick={() => openEdit(user)}
