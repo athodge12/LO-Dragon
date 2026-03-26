@@ -5,7 +5,7 @@ import {
   signOut,
   onAuthStateChanged
 } from 'firebase/auth';
-import { doc, setDoc, getDoc } from 'firebase/firestore';
+import { doc, setDoc, getDoc, collection, getDocs } from 'firebase/firestore';
 import { auth, db } from '../firebase/config';
 
 const AuthContext = createContext();
@@ -42,8 +42,34 @@ export function AuthProvider({ children }) {
     const docRef = doc(db, 'users', uid);
     const docSnap = await getDoc(docRef);
     if (docSnap.exists()) {
-      setUserProfile(docSnap.data());
-      return docSnap.data();
+      const data = docSnap.data();
+      // Backfill claimedPlayers from roster if not yet set
+      if (!data.claimedPlayers) {
+        try {
+          const rosterSnap = await getDocs(collection(db, 'roster'));
+          const claimed = [];
+          rosterSnap.forEach(d => {
+            const player = d.data();
+            const cb = player.claimedBy;
+            if (cb && typeof cb === 'object' && cb[uid]) {
+              const entry = cb[uid];
+              claimed.push({
+                playerId: d.id,
+                playerName: player.name || '',
+                relationship: typeof entry === 'object' ? entry.relationship || '' : ''
+              });
+            }
+          });
+          if (claimed.length > 0) {
+            data.claimedPlayers = claimed;
+            await setDoc(docRef, { claimedPlayers: claimed }, { merge: true });
+          }
+        } catch {
+          // Roster read failed — skip backfill
+        }
+      }
+      setUserProfile(data);
+      return data;
     }
     return null;
   }
