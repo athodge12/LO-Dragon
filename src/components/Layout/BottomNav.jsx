@@ -32,11 +32,10 @@ const tabs = [
     )
   },
   {
-    path: '/practice', label: 'Practice',
+    path: '/chat', label: 'Chat',
     icon: (active) => (
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke={active ? '#CC1B1B' : '#9CA3AF'} strokeWidth="2">
-        <circle cx="12" cy="12" r="10"/>
-        <polyline points="12,6 12,12 16,14"/>
+        <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
       </svg>
     )
   },
