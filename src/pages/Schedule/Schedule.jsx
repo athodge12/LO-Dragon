@@ -1,14 +1,35 @@
 import { useState, useEffect } from 'react';
-import { collection, onSnapshot, addDoc, deleteDoc, doc, setDoc, getDoc, query, orderBy } from 'firebase/firestore';
+import { collection, onSnapshot, addDoc, deleteDoc, doc, setDoc, query, orderBy } from 'firebase/firestore';
 import { db } from '../../firebase/config';
 import { useAuth } from '../../contexts/AuthContext';
 import Header from '../../components/Layout/Header';
 import Toast from '../../components/UI/Toast';
 
+const DAY_MAP = { Sunday: 0, Monday: 1, Tuesday: 2, Wednesday: 3, Thursday: 4, Friday: 5, Saturday: 6 };
+
+function getUpcomingPracticeDates(slot, weeksAhead = 10) {
+  const targetDay = DAY_MAP[slot.day];
+  if (targetDay === undefined) return [];
+  const dates = [];
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const current = new Date(today);
+  const daysUntil = (targetDay - current.getDay() + 7) % 7;
+  current.setDate(current.getDate() + (daysUntil === 0 ? 0 : daysUntil));
+  for (let i = 0; i < weeksAhead; i++) {
+    dates.push(current.toISOString().split('T')[0]);
+    current.setDate(current.getDate() + 7);
+  }
+  return dates;
+}
+
 export default function Schedule() {
   const { isCoach, isBookkeeper, currentUser, userProfile } = useAuth();
   const canScore = isCoach || isBookkeeper;
+  const [tab, setTab] = useState('all');
   const [games, setGames] = useState([]);
+  const [practiceSchedule, setPracticeSchedule] = useState([]);
+  const [cancelledSlots, setCancelledSlots] = useState({});
   const [modal, setModal] = useState(null);
   const [scoreModal, setScoreModal] = useState(null);
   const [toast, setToast] = useState('');
@@ -17,28 +38,63 @@ export default function Schedule() {
   const [rsvps, setRsvps] = useState({});
 
   useEffect(() => {
-    const q = query(collection(db, 'games'), orderBy('date'));
-    const unsub = onSnapshot(q, snap => {
-      setGames(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-    });
+    const unsubs = [];
 
-    // Load user's RSVPs
+    const gamesQ = query(collection(db, 'games'), orderBy('date'));
+    unsubs.push(onSnapshot(gamesQ, snap => {
+      setGames(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    }));
+
+    unsubs.push(onSnapshot(doc(db, 'settings', 'practiceSchedule'), snap => {
+      if (snap.exists() && snap.data().practices) setPracticeSchedule(snap.data().practices);
+    }));
+
+    unsubs.push(onSnapshot(doc(db, 'settings', 'cancelledPractices'), snap => {
+      setCancelledSlots(snap.exists() ? snap.data() : {});
+    }));
+
     if (currentUser) {
-      const rsvpQ = query(collection(db, 'rsvps'));
-      onSnapshot(rsvpQ, snap => {
+      unsubs.push(onSnapshot(collection(db, 'rsvps'), snap => {
         const userRsvps = {};
         snap.docs.forEach(d => {
           const data = d.data();
-          if (data.userId === currentUser.uid) {
-            userRsvps[data.gameId] = data.status;
-          }
+          if (data.userId === currentUser.uid) userRsvps[data.gameId] = data.status;
         });
         setRsvps(userRsvps);
-      });
+      }));
     }
 
-    return unsub;
+    return () => unsubs.forEach(u => u());
   }, [currentUser]);
+
+  // Build practice events from recurring schedule
+  const practiceEvents = practiceSchedule.flatMap((slot, i) =>
+    getUpcomingPracticeDates(slot).map(date => ({
+      id: `practice-${i}-${date}`,
+      type: 'practice',
+      date,
+      slotIndex: i,
+      day: slot.day,
+      time: slot.time,
+      location: slot.location,
+      focus: slot.focus,
+      cancelled: !!cancelledSlots[i]
+    }))
+  );
+
+  const today = new Date().toISOString().split('T')[0];
+
+  const gameEvents = games.map(g => ({ ...g, type: 'game' }));
+
+  const allEvents = [...gameEvents, ...practiceEvents]
+    .filter(e => e.date >= today)
+    .sort((a, b) => a.date.localeCompare(b.date));
+
+  const completedGames = games.filter(g => g.result);
+
+  const visibleUpcoming = tab === 'all' ? allEvents
+    : tab === 'games' ? allEvents.filter(e => e.type === 'game')
+    : allEvents.filter(e => e.type === 'practice');
 
   const addGame = async () => {
     if (!form.opponent || !form.date) return;
@@ -77,34 +133,35 @@ export default function Schedule() {
     setToast(`RSVP: ${status === 'yes' ? '✅ Going' : status === 'no' ? '❌ Not Going' : '🤔 Maybe'}`);
   };
 
-  const upcoming = games.filter(g => !g.result);
-  const completed = games.filter(g => g.result);
+  const formatDate = (d) => new Date(d + 'T12:00:00').toLocaleDateString('en-US', {
+    weekday: 'short', month: 'short', day: 'numeric'
+  });
+
+  const DateBadge = ({ date, result }) => {
+    const dateObj = new Date(date + 'T12:00:00');
+    return (
+      <div style={{
+        background: result ? (result === 'W' ? '#DCFCE7' : '#FEE2E2') : 'var(--red)',
+        color: result ? (result === 'W' ? '#16A34A' : '#B91C1C') : 'white',
+        borderRadius: '10px', padding: '6px 10px', textAlign: 'center', minWidth: '52px', flexShrink: 0
+      }}>
+        <div style={{ fontSize: '10px', fontWeight: '600', textTransform: 'uppercase' }}>
+          {dateObj.toLocaleDateString('en-US', { month: 'short' })}
+        </div>
+        <div style={{ fontSize: '24px', fontWeight: '700', fontFamily: 'Oswald, sans-serif', lineHeight: 1 }}>
+          {dateObj.getDate()}
+        </div>
+        {result && <div style={{ fontSize: '14px', fontWeight: '700', fontFamily: 'Oswald, sans-serif' }}>{result}</div>}
+      </div>
+    );
+  };
 
   const GameCard = ({ game }) => {
-    const dateObj = new Date(game.date + 'T12:00:00');
     const myRsvp = rsvps[game.id];
-
     return (
       <div className="card" style={{ marginBottom: '10px' }}>
         <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
-          <div style={{
-            background: game.result ? (game.result === 'W' ? '#DCFCE7' : '#FEE2E2') : 'var(--red)',
-            color: game.result ? (game.result === 'W' ? '#16A34A' : '#B91C1C') : 'white',
-            borderRadius: '10px', padding: '6px 10px', textAlign: 'center', minWidth: '52px', flexShrink: 0
-          }}>
-            <div style={{ fontSize: '10px', fontWeight: '600', textTransform: 'uppercase' }}>
-              {dateObj.toLocaleDateString('en-US', { month: 'short' })}
-            </div>
-            <div style={{ fontSize: '24px', fontWeight: '700', fontFamily: 'Oswald, sans-serif', lineHeight: 1 }}>
-              {dateObj.getDate()}
-            </div>
-            {game.result && (
-              <div style={{ fontSize: '14px', fontWeight: '700', fontFamily: 'Oswald, sans-serif' }}>
-                {game.result}
-              </div>
-            )}
-          </div>
-
+          <DateBadge date={game.date} result={game.result} />
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
               <span style={{ fontWeight: '700', fontSize: '16px' }}>vs {game.opponent}</span>
@@ -121,8 +178,6 @@ export default function Schedule() {
             </div>
             {game.time && <div style={{ fontSize: '13px', color: 'var(--gray-500)', marginTop: '2px' }}>{game.time}</div>}
             {game.location && <div style={{ fontSize: '12px', color: 'var(--gray-400)', marginTop: '1px' }}>📍 {game.location}</div>}
-
-            {/* RSVP */}
             {!game.result && (
               <div style={{ display: 'flex', gap: '6px', marginTop: '10px' }}>
                 {[
@@ -130,16 +185,12 @@ export default function Schedule() {
                   { key: 'no', label: '❌ No' },
                   { key: 'maybe', label: '🤔 Maybe' }
                 ].map(opt => (
-                  <button
-                    key={opt.key}
-                    className={`rsvp-btn ${opt.key} ${myRsvp === opt.key ? 'active' : ''}`}
-                    onClick={() => handleRsvp(game.id, opt.key)}
-                  >{opt.label}</button>
+                  <button key={opt.key} className={`rsvp-btn ${opt.key} ${myRsvp === opt.key ? 'active' : ''}`}
+                    onClick={() => handleRsvp(game.id, opt.key)}>{opt.label}</button>
                 ))}
               </div>
             )}
           </div>
-
           {canScore && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flexShrink: 0 }}>
               {!game.result && (
@@ -159,6 +210,48 @@ export default function Schedule() {
     );
   };
 
+  const PracticeCard = ({ event }) => (
+    <div className="card" style={{
+      marginBottom: '10px',
+      opacity: event.cancelled ? 0.6 : 1,
+      border: event.cancelled ? '1px solid #FECACA' : undefined,
+      background: event.cancelled ? '#FFF5F5' : undefined
+    }}>
+      <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+        <div style={{
+          background: event.cancelled ? '#FEE2E2' : '#EDE9FE',
+          color: event.cancelled ? '#B91C1C' : '#7C3AED',
+          borderRadius: '10px', padding: '6px 10px', textAlign: 'center', minWidth: '52px', flexShrink: 0
+        }}>
+          <div style={{ fontSize: '10px', fontWeight: '600', textTransform: 'uppercase' }}>
+            {new Date(event.date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short' })}
+          </div>
+          <div style={{ fontSize: '24px', fontWeight: '700', fontFamily: 'Oswald, sans-serif', lineHeight: 1 }}>
+            {new Date(event.date + 'T12:00:00').getDate()}
+          </div>
+        </div>
+        <div style={{ flex: 1 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+            <span style={{ fontWeight: '700', fontSize: '15px' }}>Practice</span>
+            <span style={{
+              fontSize: '11px', fontWeight: '700', padding: '2px 7px', borderRadius: '10px',
+              background: '#EDE9FE', color: '#7C3AED'
+            }}>⚾ {event.day}</span>
+            {event.cancelled && (
+              <span style={{
+                fontSize: '11px', fontWeight: '700', padding: '2px 7px', borderRadius: '10px',
+                background: '#FEE2E2', color: '#B91C1C'
+              }}>Cancelled</span>
+            )}
+          </div>
+          {event.time && <div style={{ fontSize: '13px', color: 'var(--gray-500)', marginTop: '2px', textDecoration: event.cancelled ? 'line-through' : 'none' }}>{event.time}</div>}
+          {event.location && !event.cancelled && <div style={{ fontSize: '12px', color: 'var(--gray-400)', marginTop: '1px' }}>📍 {event.location}</div>}
+          {event.focus && !event.cancelled && <div style={{ fontSize: '12px', color: '#7C3AED', fontWeight: '600', marginTop: '2px' }}>{event.focus}</div>}
+        </div>
+      </div>
+    </div>
+  );
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
       <Header title="Schedule" actions={isCoach && (
@@ -174,32 +267,44 @@ export default function Schedule() {
       )} />
 
       <div className="page-content">
-        {!isCoach && <div className="view-only-banner">Tap Yes / No / Maybe to RSVP to each game</div>}
+        <div className="tabs" style={{ marginBottom: '14px' }}>
+          <button className={`tab ${tab === 'all' ? 'active' : ''}`} onClick={() => setTab('all')}>All</button>
+          <button className={`tab ${tab === 'games' ? 'active' : ''}`} onClick={() => setTab('games')}>Games</button>
+          <button className={`tab ${tab === 'practices' ? 'active' : ''}`} onClick={() => setTab('practices')}>Practices</button>
+        </div>
 
-        {upcoming.length > 0 && (
+        {!isCoach && tab !== 'practices' && (
+          <div className="view-only-banner">Tap Yes / No / Maybe to RSVP to each game</div>
+        )}
+
+        {/* Upcoming events */}
+        {visibleUpcoming.length > 0 ? (
           <>
             <div className="section-header" style={{ marginBottom: '10px' }}>
-              <span className="section-title">Upcoming ({upcoming.length})</span>
+              <span className="section-title">Upcoming ({visibleUpcoming.length})</span>
             </div>
-            {upcoming.map(g => <GameCard key={g.id} game={g} />)}
+            {visibleUpcoming.map(e =>
+              e.type === 'game'
+                ? <GameCard key={e.id} game={e} />
+                : <PracticeCard key={e.id} event={e} />
+            )}
           </>
-        )}
-
-        {completed.length > 0 && (
-          <>
-            <div className="section-header" style={{ marginTop: '16px', marginBottom: '10px' }}>
-              <span className="section-title">Results ({completed.length})</span>
-            </div>
-            {completed.map(g => <GameCard key={g.id} game={g} />)}
-          </>
-        )}
-
-        {games.length === 0 && (
+        ) : (
           <div className="empty-state">
             <p style={{ fontSize: '32px' }}>📅</p>
-            <p>No games scheduled yet</p>
-            {isCoach && <p style={{ marginTop: '8px', color: 'var(--red)', fontWeight: '600' }}>Tap + to add a game</p>}
+            <p>Nothing upcoming</p>
+            {isCoach && tab !== 'practices' && <p style={{ marginTop: '8px', color: 'var(--red)', fontWeight: '600' }}>Tap + to add a game</p>}
           </div>
+        )}
+
+        {/* Past games */}
+        {tab !== 'practices' && completedGames.length > 0 && (
+          <>
+            <div className="section-header" style={{ marginTop: '16px', marginBottom: '10px' }}>
+              <span className="section-title">Results ({completedGames.length})</span>
+            </div>
+            {completedGames.map(g => <GameCard key={g.id} game={{ ...g, type: 'game' }} />)}
+          </>
         )}
       </div>
 
@@ -247,9 +352,7 @@ export default function Schedule() {
             <h3 style={{ fontFamily: 'Oswald, sans-serif', fontSize: '20px', marginBottom: '4px', textTransform: 'uppercase' }}>
               Record Score
             </h3>
-            <p style={{ color: 'var(--gray-500)', fontSize: '14px', marginBottom: '16px' }}>
-              vs {scoreModal.opponent}
-            </p>
+            <p style={{ color: 'var(--gray-500)', fontSize: '14px', marginBottom: '16px' }}>vs {scoreModal.opponent}</p>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
               <div className="form-group" style={{ marginBottom: 0 }}>
                 <label className="form-label">Dragons</label>
