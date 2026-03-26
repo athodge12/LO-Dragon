@@ -5,7 +5,7 @@ import {
   signOut,
   onAuthStateChanged
 } from 'firebase/auth';
-import { doc, setDoc, getDoc, onSnapshot, collection, getDocs } from 'firebase/firestore';
+import { doc, setDoc, getDoc, onSnapshot, collection } from 'firebase/firestore';
 import { auth, db } from '../firebase/config';
 
 const AuthContext = createContext();
@@ -17,6 +17,7 @@ export function useAuth() {
 export function AuthProvider({ children }) {
   const [currentUser, setCurrentUser] = useState(null);
   const [userProfile, setUserProfile] = useState(null);
+  const [rosterClaims, setRosterClaims] = useState([]);
   const [loading, setLoading] = useState(true);
 
   async function register(email, password, profileData) {
@@ -38,7 +39,6 @@ export function AuthProvider({ children }) {
     return signOut(auth);
   }
 
-  // Kept for backward compatibility — onSnapshot handles live updates automatically
   async function fetchUserProfile(uid) {
     const docSnap = await getDoc(doc(db, 'users', uid));
     if (docSnap.exists()) {
@@ -48,58 +48,29 @@ export function AuthProvider({ children }) {
     return null;
   }
 
+  // Listen to user profile in real time
   useEffect(() => {
     let profileUnsub = null;
-
-    const backfillClaimed = async (uid, docRef) => {
-      try {
-        const rosterSnap = await getDocs(collection(db, 'roster'));
-        const claimed = [];
-        rosterSnap.forEach(d => {
-          const player = d.data();
-          const cb = player.claimedBy;
-          if (cb && typeof cb === 'object' && cb[uid]) {
-            const entry = cb[uid];
-            claimed.push({
-              playerId: d.id,
-              playerName: player.name || '',
-              relationship: typeof entry === 'object' ? entry.relationship || '' : ''
-            });
-          }
-        });
-        if (claimed.length > 0) {
-          // Writing triggers the onSnapshot listener to fire again with updated data
-          await setDoc(docRef, { claimedPlayers: claimed }, { merge: true });
-        }
-      } catch {
-        // Roster read failed — skip backfill
-      }
-    };
 
     const authUnsub = onAuthStateChanged(auth, (user) => {
       setCurrentUser(user);
       if (profileUnsub) { profileUnsub(); profileUnsub = null; }
 
       if (user) {
-        const docRef = doc(db, 'users', user.uid);
-        let backfillRan = false;
-
-        profileUnsub = onSnapshot(docRef, (snap) => {
-          if (snap.exists()) {
-            const data = snap.data();
-            // Run backfill once if claimedPlayers missing (for users who claimed before this feature)
-            if (!data.claimedPlayers && !backfillRan) {
-              backfillRan = true;
-              backfillClaimed(user.uid, docRef);
-            }
-            setUserProfile(data);
-          } else {
-            setUserProfile(null);
+        profileUnsub = onSnapshot(
+          doc(db, 'users', user.uid),
+          (snap) => {
+            setUserProfile(snap.exists() ? snap.data() : null);
+            setLoading(false);
+          },
+          () => {
+            // Permission error — fall back to getDoc
+            fetchUserProfile(user.uid).finally(() => setLoading(false));
           }
-          setLoading(false);
-        });
+        );
       } else {
         setUserProfile(null);
+        setRosterClaims([]);
         setLoading(false);
       }
     });
@@ -110,6 +81,33 @@ export function AuthProvider({ children }) {
     };
   }, []);
 
+  // Listen to roster to always know which players this user has claimed
+  useEffect(() => {
+    if (!currentUser) { setRosterClaims([]); return; }
+
+    const unsub = onSnapshot(
+      collection(db, 'roster'),
+      (snap) => {
+        const claims = [];
+        snap.forEach(d => {
+          const player = d.data();
+          const cb = player.claimedBy;
+          if (cb && typeof cb === 'object' && cb[currentUser.uid]) {
+            const entry = cb[currentUser.uid];
+            claims.push({
+              playerName: player.name || '',
+              relationship: typeof entry === 'object' ? entry.relationship || '' : ''
+            });
+          }
+        });
+        setRosterClaims(claims);
+      },
+      () => setRosterClaims([]) // ignore errors — just show no claims
+    );
+
+    return unsub;
+  }, [currentUser?.uid]);
+
   const getChatDisplayName = () => {
     const firstName = userProfile?.firstName || '';
     const lastName = userProfile?.lastName || '';
@@ -117,8 +115,8 @@ export function AuthProvider({ children }) {
       || userProfile?.email?.split('@')[0]
       || currentUser?.email?.split('@')[0]
       || 'Team Member';
-    if (!userProfile?.claimedPlayers?.length) return fullName;
-    const claims = userProfile.claimedPlayers.map(cp => {
+    if (!rosterClaims.length) return fullName;
+    const claims = rosterClaims.map(cp => {
       const playerFirst = cp.playerName?.split(' ')[0] || cp.playerName || '';
       return `${cp.relationship} of ${playerFirst}`;
     }).join(' · ');

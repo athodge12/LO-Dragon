@@ -239,10 +239,14 @@ export default function Chat() {
         <div style={{
           position: 'fixed', bottom: 'var(--bottom-nav-height)', left: 0,
           width: '100%', maxWidth: 'var(--max-width)', background: 'white',
-          borderTop: '1px solid var(--gray-200)', padding: '10px 16px',
-          display: 'flex', gap: '8px', alignItems: 'flex-end',
+          borderTop: '1px solid var(--gray-200)', padding: '6px 16px 10px',
+          display: 'flex', flexDirection: 'column', gap: '6px',
           boxSizing: 'border-box'
         }}>
+          <div style={{ fontSize: '11px', color: 'var(--gray-400)' }}>
+            Chatting as <strong style={{ color: 'var(--gray-600)' }}>{chatDisplayName}</strong>
+          </div>
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'flex-end' }}>
           <textarea
             value={text}
             onChange={e => setText(e.target.value)}
@@ -266,6 +270,7 @@ export default function Chat() {
               <polygon points="22,2 15,22 11,13 2,9"/>
             </svg>
           </button>
+          </div>
         </div>
       </div>
 
