@@ -269,24 +269,31 @@ export default function PlayerProfile() {
             <span className="section-title">📞 Parent Contact</span>
           </div>
           {claimants.length > 0 ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-              {claimants.map(c => (
-                <div key={c.uid} style={{ fontSize: '14px', color: 'var(--gray-700)' }}>
-                  <div style={{ display: 'flex', gap: '8px', marginBottom: '6px' }}>
-                    <span style={{ color: 'var(--gray-400)', width: '80px', flexShrink: 0 }}>
-                      {c.relationship || 'Parent'}
-                    </span>
-                    <span style={{ fontWeight: '700' }}>{c.name}</span>
+            <div style={{ display: 'flex', flexDirection: 'column' }}>
+              {claimants.map((c, i) => (
+                <div key={c.uid} style={{
+                  fontSize: '14px', color: 'var(--gray-700)',
+                  paddingTop: i > 0 ? '14px' : 0,
+                  marginTop: i > 0 ? '14px' : 0,
+                  borderTop: i > 0 ? '1px solid var(--gray-100)' : 'none'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                    <span style={{
+                      fontSize: '11px', fontWeight: '700', textTransform: 'uppercase',
+                      background: '#FEF2F2', color: 'var(--red)',
+                      padding: '2px 8px', borderRadius: '8px', letterSpacing: '0.5px'
+                    }}>{c.relationship || 'Parent'}</span>
+                    <span style={{ fontWeight: '700', fontSize: '15px' }}>{c.name}</span>
                   </div>
                   {c.phone && (
                     <div style={{ display: 'flex', gap: '8px', marginBottom: '6px' }}>
-                      <span style={{ color: 'var(--gray-400)', width: '80px', flexShrink: 0 }}>Phone</span>
+                      <span style={{ color: 'var(--gray-400)', width: '50px', flexShrink: 0 }}>📞</span>
                       <a href={`tel:${c.phone}`} style={{ fontWeight: '600', color: 'var(--red)' }}>{c.phone}</a>
                     </div>
                   )}
                   {c.email && (
                     <div style={{ display: 'flex', gap: '8px' }}>
-                      <span style={{ color: 'var(--gray-400)', width: '80px', flexShrink: 0 }}>Email</span>
+                      <span style={{ color: 'var(--gray-400)', width: '50px', flexShrink: 0 }}>✉️</span>
                       <a href={`mailto:${c.email}`} style={{ fontWeight: '600', color: 'var(--red)', wordBreak: 'break-all' }}>{c.email}</a>
                     </div>
                   )}
