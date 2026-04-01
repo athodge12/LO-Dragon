@@ -30,7 +30,8 @@ export default function Login() {
       display: 'flex',
       flexDirection: 'column',
       alignItems: 'center',
-      padding: '0 24px'
+      padding: '0 24px 40px',
+      overflowY: 'auto'
     }}>
       {/* Logo section */}
       <div style={{ textAlign: 'center', paddingTop: '60px', paddingBottom: '32px' }}>

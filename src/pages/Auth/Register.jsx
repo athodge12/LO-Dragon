@@ -74,7 +74,8 @@ export default function Register() {
     <div style={{
       minHeight: '100vh',
       background: 'linear-gradient(180deg, #8B0000 0%, #CC1B1B 30%, #f5f5f5 100%)',
-      padding: '0 24px 40px'
+      padding: '0 24px 40px',
+      overflowY: 'auto'
     }}>
       <div style={{ textAlign: 'center', paddingTop: '40px', paddingBottom: '24px' }}>
         <h1 style={{
