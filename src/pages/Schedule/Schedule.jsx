@@ -77,6 +77,7 @@ export default function Schedule() {
   const [practiceModal, setPracticeModal] = useState(false);
   const [scoreModal, setScoreModal] = useState(null);
   const [toast, setToast] = useState('');
+  const [showCalSync, setShowCalSync] = useState(false);
   const [form, setForm] = useState({ opponent: '', date: '', time: '', location: '', homeAway: 'Home' });
   const [score, setScore] = useState({ us: '', them: '', result: 'W' });
   const [rsvps, setRsvps] = useState({});
@@ -276,6 +277,92 @@ export default function Schedule() {
     weekday: 'short', month: 'short', day: 'numeric'
   });
 
+  // ── Calendar sync helpers ──────────────────────────────────────
+  function parseTimeStr(timeStr) {
+    if (!timeStr) return null;
+    const matches = [...timeStr.matchAll(/(\d{1,2}):(\d{2})\s*(AM|PM)?/gi)];
+    if (!matches.length) return null;
+    const toH24 = (h, m, ap) => {
+      let hour = parseInt(h);
+      const ampm = (ap || 'PM').toUpperCase();
+      if (ampm === 'PM' && hour !== 12) hour += 12;
+      if (ampm === 'AM' && hour === 12) hour = 0;
+      return { h: hour, m: parseInt(m) };
+    };
+    const firstAP = matches[0][3] || 'PM';
+    const start = toH24(matches[0][1], matches[0][2], matches[0][3] || firstAP);
+    const end   = matches.length > 1
+      ? toH24(matches[1][1], matches[1][2], matches[1][3] || firstAP)
+      : { h: start.h + 2, m: start.m };
+    return { startH: start.h, startM: start.m, endH: end.h, endM: end.m };
+  }
+
+  function icsDateTime(dateStr, h, m) {
+    const d = dateStr.replace(/-/g, '');
+    return `${d}T${String(h).padStart(2,'0')}${String(m).padStart(2,'0')}00`;
+  }
+
+  function generateICS() {
+    const lines = [
+      'BEGIN:VCALENDAR', 'VERSION:2.0',
+      'PRODID:-//Dragons Baseball//EN',
+      'CALSCALE:GREGORIAN', 'METHOD:PUBLISH',
+      'X-WR-CALNAME:Dragons Baseball',
+      'X-WR-CALDESC:Dragons Baseball games and practices',
+    ];
+    const upcoming = allEvents.filter(e => !e.cancelled);
+    for (const ev of upcoming) {
+      const times = parseTimeStr(ev.time);
+      const ds = ev.date.replace(/-/g, '');
+      lines.push('BEGIN:VEVENT');
+      lines.push(`UID:${ev.id}@dragons-baseball`);
+      if (ev.type === 'game') {
+        lines.push(`SUMMARY:Dragons vs ${ev.opponent}`);
+        lines.push(`DESCRIPTION:${ev.homeAway || 'Home'} game vs ${ev.opponent}`);
+      } else {
+        lines.push(`SUMMARY:Dragons Practice`);
+        lines.push(`DESCRIPTION:${ev.focus || 'Practice'}`);
+      }
+      if (times) {
+        lines.push(`DTSTART:${icsDateTime(ev.date, times.startH, times.startM)}`);
+        lines.push(`DTEND:${icsDateTime(ev.date, times.endH, times.endM)}`);
+      } else {
+        lines.push(`DTSTART;VALUE=DATE:${ds}`);
+        lines.push(`DTEND;VALUE=DATE:${ds}`);
+      }
+      if (ev.location) lines.push(`LOCATION:${ev.location.replace(/[,;\\]/g, s => '\\' + s)}`);
+      lines.push('END:VEVENT');
+    }
+    lines.push('END:VCALENDAR');
+    return lines.join('\r\n');
+  }
+
+  function downloadICS() {
+    const content = generateICS();
+    const blob = new Blob([content], { type: 'text/calendar;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'dragons-baseball.ics';
+    a.click(); URL.revokeObjectURL(url);
+  }
+
+  function googleCalUrl(ev) {
+    const times = parseTimeStr(ev.time);
+    const ds = ev.date.replace(/-/g, '');
+    const dates = times
+      ? `${icsDateTime(ev.date, times.startH, times.startM)}/${icsDateTime(ev.date, times.endH, times.endM)}`
+      : `${ds}/${ds}`;
+    const p = new URLSearchParams({
+      action: 'TEMPLATE',
+      text: ev.type === 'game' ? `Dragons vs ${ev.opponent}` : 'Dragons Practice',
+      dates,
+      details: ev.type === 'game' ? `${ev.homeAway || 'Home'} game` : (ev.focus || 'Practice'),
+      location: ev.location || '',
+    });
+    return `https://calendar.google.com/calendar/render?${p.toString()}`;
+  }
+  // ──────────────────────────────────────────────────────────────
+
   const DateBadge = ({ date, result }) => {
     const dateObj = new Date(date + 'T12:00:00');
     return (
@@ -320,7 +407,7 @@ export default function Schedule() {
               )}
               {game.score && (
                 <span style={{ fontFamily: 'Oswald, sans-serif', fontWeight: '700', fontSize: '15px', color: 'var(--gray-700)' }}>
-                  {game.score}
+                  {typeof game.score === 'object' ? `${game.score.us}-${game.score.them}` : game.score}
                 </span>
               )}
             </div>
@@ -340,6 +427,12 @@ export default function Schedule() {
             )}
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flexShrink: 0 }}>
+            {!game.cancelled && (
+              <a href={googleCalUrl(game)} target="_blank" rel="noopener noreferrer" title="Add to Google Calendar" style={{
+                background: 'var(--gray-100)', border: 'none', borderRadius: '6px',
+                padding: '4px 8px', fontSize: '13px', cursor: 'pointer', textAlign: 'center', textDecoration: 'none', display: 'block'
+              }}>📅</a>
+            )}
             {canScore && !game.result && !game.cancelled && (
               <button onClick={() => { setScoreModal(game); setScore({ us: '', them: '', result: 'W' }); }} style={{
                 background: 'var(--gray-100)', border: 'none', borderRadius: '6px',
@@ -424,17 +517,26 @@ export default function Schedule() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
-      <Header title="Schedule" actions={isCoach && (
-        <button onClick={() => setModal(true)} style={{
-          background: 'rgba(255,255,255,0.15)', border: 'none', borderRadius: '8px',
-          width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center',
-          color: 'white', cursor: 'pointer'
-        }}>
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-            <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-          </svg>
-        </button>
-      )} />
+      <Header title="Schedule" actions={
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <button onClick={() => setShowCalSync(true)} title="Sync to Calendar" style={{
+            background: 'rgba(255,255,255,0.15)', border: 'none', borderRadius: '8px',
+            width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center',
+            color: 'white', cursor: 'pointer', fontSize: '18px'
+          }}>📅</button>
+          {isCoach && (
+            <button onClick={() => setModal(true)} style={{
+              background: 'rgba(255,255,255,0.15)', border: 'none', borderRadius: '8px',
+              width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center',
+              color: 'white', cursor: 'pointer'
+            }}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+              </svg>
+            </button>
+          )}
+        </div>
+      } />
 
       <div className="page-content">
         <div className="tabs" style={{ marginBottom: '14px' }}>
@@ -687,6 +789,63 @@ export default function Schedule() {
           onSave={savePractices}
           onClose={() => setPracticeModal(false)}
         />
+      )}
+
+      {/* Calendar Sync Modal */}
+      {showCalSync && (
+        <div className="modal-overlay" onClick={() => setShowCalSync(false)}>
+          <div className="modal-sheet" onClick={e => e.stopPropagation()} style={{ maxHeight: '85vh', overflowY: 'auto' }}>
+            <div className="modal-handle" />
+            <h3 style={{ fontFamily: 'Oswald, sans-serif', fontSize: '20px', marginBottom: '4px', textTransform: 'uppercase' }}>
+              📅 Sync Schedule
+            </h3>
+            <p style={{ color: 'var(--gray-500)', fontSize: '14px', marginBottom: '20px' }}>
+              Add all upcoming games &amp; practices to your calendar app.
+            </p>
+
+            {/* ICS download */}
+            <button onClick={downloadICS} style={{
+              width: '100%', padding: '14px', borderRadius: '12px', cursor: 'pointer',
+              fontWeight: '700', fontSize: '15px', border: 'none',
+              background: 'var(--red)', color: 'white', marginBottom: '10px'
+            }}>
+              ⬇️ Download .ics File
+            </button>
+            <p style={{ fontSize: '12px', color: 'var(--gray-400)', textAlign: 'center', marginBottom: '18px' }}>
+              Works with Apple Calendar, Outlook, and most calendar apps
+            </p>
+
+            {/* Platform instructions */}
+            <div style={{ borderTop: '1px solid var(--gray-100)', paddingTop: '16px' }}>
+              <p style={{ fontWeight: '700', fontSize: '13px', color: 'var(--gray-700)', marginBottom: '10px' }}>HOW TO IMPORT:</p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                <div style={{ background: 'var(--gray-50)', borderRadius: '10px', padding: '12px' }}>
+                  <p style={{ fontWeight: '700', fontSize: '13px', marginBottom: '4px' }}>🍎 Apple Calendar (iPhone/Mac)</p>
+                  <p style={{ fontSize: '12px', color: 'var(--gray-500)', lineHeight: '1.5' }}>
+                    Download the .ics file → tap it in Files/Downloads → "Add All" to import into Calendar.
+                  </p>
+                </div>
+                <div style={{ background: 'var(--gray-50)', borderRadius: '10px', padding: '12px' }}>
+                  <p style={{ fontWeight: '700', fontSize: '13px', marginBottom: '4px' }}>📆 Google Calendar</p>
+                  <p style={{ fontSize: '12px', color: 'var(--gray-500)', lineHeight: '1.5' }}>
+                    Download the .ics file → open Google Calendar on desktop → Settings → Import → choose the file.
+                    <br/>Or tap 📅 next to any game to add it directly.
+                  </p>
+                </div>
+                <div style={{ background: 'var(--gray-50)', borderRadius: '10px', padding: '12px' }}>
+                  <p style={{ fontWeight: '700', fontSize: '13px', marginBottom: '4px' }}>📧 Outlook</p>
+                  <p style={{ fontSize: '12px', color: 'var(--gray-500)', lineHeight: '1.5' }}>
+                    Download the .ics file → double-click it (desktop) or go to Calendar → Import.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <button className="btn-secondary" onClick={() => setShowCalSync(false)} style={{ marginTop: '16px' }}>
+              Close
+            </button>
+          </div>
+        </div>
       )}
 
       {toast && <Toast message={toast} onDismiss={() => setToast('')} />}
