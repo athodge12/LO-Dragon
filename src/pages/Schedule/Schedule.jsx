@@ -519,11 +519,11 @@ export default function Schedule() {
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
       <Header title="Schedule" actions={
         <div style={{ display: 'flex', gap: '8px' }}>
-          <button onClick={() => setShowCalSync(true)} title="Sync to Calendar" style={{
+          <button onClick={() => setShowCalSync(true)} style={{
             background: 'rgba(255,255,255,0.15)', border: 'none', borderRadius: '8px',
-            width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center',
-            color: 'white', cursor: 'pointer', fontSize: '18px'
-          }}>📅</button>
+            padding: '0 12px', height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center',
+            color: 'white', cursor: 'pointer', fontSize: '13px', fontWeight: '700', letterSpacing: '0.3px'
+          }}>Export Schedule</button>
           {isCoach && (
             <button onClick={() => setModal(true)} style={{
               background: 'rgba(255,255,255,0.15)', border: 'none', borderRadius: '8px',
@@ -799,9 +799,14 @@ export default function Schedule() {
             <h3 style={{ fontFamily: 'Oswald, sans-serif', fontSize: '20px', marginBottom: '4px', textTransform: 'uppercase' }}>
               📅 Sync Schedule
             </h3>
-            <p style={{ color: 'var(--gray-500)', fontSize: '14px', marginBottom: '20px' }}>
+            <p style={{ color: 'var(--gray-500)', fontSize: '14px', marginBottom: '4px' }}>
               Add all upcoming games &amp; practices to your calendar app.
             </p>
+            <div style={{ background: '#FEF9C3', border: '1px solid #FDE047', borderRadius: '8px', padding: '10px 12px', marginBottom: '16px' }}>
+              <p style={{ fontSize: '12px', color: '#854D0E', lineHeight: '1.5', margin: 0 }}>
+                <strong>Heads up:</strong> This is a one-time export (snapshot). If game times or locations change, you'll need to re-export and re-import to get the updates.
+              </p>
+            </div>
 
             {/* ICS download */}
             <button onClick={downloadICS} style={{
