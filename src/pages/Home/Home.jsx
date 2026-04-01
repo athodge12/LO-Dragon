@@ -13,7 +13,7 @@ const DEFAULT_PRACTICES = [
 ];
 
 export default function Home() {
-  const { isCoach, userProfile, chatDisplayName } = useAuth();
+  const { isCoach, isAdmin, userProfile, chatDisplayName } = useAuth();
   const navigate = useNavigate();
   const [nextGame, setNextGame] = useState(null);
   const [record, setRecord] = useState({ wins: 0, losses: 0 });
@@ -29,6 +29,7 @@ export default function Home() {
   const [practices, setPractices] = useState(DEFAULT_PRACTICES);
   const [cancelledSlots, setCancelledSlots] = useState({});
   const [liveStream, setLiveStream] = useState(null);
+  const [deleteGameConfirm, setDeleteGameConfirm] = useState(false);
 
   useEffect(() => {
     const unsubs = [];
@@ -77,6 +78,16 @@ export default function Home() {
 
     return () => unsubs.forEach(u => u());
   }, []);
+
+  const deleteNextGame = async () => {
+    if (nextGame?.id) {
+      await deleteDoc(doc(db, 'games', nextGame.id));
+    }
+    await setDoc(doc(db, 'settings', 'nextGame'), {});
+    setNextGame(null);
+    setDeleteGameConfirm(false);
+    setToast('Game removed');
+  };
 
   const saveNextGame = async (data) => {
     await setDoc(doc(db, 'settings', 'nextGame'), data);
@@ -259,9 +270,15 @@ export default function Home() {
         <div className="card" style={{ marginBottom: '14px' }}>
           <div className="section-header">
             <span className="section-title">⚾ Next Game</span>
-            {isCoach && (
-              <button className="btn-ghost" onClick={() => setEditModal('nextGame')}>Edit</button>
-            )}
+            <div style={{ display: 'flex', gap: '6px' }}>
+              {isCoach && (
+                <button className="btn-ghost" onClick={() => setEditModal('nextGame')}>Edit</button>
+              )}
+              {isAdmin && nextGame && (
+                <button className="btn-ghost" onClick={() => setDeleteGameConfirm(true)}
+                  style={{ color: '#ef4444' }}>Delete</button>
+              )}
+            </div>
           </div>
           {nextGame ? (
             <div>
@@ -499,6 +516,36 @@ export default function Home() {
           onSave={savePractices}
           onClose={() => setEditModal(null)}
         />
+      )}
+
+      {/* Delete Next Game confirm modal */}
+      {deleteGameConfirm && (
+        <div className="modal-overlay" onClick={() => setDeleteGameConfirm(false)}>
+          <div className="modal-sheet" onClick={e => e.stopPropagation()}>
+            <div className="modal-handle" />
+            <h3 style={{ fontFamily: 'Oswald, sans-serif', fontSize: '20px', marginBottom: '4px', textTransform: 'uppercase' }}>
+              Remove Game?
+            </h3>
+            <p style={{ fontSize: '14px', color: 'var(--gray-500)', marginBottom: '20px' }}>
+              vs {nextGame?.opponent} · {nextGame?.date ? new Date(nextGame.date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : ''}
+            </p>
+            <p style={{ fontSize: '13px', color: 'var(--gray-600)', marginBottom: '20px' }}>
+              This will permanently delete this game from the schedule.
+            </p>
+            <button
+              onClick={deleteNextGame}
+              style={{
+                width: '100%', padding: '14px', border: 'none', borderRadius: '10px',
+                background: '#ef4444', color: 'white', fontWeight: '700', fontSize: '15px', cursor: 'pointer'
+              }}
+            >
+              Yes, Delete Game
+            </button>
+            <button className="btn-secondary" onClick={() => setDeleteGameConfirm(false)} style={{ marginTop: '8px' }}>
+              Cancel
+            </button>
+          </div>
+        </div>
       )}
 
       {toast && <Toast message={toast} onDismiss={() => setToast('')} />}
