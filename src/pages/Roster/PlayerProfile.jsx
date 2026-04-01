@@ -23,13 +23,15 @@ function StatBox({ label, value }) {
 function StatsGrid({ s = {} }) {
   const avg = !s.ab ? '.000' : '.' + String(Math.round((s.avg ?? (s.hits / s.ab)) * 1000)).padStart(3, '0');
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '1px', background: 'var(--gray-200)', borderRadius: '8px', overflow: 'hidden' }}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1px', background: 'var(--gray-200)', borderRadius: '8px', overflow: 'hidden' }}>
       <StatBox label="AVG" value={avg} />
+      <StatBox label="H" value={s.hits || 0} />
       <StatBox label="HR" value={s.hr || 0} />
       <StatBox label="RBI" value={s.rbi || 0} />
-      <StatBox label="R" value={s.runs || 0} />
-      <StatBox label="SB" value={s.sb || 0} />
-      <StatBox label="ERA" value={s.era ? s.era.toFixed(2) : '--'} />
+      <StatBox label="1B" value={s.singles || 0} />
+      <StatBox label="2B" value={s.doubles || 0} />
+      <StatBox label="3B" value={s.triples || 0} />
+      <StatBox label="AB" value={s.ab || 0} />
     </div>
   );
 }
