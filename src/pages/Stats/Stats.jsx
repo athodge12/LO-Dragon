@@ -4,6 +4,7 @@ import { db } from '../../firebase/config';
 import { useAuth } from '../../contexts/AuthContext';
 import Header from '../../components/Layout/Header';
 import Toast from '../../components/UI/Toast';
+import LogGameModal from '../../components/LogGameModal';
 
 const FIELDING_POSITIONS = ['Catcher','1st Base','2nd Base','3rd Base','Shortstop','Left Field','Left Center','Right Center','Right Field'];
 const POS_SHORT = { 'Catcher':'C','1st Base':'1B','2nd Base':'2B','3rd Base':'3B','Shortstop':'SS','Left Field':'LF','Left Center':'LC','Right Center':'RC','Right Field':'RF' };
@@ -24,13 +25,10 @@ export default function Stats() {
   const [showNewSeasonModal, setShowNewSeasonModal] = useState(false);
   const [newSeasonYear, setNewSeasonYear] = useState('');
   const [showLogGame, setShowLogGame] = useState(false);
-  const [logStep, setLogStep] = useState(0);         // 0=pick game, 1..N=per-player
-  const [logGame, setLogGame] = useState(null);       // selected game object
-  const [manualGame, setManualGame] = useState({ opponent: '', date: '' });
-  const [logEntries, setLogEntries] = useState({});   // { [playerId]: { ab, singles, ... } }
-  const [isSavingLog, setIsSavingLog] = useState(false);
   const [games, setGames] = useState([]);
   const [expandedLogGame, setExpandedLogGame] = useState(null);
+  const [sortCol, setSortCol] = useState('avg');
+  const [sortDir, setSortDir] = useState('desc');
 
   useEffect(() => {
     const unsubs = [];
@@ -160,73 +158,6 @@ export default function Stats() {
     setToast(`${newSeasonYear} season started!`);
   };
 
-  const recalcFromLogs = (allLogs, year, currentSeasons) => {
-    const seasonLogs = Object.values(allLogs).filter(g => g.year === year);
-    if (seasonLogs.length === 0) return currentSeasons;
-    const totals = seasonLogs.reduce((acc, g) => ({
-      ab:      (acc.ab      || 0) + (g.ab      || 0),
-      singles: (acc.singles || 0) + (g.singles || 0),
-      doubles: (acc.doubles || 0) + (g.doubles || 0),
-      triples: (acc.triples || 0) + (g.triples || 0),
-      hr:      (acc.hr      || 0) + (g.hr      || 0),
-      hits:    (acc.hits    || 0) + (g.hits    || 0),
-      rbi:     (acc.rbi     || 0) + (g.rbi     || 0),
-      k:       (acc.k       || 0) + (g.k       || 0),
-      bb:      (acc.bb      || 0) + (g.bb      || 0),
-      runs:    (acc.runs    || 0) + (g.runs    || 0),
-    }), {});
-    totals.avg = totals.ab > 0 ? totals.hits / totals.ab : 0;
-    totals.obp = calcOBP(totals.hits || 0, totals.bb || 0, totals.ab || 0);
-    return { ...currentSeasons, [year]: totals };
-  };
-
-  const logGameEntry = async () => {
-    setIsSavingLog(true);
-    const game = logGame;
-    const year = currentYear;
-    const safeId = (game.id || 'manual_' + (game.date || Date.now())).replace(/[^a-zA-Z0-9_-]/g, '_');
-    const gameKey = `${year}_${safeId}`;
-    for (const player of players) {
-      const e = logEntries[player.id] || {};
-      const singles = parseInt(e.singles) || 0;
-      const doubles = parseInt(e.doubles) || 0;
-      const triples = parseInt(e.triples) || 0;
-      const hr      = parseInt(e.hr)      || 0;
-      const ab      = parseInt(e.ab)      || 0;
-      const rbi     = parseInt(e.rbi)     || 0;
-      const k       = parseInt(e.k)       || 0;
-      const bb      = parseInt(e.bb)      || 0;
-      const runs    = parseInt(e.runs)    || 0;
-      const hits    = singles + doubles + triples + hr;
-      const ref = doc(db, 'playerStats', player.id);
-      const snap = await getDoc(ref);
-      const current = snap.exists() ? snap.data() : {};
-      const updatedLogs = { ...(current.gameLogs || {}), [gameKey]: { gameId: safeId, date: game.date, opponent: game.opponent, year, ab, singles, doubles, triples, hr, hits, rbi, k, bb, runs } };
-      const updatedSeasons = recalcFromLogs(updatedLogs, year, current.seasons || {});
-      const career = Object.values(updatedSeasons).reduce((acc, s) => ({
-        ab:      (acc.ab      || 0) + (s.ab      || 0),
-        hits:    (acc.hits    || 0) + (s.hits    || 0),
-        singles: (acc.singles || 0) + (s.singles || 0),
-        doubles: (acc.doubles || 0) + (s.doubles || 0),
-        triples: (acc.triples || 0) + (s.triples || 0),
-        hr:      (acc.hr      || 0) + (s.hr      || 0),
-        rbi:     (acc.rbi     || 0) + (s.rbi     || 0),
-        k:       (acc.k       || 0) + (s.k       || 0),
-        bb:      (acc.bb      || 0) + (s.bb      || 0),
-        runs:    (acc.runs    || 0) + (s.runs    || 0),
-      }), {});
-      career.avg = career.ab > 0 ? career.hits / career.ab : 0;
-      career.obp = calcOBP(career.hits || 0, career.bb || 0, career.ab || 0);
-      await setDoc(ref, { ...current, gameLogs: updatedLogs, seasons: updatedSeasons, career }, { merge: true });
-    }
-    setIsSavingLog(false);
-    setShowLogGame(false);
-    setLogStep(0);
-    setLogGame(null);
-    setLogEntries({});
-    setToast(`Game vs ${game.opponent} logged for ${players.length} players!`);
-  };
-
   const deleteGameLog = async (gameKey) => {
     for (const player of players) {
       const ref = doc(db, 'playerStats', player.id);
@@ -238,7 +169,27 @@ export default function Stats() {
       if (!deletedEntry) continue;
       delete updatedLogs[gameKey];
       const year = deletedEntry.year || gameKey.split('_')[0];
-      const updatedSeasons = recalcFromLogs(updatedLogs, year, current.seasons || {});
+
+      // Recalc batting season totals
+      const logs = Object.values(updatedLogs).filter(g => g.year === year);
+      let updatedSeasons = current.seasons || {};
+      if (logs.length > 0) {
+        const t = logs.reduce((a, g) => ({
+          ab:      (a.ab      || 0) + (g.ab      || 0),
+          singles: (a.singles || 0) + (g.singles || 0),
+          doubles: (a.doubles || 0) + (g.doubles || 0),
+          triples: (a.triples || 0) + (g.triples || 0),
+          hr:      (a.hr      || 0) + (g.hr      || 0),
+          hits:    (a.hits    || 0) + (g.hits    || 0),
+          rbi:     (a.rbi     || 0) + (g.rbi     || 0),
+          k:       (a.k       || 0) + (g.k       || 0),
+          bb:      (a.bb      || 0) + (g.bb      || 0),
+          runs:    (a.runs    || 0) + (g.runs    || 0),
+        }), {});
+        t.avg = t.ab > 0 ? t.hits / t.ab : 0;
+        t.obp = calcOBP(t.hits || 0, t.bb || 0, t.ab || 0);
+        updatedSeasons = { ...updatedSeasons, [year]: t };
+      }
       const career = Object.values(updatedSeasons).reduce((acc, s) => ({
         ab:      (acc.ab      || 0) + (s.ab      || 0),
         hits:    (acc.hits    || 0) + (s.hits    || 0),
@@ -253,7 +204,22 @@ export default function Stats() {
       }), {});
       career.avg = career.ab > 0 ? career.hits / career.ab : 0;
       career.obp = calcOBP(career.hits || 0, career.bb || 0, career.ab || 0);
-      await setDoc(ref, { ...current, gameLogs: updatedLogs, seasons: updatedSeasons, career }, { merge: true });
+
+      // Recalc fielding from remaining logs
+      const fieldingTotals = {};
+      Object.values(updatedLogs).forEach(g => {
+        if (!g.fielding) return;
+        Object.entries(g.fielding).forEach(([pos, f]) => {
+          if (!fieldingTotals[pos]) fieldingTotals[pos] = { innings: 0, putouts: 0, assists: 0, errors: 0 };
+          fieldingTotals[pos].innings += parseInt(f.innings) || 0;
+          fieldingTotals[pos].putouts += parseInt(f.putouts) || 0;
+          fieldingTotals[pos].assists += parseInt(f.assists) || 0;
+          fieldingTotals[pos].errors  += parseInt(f.errors)  || 0;
+        });
+      });
+      const mergedFielding = { ...(current.fielding || {}), ...fieldingTotals };
+
+      await setDoc(ref, { ...current, gameLogs: updatedLogs, seasons: updatedSeasons, career, fielding: mergedFielding }, { merge: true });
     }
     setToast('Game log deleted. Season totals updated.');
   };
@@ -285,53 +251,83 @@ export default function Stats() {
     return { bg: '#FEE2E2', text: '#B91C1C' };
   };
 
-  const BattingTable = ({ getStats, showEdit }) => (
-    <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
-      <div style={{ overflowX: 'auto' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '680px' }}>
-          <thead>
-            <tr style={{ background: 'var(--gray-50)', borderBottom: '2px solid var(--gray-200)' }}>
-              <th style={{ padding: '10px 12px', textAlign: 'left', fontSize: '11px', fontWeight: '700', color: 'var(--gray-500)', textTransform: 'uppercase' }}>Player</th>
-              {['AVG','OBP','AB','H','1B','2B','3B','HR','RBI','R','K','BB'].map(h => (
-                <th key={h} style={{ padding: '10px 6px', textAlign: 'center', fontSize: '11px', fontWeight: '700', color: 'var(--gray-500)', textTransform: 'uppercase' }}>{h}</th>
-              ))}
-              {showEdit && canEdit && <th style={{ padding: '10px 6px' }} />}
-            </tr>
-          </thead>
-          <tbody>
-            {players.map((player, i) => {
-              const s = getStats(player.id);
-              return (
-                <tr key={player.id} style={{ borderBottom: '1px solid var(--gray-100)', background: i % 2 === 0 ? 'white' : 'var(--gray-50)' }}>
-                  <td style={{ padding: '10px 12px' }}>
-                    <div style={{ fontWeight: '600', fontSize: '14px' }}>{getPlayerName(player)}</div>
-                    {player.jerseyNumber && <div style={{ fontSize: '11px', color: 'var(--gray-400)' }}>#{player.jerseyNumber}</div>}
-                  </td>
-                  <td style={{ padding: '10px 6px', textAlign: 'center', fontFamily: 'Oswald, sans-serif', fontSize: '14px', fontWeight: '700', color: 'var(--red)' }}>{formatAvg(s)}</td>
-                  <td style={{ padding: '10px 6px', textAlign: 'center', fontFamily: 'Oswald, sans-serif', fontSize: '14px', fontWeight: '700', color: 'var(--blue)' }}>{formatOBP(s)}</td>
-                  <td style={{ padding: '10px 6px', textAlign: 'center', fontSize: '14px' }}>{s.ab || 0}</td>
-                  <td style={{ padding: '10px 6px', textAlign: 'center', fontSize: '14px', fontWeight: '600' }}>{s.hits || 0}</td>
-                  <td style={{ padding: '10px 6px', textAlign: 'center', fontSize: '14px' }}>{s.singles || 0}</td>
-                  <td style={{ padding: '10px 6px', textAlign: 'center', fontSize: '14px' }}>{s.doubles || 0}</td>
-                  <td style={{ padding: '10px 6px', textAlign: 'center', fontSize: '14px' }}>{s.triples || 0}</td>
-                  <td style={{ padding: '10px 6px', textAlign: 'center', fontSize: '14px', fontWeight: '700', color: s.hr > 0 ? 'var(--red)' : 'inherit' }}>{s.hr || 0}</td>
-                  <td style={{ padding: '10px 6px', textAlign: 'center', fontSize: '14px' }}>{s.rbi || 0}</td>
-                  <td style={{ padding: '10px 6px', textAlign: 'center', fontSize: '14px' }}>{s.runs || 0}</td>
-                  <td style={{ padding: '10px 6px', textAlign: 'center', fontSize: '14px' }}>{s.k || 0}</td>
-                  <td style={{ padding: '10px 6px', textAlign: 'center', fontSize: '14px' }}>{s.bb || 0}</td>
-                  {showEdit && canEdit && (
-                    <td style={{ padding: '10px 6px', textAlign: 'center' }}>
-                      <button onClick={() => startEdit(player)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '16px' }}>✏️</button>
+  const BATTING_COLS = [
+    { key: 'avg',     label: 'AVG', getValue: s => s.avg !== undefined ? s.avg : (s.hits||0)/(s.ab||1) },
+    { key: 'obp',     label: 'OBP', getValue: s => s.obp !== undefined ? s.obp : calcOBP(s.hits||0, s.bb||0, s.ab||0) },
+    { key: 'ab',      label: 'AB',  getValue: s => s.ab      || 0 },
+    { key: 'hits',    label: 'H',   getValue: s => s.hits    || 0 },
+    { key: 'singles', label: '1B',  getValue: s => s.singles || 0 },
+    { key: 'doubles', label: '2B',  getValue: s => s.doubles || 0 },
+    { key: 'triples', label: '3B',  getValue: s => s.triples || 0 },
+    { key: 'hr',      label: 'HR',  getValue: s => s.hr      || 0 },
+    { key: 'rbi',     label: 'RBI', getValue: s => s.rbi     || 0 },
+    { key: 'runs',    label: 'R',   getValue: s => s.runs    || 0 },
+    { key: 'k',       label: 'K',   getValue: s => s.k       || 0 },
+    { key: 'bb',      label: 'BB',  getValue: s => s.bb      || 0 },
+  ];
+
+  const handleSort = (key) => {
+    if (sortCol === key) setSortDir(d => d === 'desc' ? 'asc' : 'desc');
+    else { setSortCol(key); setSortDir('desc'); }
+  };
+
+  const BattingTable = ({ getStats, showEdit }) => {
+    const col = BATTING_COLS.find(c => c.key === sortCol) || BATTING_COLS[0];
+    const sorted = [...players].sort((a, b) => {
+      const av = col.getValue(getStats(a.id));
+      const bv = col.getValue(getStats(b.id));
+      return sortDir === 'desc' ? bv - av : av - bv;
+    });
+    return (
+      <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '680px' }}>
+            <thead>
+              <tr style={{ background: 'var(--gray-50)', borderBottom: '2px solid var(--gray-200)' }}>
+                <th style={{ padding: '10px 12px', textAlign: 'left', fontSize: '11px', fontWeight: '700', color: 'var(--gray-500)', textTransform: 'uppercase' }}>Player</th>
+                {BATTING_COLS.map(h => (
+                  <th key={h.key} onClick={() => handleSort(h.key)} style={{ padding: '10px 6px', textAlign: 'center', fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', cursor: 'pointer', userSelect: 'none', color: sortCol === h.key ? 'var(--red)' : 'var(--gray-500)', whiteSpace: 'nowrap' }}>
+                    {h.label}{sortCol === h.key ? (sortDir === 'desc' ? ' ▼' : ' ▲') : ''}
+                  </th>
+                ))}
+                {showEdit && canEdit && <th style={{ padding: '10px 6px' }} />}
+              </tr>
+            </thead>
+            <tbody>
+              {sorted.map((player, i) => {
+                const s = getStats(player.id);
+                return (
+                  <tr key={player.id} style={{ borderBottom: '1px solid var(--gray-100)', background: i % 2 === 0 ? 'white' : 'var(--gray-50)' }}>
+                    <td style={{ padding: '10px 12px' }}>
+                      <div style={{ fontWeight: '600', fontSize: '14px' }}>{getPlayerName(player)}</div>
+                      {player.jerseyNumber && <div style={{ fontSize: '11px', color: 'var(--gray-400)' }}>#{player.jerseyNumber}</div>}
                     </td>
-                  )}
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+                    <td style={{ padding: '10px 6px', textAlign: 'center', fontFamily: 'Oswald, sans-serif', fontSize: '14px', fontWeight: '700', color: 'var(--red)' }}>{formatAvg(s)}</td>
+                    <td style={{ padding: '10px 6px', textAlign: 'center', fontFamily: 'Oswald, sans-serif', fontSize: '14px', fontWeight: '700', color: 'var(--blue)' }}>{formatOBP(s)}</td>
+                    <td style={{ padding: '10px 6px', textAlign: 'center', fontSize: '14px' }}>{s.ab || 0}</td>
+                    <td style={{ padding: '10px 6px', textAlign: 'center', fontSize: '14px', fontWeight: '600' }}>{s.hits || 0}</td>
+                    <td style={{ padding: '10px 6px', textAlign: 'center', fontSize: '14px' }}>{s.singles || 0}</td>
+                    <td style={{ padding: '10px 6px', textAlign: 'center', fontSize: '14px' }}>{s.doubles || 0}</td>
+                    <td style={{ padding: '10px 6px', textAlign: 'center', fontSize: '14px' }}>{s.triples || 0}</td>
+                    <td style={{ padding: '10px 6px', textAlign: 'center', fontSize: '14px', fontWeight: '700', color: s.hr > 0 ? 'var(--red)' : 'inherit' }}>{s.hr || 0}</td>
+                    <td style={{ padding: '10px 6px', textAlign: 'center', fontSize: '14px' }}>{s.rbi || 0}</td>
+                    <td style={{ padding: '10px 6px', textAlign: 'center', fontSize: '14px' }}>{s.runs || 0}</td>
+                    <td style={{ padding: '10px 6px', textAlign: 'center', fontSize: '14px' }}>{s.k || 0}</td>
+                    <td style={{ padding: '10px 6px', textAlign: 'center', fontSize: '14px' }}>{s.bb || 0}</td>
+                    {showEdit && canEdit && (
+                      <td style={{ padding: '10px 6px', textAlign: 'center' }}>
+                        <button onClick={() => startEdit(player)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '16px' }}>✏️</button>
+                      </td>
+                    )}
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   // Rotation helper: grid of players vs positions showing games + errors
   const RotationView = () => (
@@ -562,14 +558,6 @@ export default function Stats() {
         )}
       </div>
     );
-  };
-
-  // Current player being logged (1-indexed logStep)
-  const currentLogPlayer = logStep >= 1 ? players[logStep - 1] : null;
-  const currentLogEntry = currentLogPlayer ? (logEntries[currentLogPlayer.id] || { ab:0, singles:0, doubles:0, triples:0, hr:0, rbi:0, k:0, bb:0, runs:0 }) : {};
-  const setLogEntry = (key, val) => {
-    if (!currentLogPlayer) return;
-    setLogEntries(prev => ({ ...prev, [currentLogPlayer.id]: { ...(prev[currentLogPlayer.id] || { ab:0,singles:0,doubles:0,triples:0,hr:0,rbi:0,k:0,bb:0,runs:0 }), [key]: val } }));
   };
 
   return (
@@ -807,135 +795,14 @@ export default function Stats() {
         </div>
       )}
 
-      {/* Log Game Modal */}
       {showLogGame && (
-        <div className="modal-overlay" onClick={() => { setShowLogGame(false); setLogStep(0); }}>
-          <div className="modal-sheet" onClick={e => e.stopPropagation()} style={{ maxHeight: '90vh', overflowY: 'auto' }}>
-            <div className="modal-handle" />
-
-            {/* Step 0: Pick Game */}
-            {logStep === 0 && (
-              <>
-                <h3 style={{ fontFamily: 'Oswald, sans-serif', fontSize: '20px', marginBottom: '4px', textTransform: 'uppercase' }}>Log a Game</h3>
-                <p style={{ color: 'var(--gray-500)', fontSize: '14px', marginBottom: '14px' }}>Pick the game you played or enter manually.</p>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px' }}>
-                  {games.slice(0, 10).map(g => (
-                    <button key={g.id} onClick={() => { setLogGame({ id: g.id, opponent: g.opponent || g.title || 'Game', date: g.date || '', year: currentYear }); setLogStep(1); }}
-                      style={{ textAlign: 'left', padding: '12px 14px', borderRadius: '10px', border: '1px solid var(--gray-200)', background: 'white', cursor: 'pointer' }}>
-                      <div style={{ fontWeight: '700', fontSize: '14px' }}>vs {g.opponent || g.title || 'Game'}</div>
-                      <div style={{ fontSize: '12px', color: 'var(--gray-500)', marginTop: '2px' }}>{g.date || ''}</div>
-                    </button>
-                  ))}
-                </div>
-                <div style={{ borderTop: '1px solid var(--gray-200)', paddingTop: '14px' }}>
-                  <p style={{ fontSize: '13px', fontWeight: '700', color: 'var(--gray-600)', marginBottom: '10px' }}>Or enter manually:</p>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '12px' }}>
-                    <div className="form-group" style={{ marginBottom: 0 }}>
-                      <label className="form-label">Opponent</label>
-                      <input className="form-input" placeholder="e.g. Tigers" value={manualGame.opponent} onChange={e => setManualGame(m => ({ ...m, opponent: e.target.value }))} />
-                    </div>
-                    <div className="form-group" style={{ marginBottom: 0 }}>
-                      <label className="form-label">Date</label>
-                      <input className="form-input" type="date" value={manualGame.date} onChange={e => setManualGame(m => ({ ...m, date: e.target.value }))} />
-                    </div>
-                  </div>
-                  <button className="btn-primary" disabled={!manualGame.opponent.trim() || !manualGame.date}
-                    onClick={() => { setLogGame({ id: 'manual_' + manualGame.date, opponent: manualGame.opponent.trim(), date: manualGame.date, year: currentYear }); setLogStep(1); }}>
-                    Use Manual Entry
-                  </button>
-                </div>
-              </>
-            )}
-
-            {/* Steps 1..N: Per-player stats */}
-            {logStep >= 1 && currentLogPlayer && (
-              <>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
-                  <div>
-                    <div style={{ fontSize: '12px', color: 'var(--gray-500)', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                      vs {logGame?.opponent} &middot; {logGame?.date}
-                    </div>
-                    <div style={{ fontFamily: 'Oswald, sans-serif', fontSize: '20px', fontWeight: '700', textTransform: 'uppercase' }}>
-                      {getPlayerName(currentLogPlayer)}
-                    </div>
-                  </div>
-                  <div style={{ fontSize: '12px', color: 'var(--gray-400)', textAlign: 'right', paddingTop: '4px' }}>
-                    Player {logStep} of {players.length}
-                  </div>
-                </div>
-                {/* Progress bar */}
-                <div style={{ height: '4px', background: 'var(--gray-100)', borderRadius: '2px', marginBottom: '16px' }}>
-                  <div style={{ height: '100%', width: `${(logStep / players.length) * 100}%`, background: 'var(--red)', borderRadius: '2px', transition: 'width 0.2s' }} />
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px', marginBottom: '12px' }}>
-                  {[
-                    { key: 'ab',      label: 'AB' },
-                    { key: 'singles', label: '1B' },
-                    { key: 'doubles', label: '2B' },
-                    { key: 'triples', label: '3B' },
-                    { key: 'hr',      label: 'HR' },
-                    { key: 'rbi',     label: 'RBI' },
-                    { key: 'runs',    label: 'R' },
-                    { key: 'k',       label: 'K' },
-                    { key: 'bb',      label: 'BB' },
-                  ].map(f => (
-                    <div key={f.key} className="form-group" style={{ marginBottom: 0 }}>
-                      <label className="form-label">{f.label}</label>
-                      <input className="form-input" type="number" min="0" step="1"
-                        value={currentLogEntry[f.key] ?? 0}
-                        onChange={e => setLogEntry(f.key, e.target.value)}
-                        style={{ textAlign: 'center', fontSize: '20px', fontFamily: 'Oswald, sans-serif', padding: '8px 4px' }} />
-                    </div>
-                  ))}
-                </div>
-                {/* Live auto-calc */}
-                {(() => {
-                  const h  = (parseInt(currentLogEntry.singles)||0)+(parseInt(currentLogEntry.doubles)||0)+(parseInt(currentLogEntry.triples)||0)+(parseInt(currentLogEntry.hr)||0);
-                  const ab = parseInt(currentLogEntry.ab) || 0;
-                  const bb = parseInt(currentLogEntry.bb) || 0;
-                  const avg = ab > 0 ? '.'+String(Math.round(h/ab*1000)).padStart(3,'0') : '.000';
-                  const obp = '.'+String(Math.round(calcOBP(h,bb,ab)*1000)).padStart(3,'0');
-                  return (
-                    <div style={{ display: 'flex', gap: '8px', marginBottom: '14px' }}>
-                      <div style={{ flex: 1, background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: '8px', padding: '8px', textAlign: 'center' }}>
-                        <div style={{ fontSize: '10px', fontWeight: '700', color: 'var(--gray-500)', textTransform: 'uppercase' }}>H</div>
-                        <div style={{ fontFamily: 'Oswald, sans-serif', fontSize: '22px', fontWeight: '700', color: 'var(--red)' }}>{h}</div>
-                      </div>
-                      <div style={{ flex: 1, background: 'var(--gray-50)', border: '1px solid var(--gray-200)', borderRadius: '8px', padding: '8px', textAlign: 'center' }}>
-                        <div style={{ fontSize: '10px', fontWeight: '700', color: 'var(--gray-500)', textTransform: 'uppercase' }}>AVG</div>
-                        <div style={{ fontFamily: 'Oswald, sans-serif', fontSize: '22px', fontWeight: '700' }}>{avg}</div>
-                      </div>
-                      <div style={{ flex: 1, background: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: '8px', padding: '8px', textAlign: 'center' }}>
-                        <div style={{ fontSize: '10px', fontWeight: '700', color: 'var(--gray-500)', textTransform: 'uppercase' }}>OBP</div>
-                        <div style={{ fontFamily: 'Oswald, sans-serif', fontSize: '22px', fontWeight: '700', color: 'var(--blue)' }}>{obp}</div>
-                      </div>
-                    </div>
-                  );
-                })()}
-                <div style={{ display: 'flex', gap: '10px' }}>
-                  <button onClick={() => {
-                    // Skip = keep zeros (already default)
-                    if (logStep < players.length) { setLogStep(s => s + 1); }
-                    else { logGameEntry(); }
-                  }} style={{ flex: 1, padding: '12px', borderRadius: '10px', border: '1px solid var(--gray-200)', background: 'white', cursor: 'pointer', fontWeight: '600', fontSize: '14px' }}>
-                    Skip (0s)
-                  </button>
-                  <button disabled={isSavingLog} onClick={() => {
-                    if (logStep < players.length) { setLogStep(s => s + 1); }
-                    else { logGameEntry(); }
-                  }} style={{ flex: 2, padding: '12px', borderRadius: '10px', border: 'none', background: 'var(--red)', color: 'white', cursor: 'pointer', fontWeight: '700', fontSize: '14px' }}>
-                    {isSavingLog ? 'Saving...' : logStep < players.length ? 'Save & Next' : 'Finish & Save All'}
-                  </button>
-                </div>
-                {logStep > 1 && (
-                  <button onClick={() => setLogStep(s => s - 1)} style={{ marginTop: '8px', width: '100%', background: 'none', border: 'none', color: 'var(--gray-400)', cursor: 'pointer', fontSize: '13px' }}>
-                    ← Back
-                  </button>
-                )}
-              </>
-            )}
-          </div>
-        </div>
+        <LogGameModal
+          players={players}
+          currentYear={currentYear}
+          games={games}
+          onClose={() => setShowLogGame(false)}
+          onSaved={msg => setToast(msg)}
+        />
       )}
 
       {/* New Season Modal */}

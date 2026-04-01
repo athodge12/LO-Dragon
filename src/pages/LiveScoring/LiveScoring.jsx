@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
-import { doc, onSnapshot, setDoc } from 'firebase/firestore';
+import { doc, onSnapshot, setDoc, collection, query, orderBy } from 'firebase/firestore';
 import { db } from '../../firebase/config';
 import { useAuth } from '../../contexts/AuthContext';
 import Header from '../../components/Layout/Header';
 import Toast from '../../components/UI/Toast';
+import LogGameModal from '../../components/LogGameModal';
 
 const INNINGS = [1, 2, 3, 4, 5, 6, 7];
 
@@ -29,6 +30,9 @@ export default function LiveScoring() {
   const [streamUrl, setStreamUrl] = useState('');
   const [streamTitle, setStreamTitle] = useState('');
   const [toast, setToast] = useState('');
+  const [showLogStats, setShowLogStats] = useState(false);
+  const [players, setPlayers] = useState([]);
+  const [season, setSeason] = useState(null);
 
   useEffect(() => {
     const unsubs = [
@@ -41,7 +45,13 @@ export default function LiveScoring() {
       }),
       onSnapshot(doc(db, 'settings', 'liveStream'), snap => {
         setLiveStream(snap.exists() ? snap.data() : null);
-      })
+      }),
+      onSnapshot(query(collection(db, 'roster'), orderBy('createdAt')), snap => {
+        setPlayers(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      }),
+      onSnapshot(doc(db, 'settings', 'season'), snap => {
+        setSeason(snap.exists() ? snap.data() : { year: '2026' });
+      }),
     ];
     return () => unsubs.forEach(u => u());
   }, []);
@@ -109,16 +119,23 @@ export default function LiveScoring() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
       <Header title="Live Scoring" back="/" actions={canEdit && (
-        <button onClick={openStreamModal} style={{
-          background: liveStream?.isLive ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.15)',
-          border: 'none', borderRadius: '8px',
-          padding: '6px 10px', color: 'white', cursor: 'pointer',
-          fontWeight: '700', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px'
-        }}>
-          {liveStream?.isLive
-            ? <><span style={{ width: 8, height: 8, borderRadius: '50%', background: '#ff4444', display: 'inline-block' }} /> LIVE</>
-            : '📡 Stream'}
-        </button>
+        <div style={{ display: 'flex', gap: '6px' }}>
+          <button onClick={() => setShowLogStats(true)} style={{
+            background: 'rgba(255,255,255,0.2)', border: 'none', borderRadius: '8px',
+            padding: '6px 10px', color: 'white', cursor: 'pointer',
+            fontWeight: '700', fontSize: '12px'
+          }}>📊 Stats</button>
+          <button onClick={openStreamModal} style={{
+            background: liveStream?.isLive ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.15)',
+            border: 'none', borderRadius: '8px',
+            padding: '6px 10px', color: 'white', cursor: 'pointer',
+            fontWeight: '700', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px'
+          }}>
+            {liveStream?.isLive
+              ? <><span style={{ width: 8, height: 8, borderRadius: '50%', background: '#ff4444', display: 'inline-block' }} /> LIVE</>
+              : '📡 Stream'}
+          </button>
+        </div>
       )} />
 
       <div className="page-content">
@@ -347,6 +364,22 @@ export default function LiveScoring() {
             )}
           </div>
         </div>
+      )}
+
+      {showLogStats && (
+        <LogGameModal
+          players={players}
+          currentYear={season?.year || '2026'}
+          games={[]}
+          initialGame={{
+            id: 'live_' + new Date().toISOString().slice(0, 10),
+            opponent: scoreData.opponent || 'Opponent',
+            date: new Date().toISOString().slice(0, 10),
+            year: season?.year || '2026'
+          }}
+          onClose={() => setShowLogStats(false)}
+          onSaved={msg => { setToast(msg); setShowLogStats(false); }}
+        />
       )}
 
       {toast && <Toast message={toast} onDismiss={() => setToast('')} />}
