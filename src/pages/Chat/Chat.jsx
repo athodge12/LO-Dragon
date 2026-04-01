@@ -168,7 +168,8 @@ export default function Chat() {
 
       {/* Tabs — fixed below header so they're always visible */}
       <div style={{
-        position: 'fixed', top: 'var(--header-height)', left: 0,
+        position: 'fixed', top: 'var(--header-height)', left: '50%',
+        transform: 'translateX(-50%)',
         width: '100%', maxWidth: 'var(--max-width)', zIndex: 10,
         display: 'flex', borderBottom: '1px solid var(--gray-200)',
         background: 'white'
@@ -237,7 +238,8 @@ export default function Chat() {
 
         {/* Input */}
         <div style={{
-          position: 'fixed', bottom: 'var(--bottom-nav-height)', left: 0,
+          position: 'fixed', bottom: 'var(--bottom-nav-height)', left: '50%',
+          transform: 'translateX(-50%)',
           width: '100%', maxWidth: 'var(--max-width)', background: 'white',
           borderTop: '1px solid var(--gray-200)', padding: '10px 16px',
           display: 'flex', gap: '8px', alignItems: 'center',
