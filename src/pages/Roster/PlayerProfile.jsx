@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
-import { doc, onSnapshot, setDoc, getDoc } from 'firebase/firestore';
+import { doc, collection, onSnapshot, setDoc, getDoc } from 'firebase/firestore';
 import { db } from '../../firebase/config';
 import { useAuth } from '../../contexts/AuthContext';
 import Header from '../../components/Layout/Header';
@@ -47,6 +47,7 @@ export default function PlayerProfile() {
   const [ratings, setRatings] = useState({});
   const [editing, setEditing] = useState(false);
   const [editForm, setEditForm] = useState({});
+  const [linkedParent, setLinkedParent] = useState(null);
   const [toast, setToast] = useState('');
 
   useEffect(() => {
@@ -69,6 +70,23 @@ export default function PlayerProfile() {
     }));
     return () => unsubs.forEach(u => u());
   }, [id]);
+
+  // When player loads, find the parent who claimed them
+  useEffect(() => {
+    if (!player) return;
+    const playerName = (player.name || player.childName || `${player.firstName || ''} ${player.lastName || ''}`.trim()).toLowerCase();
+    const unsub = onSnapshot(collection(db, 'users'), snap => {
+      const match = snap.docs
+        .map(d => ({ id: d.id, ...d.data() }))
+        .find(u => {
+          if (u.role !== 'parent' && !u.roles?.includes('parent')) return false;
+          const cn = (u.childName || '').toLowerCase().trim();
+          return cn && (playerName.includes(cn) || cn.includes(playerName));
+        });
+      setLinkedParent(match || null);
+    });
+    return () => unsub();
+  }, [player]);
 
   const saveProfile = async () => {
     await setDoc(doc(db, 'roster', id), editForm, { merge: true });
@@ -243,26 +261,30 @@ export default function PlayerProfile() {
           <div className="section-header">
             <span className="section-title">📞 Parent Contact</span>
           </div>
-          <div style={{ fontSize: '14px', color: 'var(--gray-700)' }}>
-            <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
-              <span style={{ color: 'var(--gray-400)', width: '70px' }}>Parent</span>
-              <span style={{ fontWeight: '600' }}>
-                {player.parentName || `${player.firstName || ''} ${player.lastName || ''}`.trim() || 'Not set'}
-              </span>
-            </div>
-            {player.phone && (
+          {linkedParent ? (
+            <div style={{ fontSize: '14px', color: 'var(--gray-700)' }}>
               <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
-                <span style={{ color: 'var(--gray-400)', width: '70px' }}>Phone</span>
-                <a href={`tel:${player.phone}`} style={{ fontWeight: '600', color: 'var(--red)' }}>{player.phone}</a>
+                <span style={{ color: 'var(--gray-400)', width: '70px', flexShrink: 0 }}>Parent</span>
+                <span style={{ fontWeight: '600' }}>{`${linkedParent.firstName || ''} ${linkedParent.lastName || ''}`.trim() || 'Unknown'}</span>
               </div>
-            )}
-            {player.email && (
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <span style={{ color: 'var(--gray-400)', width: '70px' }}>Email</span>
-                <a href={`mailto:${player.email}`} style={{ fontWeight: '600', color: 'var(--red)', wordBreak: 'break-all' }}>{player.email}</a>
-              </div>
-            )}
-          </div>
+              {linkedParent.phone && (
+                <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
+                  <span style={{ color: 'var(--gray-400)', width: '70px', flexShrink: 0 }}>Phone</span>
+                  <a href={`tel:${linkedParent.phone}`} style={{ fontWeight: '600', color: 'var(--red)' }}>{linkedParent.phone}</a>
+                </div>
+              )}
+              {linkedParent.email && (
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <span style={{ color: 'var(--gray-400)', width: '70px', flexShrink: 0 }}>Email</span>
+                  <a href={`mailto:${linkedParent.email}`} style={{ fontWeight: '600', color: 'var(--red)', wordBreak: 'break-all' }}>{linkedParent.email}</a>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div style={{ fontSize: '14px', color: 'var(--gray-400)', textAlign: 'center', padding: '12px 0' }}>
+              No parent account linked yet
+            </div>
+          )}
         </div>
 
         {/* AI Scouting Placeholder */}
