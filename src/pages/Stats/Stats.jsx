@@ -47,6 +47,16 @@ export default function Stats() {
   const getSeasonHistory = (id) => allStats[id]?.seasons || {};
   const getFielding = (id) => allStats[id]?.fielding || {};
 
+  const calcOBP = (hits, bb, ab) => {
+    const denom = ab + bb;
+    return denom > 0 ? (hits + bb) / denom : 0;
+  };
+
+  const formatOBP = (s) => {
+    const obp = s.obp !== undefined ? s.obp : calcOBP(s.hits || 0, s.bb || 0, s.ab || 0);
+    return '.' + String(Math.round(obp * 1000)).padStart(3, '0');
+  };
+
   const startEdit = (player) => {
     const s = getCurrentSeason(player.id);
     setEditingPlayer(player.id);
@@ -57,6 +67,9 @@ export default function Stats() {
       triples: s.triples || 0,
       hr: s.hr || 0,
       rbi: s.rbi || 0,
+      k: s.k || 0,
+      bb: s.bb || 0,
+      runs: s.runs || 0,
     });
     const pos = FIELDING_POSITIONS[0];
     setEditFieldingPos(pos);
@@ -71,10 +84,15 @@ export default function Stats() {
     const doubles = parseInt(editStats.doubles) || 0;
     const triples = parseInt(editStats.triples) || 0;
     const hr = parseInt(editStats.hr) || 0;
+    const rbi = parseInt(editStats.rbi) || 0;
+    const k   = parseInt(editStats.k)   || 0;
+    const bb  = parseInt(editStats.bb)  || 0;
+    const runs = parseInt(editStats.runs) || 0;
     const hits = singles + doubles + triples + hr;
     const avg = ab > 0 ? hits / ab : 0;
+    const obp = calcOBP(hits, bb, ab);
 
-    const newSeasonStats = { ab, singles, doubles, triples, hr, hits, rbi: parseInt(editStats.rbi) || 0, avg };
+    const newSeasonStats = { ab, singles, doubles, triples, hr, hits, rbi, avg, k, bb, runs, obp };
 
     const ref = doc(db, 'playerStats', playerId);
     const snap = await getDoc(ref);
@@ -82,15 +100,19 @@ export default function Stats() {
     const updatedSeasons = { ...(current.seasons || {}), [currentYear]: newSeasonStats };
 
     const career = Object.values(updatedSeasons).reduce((acc, s) => ({
-      ab: (acc.ab || 0) + (s.ab || 0),
-      hits: (acc.hits || 0) + (s.hits || 0),
+      ab:      (acc.ab      || 0) + (s.ab      || 0),
+      hits:    (acc.hits    || 0) + (s.hits    || 0),
       singles: (acc.singles || 0) + (s.singles || 0),
       doubles: (acc.doubles || 0) + (s.doubles || 0),
       triples: (acc.triples || 0) + (s.triples || 0),
-      hr: (acc.hr || 0) + (s.hr || 0),
-      rbi: (acc.rbi || 0) + (s.rbi || 0),
+      hr:      (acc.hr      || 0) + (s.hr      || 0),
+      rbi:     (acc.rbi     || 0) + (s.rbi     || 0),
+      k:       (acc.k       || 0) + (s.k       || 0),
+      bb:      (acc.bb      || 0) + (s.bb      || 0),
+      runs:    (acc.runs    || 0) + (s.runs    || 0),
     }), {});
     career.avg = career.ab > 0 ? career.hits / career.ab : 0;
+    career.obp = calcOBP(career.hits || 0, career.bb || 0, career.ab || 0);
 
     await setDoc(ref, { ...current, seasons: updatedSeasons, career }, { merge: true });
     setEditingPlayer(null);
@@ -129,9 +151,12 @@ export default function Stats() {
     const s = fn(p.id);
     return {
       hits: (acc.hits || 0) + (s.hits || 0),
-      hr: (acc.hr || 0) + (s.hr || 0),
-      rbi: (acc.rbi || 0) + (s.rbi || 0),
-      ab: (acc.ab || 0) + (s.ab || 0),
+      hr:   (acc.hr   || 0) + (s.hr   || 0),
+      rbi:  (acc.rbi  || 0) + (s.rbi  || 0),
+      ab:   (acc.ab   || 0) + (s.ab   || 0),
+      bb:   (acc.bb   || 0) + (s.bb   || 0),
+      runs: (acc.runs || 0) + (s.runs || 0),
+      k:    (acc.k    || 0) + (s.k    || 0),
     };
   }, {});
 
@@ -152,11 +177,11 @@ export default function Stats() {
   const BattingTable = ({ getStats, showEdit }) => (
     <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
       <div style={{ overflowX: 'auto' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '480px' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '680px' }}>
           <thead>
             <tr style={{ background: 'var(--gray-50)', borderBottom: '2px solid var(--gray-200)' }}>
               <th style={{ padding: '10px 12px', textAlign: 'left', fontSize: '11px', fontWeight: '700', color: 'var(--gray-500)', textTransform: 'uppercase' }}>Player</th>
-              {['AVG','AB','H','1B','2B','3B','HR','RBI'].map(h => (
+              {['AVG','OBP','AB','H','1B','2B','3B','HR','RBI','R','K','BB'].map(h => (
                 <th key={h} style={{ padding: '10px 6px', textAlign: 'center', fontSize: '11px', fontWeight: '700', color: 'var(--gray-500)', textTransform: 'uppercase' }}>{h}</th>
               ))}
               {showEdit && canEdit && <th style={{ padding: '10px 6px' }} />}
@@ -171,7 +196,8 @@ export default function Stats() {
                     <div style={{ fontWeight: '600', fontSize: '14px' }}>{getPlayerName(player)}</div>
                     {player.jerseyNumber && <div style={{ fontSize: '11px', color: 'var(--gray-400)' }}>#{player.jerseyNumber}</div>}
                   </td>
-                  <td style={{ padding: '10px 6px', textAlign: 'center', fontFamily: 'Oswald, sans-serif', fontSize: '15px', fontWeight: '700', color: 'var(--red)' }}>{formatAvg(s)}</td>
+                  <td style={{ padding: '10px 6px', textAlign: 'center', fontFamily: 'Oswald, sans-serif', fontSize: '14px', fontWeight: '700', color: 'var(--red)' }}>{formatAvg(s)}</td>
+                  <td style={{ padding: '10px 6px', textAlign: 'center', fontFamily: 'Oswald, sans-serif', fontSize: '14px', fontWeight: '700', color: 'var(--blue)' }}>{formatOBP(s)}</td>
                   <td style={{ padding: '10px 6px', textAlign: 'center', fontSize: '14px' }}>{s.ab || 0}</td>
                   <td style={{ padding: '10px 6px', textAlign: 'center', fontSize: '14px', fontWeight: '600' }}>{s.hits || 0}</td>
                   <td style={{ padding: '10px 6px', textAlign: 'center', fontSize: '14px' }}>{s.singles || 0}</td>
@@ -179,6 +205,9 @@ export default function Stats() {
                   <td style={{ padding: '10px 6px', textAlign: 'center', fontSize: '14px' }}>{s.triples || 0}</td>
                   <td style={{ padding: '10px 6px', textAlign: 'center', fontSize: '14px', fontWeight: '700', color: s.hr > 0 ? 'var(--red)' : 'inherit' }}>{s.hr || 0}</td>
                   <td style={{ padding: '10px 6px', textAlign: 'center', fontSize: '14px' }}>{s.rbi || 0}</td>
+                  <td style={{ padding: '10px 6px', textAlign: 'center', fontSize: '14px' }}>{s.runs || 0}</td>
+                  <td style={{ padding: '10px 6px', textAlign: 'center', fontSize: '14px' }}>{s.k || 0}</td>
+                  <td style={{ padding: '10px 6px', textAlign: 'center', fontSize: '14px' }}>{s.bb || 0}</td>
                   {showEdit && canEdit && (
                     <td style={{ padding: '10px 6px', textAlign: 'center' }}>
                       <button onClick={() => startEdit(player)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '16px' }}>✏️</button>
@@ -291,7 +320,7 @@ export default function Stats() {
                   <thead>
                     <tr style={{ background: 'var(--gray-50)', borderBottom: '1px solid var(--gray-200)' }}>
                       <th style={{ padding: '8px 12px', textAlign: 'left', fontSize: '11px', fontWeight: '700', color: 'var(--gray-500)', textTransform: 'uppercase' }}>Player</th>
-                      {['AVG','AB','H','1B','2B','3B','HR','RBI'].map(h => (
+                      {['AVG','OBP','AB','H','1B','2B','3B','HR','RBI','R','K','BB'].map(h => (
                         <th key={h} style={{ padding: '8px 6px', textAlign: 'center', fontSize: '11px', fontWeight: '700', color: 'var(--gray-500)', textTransform: 'uppercase' }}>{h}</th>
                       ))}
                     </tr>
@@ -302,7 +331,8 @@ export default function Stats() {
                       return (
                         <tr key={player.id} style={{ borderBottom: '1px solid var(--gray-100)', background: i % 2 === 0 ? 'white' : 'var(--gray-50)' }}>
                           <td style={{ padding: '8px 12px', fontWeight: '600', fontSize: '13px' }}>{getPlayerName(player)}</td>
-                          <td style={{ padding: '8px 6px', textAlign: 'center', fontFamily: 'Oswald, sans-serif', fontSize: '14px', fontWeight: '700', color: 'var(--red)' }}>{formatAvg(s)}</td>
+                          <td style={{ padding: '8px 6px', textAlign: 'center', fontFamily: 'Oswald, sans-serif', fontSize: '13px', fontWeight: '700', color: 'var(--red)' }}>{formatAvg(s)}</td>
+                          <td style={{ padding: '8px 6px', textAlign: 'center', fontFamily: 'Oswald, sans-serif', fontSize: '13px', fontWeight: '700', color: 'var(--blue)' }}>{formatOBP(s)}</td>
                           <td style={{ padding: '8px 6px', textAlign: 'center', fontSize: '13px' }}>{s.ab || 0}</td>
                           <td style={{ padding: '8px 6px', textAlign: 'center', fontSize: '13px', fontWeight: '600' }}>{s.hits || 0}</td>
                           <td style={{ padding: '8px 6px', textAlign: 'center', fontSize: '13px' }}>{s.singles || 0}</td>
@@ -310,6 +340,9 @@ export default function Stats() {
                           <td style={{ padding: '8px 6px', textAlign: 'center', fontSize: '13px' }}>{s.triples || 0}</td>
                           <td style={{ padding: '8px 6px', textAlign: 'center', fontSize: '13px' }}>{s.hr || 0}</td>
                           <td style={{ padding: '8px 6px', textAlign: 'center', fontSize: '13px' }}>{s.rbi || 0}</td>
+                          <td style={{ padding: '8px 6px', textAlign: 'center', fontSize: '13px' }}>{s.runs || 0}</td>
+                          <td style={{ padding: '8px 6px', textAlign: 'center', fontSize: '13px' }}>{s.k || 0}</td>
+                          <td style={{ padding: '8px 6px', textAlign: 'center', fontSize: '13px' }}>{s.bb || 0}</td>
                         </tr>
                       );
                     })}
@@ -342,12 +375,13 @@ export default function Stats() {
           <p style={{ fontSize: '11px', fontWeight: '600', letterSpacing: '1px', opacity: 0.75, textTransform: 'uppercase', marginBottom: '8px' }}>
             Team Batting — {tab === 'career' ? 'All-Time' : `${currentYear} Season`}
           </p>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '8px' }}>
             {[
               { label: 'AVG', value: '.' + String(Math.round(teamAvg * 1000)).padStart(3, '0') },
-              { label: 'H', value: activeTeam.hits || 0 },
-              { label: 'HR', value: activeTeam.hr || 0 },
-              { label: 'RBI', value: activeTeam.rbi || 0 },
+              { label: 'OBP', value: '.' + String(Math.round(calcOBP(activeTeam.hits||0, activeTeam.bb||0, activeTeam.ab||0) * 1000)).padStart(3,'0') },
+              { label: 'H',   value: activeTeam.hits || 0 },
+              { label: 'HR',  value: activeTeam.hr   || 0 },
+              { label: 'RBI', value: activeTeam.rbi  || 0 },
             ].map(s => (
               <div key={s.label} style={{ textAlign: 'center' }}>
                 <div style={{ fontFamily: 'Oswald, sans-serif', fontSize: '22px', fontWeight: '700' }}>{s.value}</div>
@@ -384,7 +418,11 @@ export default function Stats() {
                 { abbr: '2B',  name: 'Double',          desc: 'Hit where the batter reaches 2nd base.' },
                 { abbr: '3B',  name: 'Triple',          desc: 'Hit where the batter reaches 3rd base.' },
                 { abbr: 'HR',  name: 'Home Run',        desc: 'Batter rounds all bases and scores.' },
-                { abbr: 'RBI', name: 'Runs Batted In',  desc: 'Number of runs scored due to the batter\'s hit.' },
+                { abbr: 'RBI', name: 'Runs Batted In',   desc: 'Number of runs scored due to the batter\'s hit.' },
+                { abbr: 'R',   name: 'Runs Scored',      desc: 'Number of times the player crossed home plate and scored.' },
+                { abbr: 'K',   name: 'Strikeout',         desc: 'Batter gets 3 strikes without putting the ball in play.' },
+                { abbr: 'BB',  name: 'Walk',              desc: 'Pitcher throws 4 balls — batter walks to 1st base free. Counts toward OBP but not AVG.' },
+                { abbr: 'OBP', name: 'On-Base %',         desc: 'How often the player gets on base any way possible: (H + BB) ÷ (AB + BB). .350+ is excellent.' },
               ].map(s => (
                 <div key={s.abbr} style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
                   <span style={{
@@ -447,12 +485,15 @@ export default function Stats() {
               <>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                   {[
-                    { key: 'ab', label: 'At Bats' },
+                    { key: 'ab',      label: 'At Bats' },
                     { key: 'singles', label: '1B — Singles' },
                     { key: 'doubles', label: '2B — Doubles' },
                     { key: 'triples', label: '3B — Triples' },
-                    { key: 'hr', label: 'HR — Home Runs' },
-                    { key: 'rbi', label: 'RBI' },
+                    { key: 'hr',      label: 'HR — Home Runs' },
+                    { key: 'rbi',     label: 'RBI' },
+                    { key: 'k',       label: 'K — Strikeouts' },
+                    { key: 'bb',      label: 'BB — Walks' },
+                    { key: 'runs',    label: 'R — Runs Scored' },
                   ].map(field => (
                     <div key={field.key} className="form-group" style={{ marginBottom: 0 }}>
                       <label className="form-label">{field.label}</label>
@@ -464,20 +505,27 @@ export default function Stats() {
                   ))}
                 </div>
                 {(() => {
-                  const h = (parseInt(editStats.singles)||0)+(parseInt(editStats.doubles)||0)+(parseInt(editStats.triples)||0)+(parseInt(editStats.hr)||0);
+                  const h  = (parseInt(editStats.singles)||0)+(parseInt(editStats.doubles)||0)+(parseInt(editStats.triples)||0)+(parseInt(editStats.hr)||0);
                   const ab = parseInt(editStats.ab) || 0;
+                  const bb = parseInt(editStats.bb) || 0;
                   const avg = ab > 0 ? '.'+String(Math.round(h/ab*1000)).padStart(3,'0') : '.000';
+                  const obp = '.'+String(Math.round(calcOBP(h,bb,ab)*1000)).padStart(3,'0');
                   return (
                     <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
                       <div style={{ flex: 1, background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: '10px', padding: '10px', textAlign: 'center' }}>
-                        <div style={{ fontSize: '11px', fontWeight: '700', color: 'var(--gray-500)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '2px' }}>Total Hits (auto)</div>
-                        <div style={{ fontFamily: 'Oswald, sans-serif', fontSize: '28px', fontWeight: '700', color: 'var(--red)', lineHeight: 1 }}>{h}</div>
-                        <div style={{ fontSize: '11px', color: 'var(--gray-400)', marginTop: '2px' }}>1B+2B+3B+HR</div>
+                        <div style={{ fontSize: '10px', fontWeight: '700', color: 'var(--gray-500)', textTransform: 'uppercase', marginBottom: '2px' }}>H (auto)</div>
+                        <div style={{ fontFamily: 'Oswald, sans-serif', fontSize: '26px', fontWeight: '700', color: 'var(--red)', lineHeight: 1 }}>{h}</div>
+                        <div style={{ fontSize: '10px', color: 'var(--gray-400)', marginTop: '2px' }}>1B+2B+3B+HR</div>
                       </div>
                       <div style={{ flex: 1, background: 'var(--gray-50)', border: '1px solid var(--gray-200)', borderRadius: '10px', padding: '10px', textAlign: 'center' }}>
-                        <div style={{ fontSize: '11px', fontWeight: '700', color: 'var(--gray-500)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '2px' }}>AVG (auto)</div>
-                        <div style={{ fontFamily: 'Oswald, sans-serif', fontSize: '28px', fontWeight: '700', color: 'var(--black)', lineHeight: 1 }}>{avg}</div>
-                        <div style={{ fontSize: '11px', color: 'var(--gray-400)', marginTop: '2px' }}>H ÷ AB</div>
+                        <div style={{ fontSize: '10px', fontWeight: '700', color: 'var(--gray-500)', textTransform: 'uppercase', marginBottom: '2px' }}>AVG (auto)</div>
+                        <div style={{ fontFamily: 'Oswald, sans-serif', fontSize: '26px', fontWeight: '700', color: 'var(--black)', lineHeight: 1 }}>{avg}</div>
+                        <div style={{ fontSize: '10px', color: 'var(--gray-400)', marginTop: '2px' }}>H ÷ AB</div>
+                      </div>
+                      <div style={{ flex: 1, background: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: '10px', padding: '10px', textAlign: 'center' }}>
+                        <div style={{ fontSize: '10px', fontWeight: '700', color: 'var(--gray-500)', textTransform: 'uppercase', marginBottom: '2px' }}>OBP (auto)</div>
+                        <div style={{ fontFamily: 'Oswald, sans-serif', fontSize: '26px', fontWeight: '700', color: 'var(--blue)', lineHeight: 1 }}>{obp}</div>
+                        <div style={{ fontSize: '10px', color: 'var(--gray-400)', marginTop: '2px' }}>(H+BB)÷(AB+BB)</div>
                       </div>
                     </div>
                   );
