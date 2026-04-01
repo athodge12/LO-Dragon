@@ -7,6 +7,14 @@ import Toast from '../../components/UI/Toast';
 
 const INNINGS = [1, 2, 3, 4, 5, 6, 7];
 
+function getYouTubeId(url) {
+  if (!url) return null;
+  const match = url.match(
+    /(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|live\/|embed\/|shorts\/))([a-zA-Z0-9_-]{11})/
+  );
+  return match ? match[1] : null;
+}
+
 export default function LiveScoring() {
   const { isCoach, isBookkeeper } = useAuth();
   const canEdit = isCoach || isBookkeeper;
@@ -16,17 +24,26 @@ export default function LiveScoring() {
     them: [0, 0, 0, 0, 0, 0, 0]
   });
   const [opponent, setOpponent] = useState('');
+  const [liveStream, setLiveStream] = useState(null);
+  const [streamModal, setStreamModal] = useState(false);
+  const [streamUrl, setStreamUrl] = useState('');
+  const [streamTitle, setStreamTitle] = useState('');
   const [toast, setToast] = useState('');
-  const [saved, setSaved] = useState(false);
 
   useEffect(() => {
-    return onSnapshot(doc(db, 'settings', 'liveScore'), snap => {
-      if (snap.exists()) {
-        const data = snap.data();
-        setScoreData(data);
-        setOpponent(data.opponent || '');
-      }
-    });
+    const unsubs = [
+      onSnapshot(doc(db, 'settings', 'liveScore'), snap => {
+        if (snap.exists()) {
+          const data = snap.data();
+          setScoreData(data);
+          setOpponent(data.opponent || '');
+        }
+      }),
+      onSnapshot(doc(db, 'settings', 'liveStream'), snap => {
+        setLiveStream(snap.exists() ? snap.data() : null);
+      })
+    ];
+    return () => unsubs.forEach(u => u());
   }, []);
 
   const updateScore = async (team, inning, delta) => {
@@ -39,12 +56,11 @@ export default function LiveScoring() {
 
   const resetScore = async () => {
     if (!window.confirm('Reset the scoreboard?')) return;
-    const newData = {
+    await setDoc(doc(db, 'settings', 'liveScore'), {
       opponent: scoreData.opponent,
       dragons: [0, 0, 0, 0, 0, 0, 0],
       them: [0, 0, 0, 0, 0, 0, 0]
-    };
-    await setDoc(doc(db, 'settings', 'liveScore'), newData);
+    });
     setToast('Scoreboard reset!');
   };
 
@@ -53,15 +69,92 @@ export default function LiveScoring() {
     setToast('Opponent set!');
   };
 
+  const openStreamModal = () => {
+    setStreamUrl(liveStream?.url || '');
+    setStreamTitle(liveStream?.title || '');
+    setStreamModal(true);
+  };
+
+  const saveStream = async () => {
+    await setDoc(doc(db, 'settings', 'liveStream'), {
+      url: streamUrl.trim(),
+      title: streamTitle.trim(),
+      isLive: liveStream?.isLive || false
+    });
+    setStreamModal(false);
+    setToast('Stream saved!');
+  };
+
+  const toggleLive = async () => {
+    const next = !liveStream?.isLive;
+    await setDoc(doc(db, 'settings', 'liveStream'), {
+      url: liveStream?.url || '',
+      title: liveStream?.title || '',
+      isLive: next
+    });
+    setToast(next ? '🔴 Stream is now LIVE' : 'Stream set to offline');
+  };
+
+  const clearStream = async () => {
+    await setDoc(doc(db, 'settings', 'liveStream'), { url: '', title: '', isLive: false });
+    setStreamModal(false);
+    setToast('Stream cleared');
+  };
+
   const total = (arr) => (arr || []).reduce((s, v) => s + (v || 0), 0);
   const dragonsTotal = total(scoreData.dragons);
   const themTotal = total(scoreData.them);
+  const videoId = getYouTubeId(liveStream?.url || '');
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
-      <Header title="Live Scoring" back="/" />
+      <Header title="Live Scoring" back="/" actions={canEdit && (
+        <button onClick={openStreamModal} style={{
+          background: liveStream?.isLive ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.15)',
+          border: 'none', borderRadius: '8px',
+          padding: '6px 10px', color: 'white', cursor: 'pointer',
+          fontWeight: '700', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px'
+        }}>
+          {liveStream?.isLive
+            ? <><span style={{ width: 8, height: 8, borderRadius: '50%', background: '#ff4444', display: 'inline-block' }} /> LIVE</>
+            : '📡 Stream'}
+        </button>
+      )} />
 
       <div className="page-content">
+
+        {/* Live stream embed */}
+        {videoId && (
+          <div style={{ marginBottom: '14px' }}>
+            {liveStream?.isLive && (
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: '6px',
+                marginBottom: '8px'
+              }}>
+                <span style={{
+                  width: 8, height: 8, borderRadius: '50%', background: '#ff4444',
+                  display: 'inline-block', animation: 'pulse 1.5s infinite'
+                }} />
+                <span style={{ fontWeight: '700', fontSize: '13px', color: '#ff4444', fontFamily: 'Oswald, sans-serif', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                  Live
+                </span>
+                {liveStream?.title && (
+                  <span style={{ fontSize: '13px', color: 'var(--gray-500)' }}>· {liveStream.title}</span>
+                )}
+              </div>
+            )}
+            <div style={{ borderRadius: '12px', overflow: 'hidden', background: '#000' }}>
+              <iframe
+                src={`https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0`}
+                style={{ width: '100%', aspectRatio: '16/9', border: 'none', display: 'block' }}
+                allow="autoplay; encrypted-media; picture-in-picture"
+                allowFullScreen
+                title="Live Stream"
+              />
+            </div>
+          </div>
+        )}
+
         {!canEdit && <div className="view-only-banner">Live score updated by coaches</div>}
 
         {canEdit && (
@@ -85,16 +178,13 @@ export default function LiveScoring() {
           background: '#111', borderRadius: '16px', padding: '20px',
           marginBottom: '14px', fontFamily: 'Oswald, sans-serif'
         }}>
-          {/* Team names & total */}
           <div style={{ display: 'flex', alignItems: 'center', marginBottom: '16px' }}>
             <div style={{ flex: 1 }}>
               <div style={{ color: 'var(--red)', fontSize: '18px', fontWeight: '700', textTransform: 'uppercase' }}>
                 Dragons
               </div>
             </div>
-            <div style={{
-              display: 'flex', alignItems: 'center', gap: '12px'
-            }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
               <div style={{
                 fontSize: '56px', fontWeight: '700',
                 color: dragonsTotal >= themTotal ? '#FFD700' : 'white',
@@ -114,7 +204,6 @@ export default function LiveScoring() {
             </div>
           </div>
 
-          {/* Inning by inning */}
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '320px' }}>
               <thead>
@@ -193,6 +282,72 @@ export default function LiveScoring() {
           </button>
         )}
       </div>
+
+      {/* Stream setup modal */}
+      {streamModal && (
+        <div className="modal-overlay" onClick={() => setStreamModal(false)}>
+          <div className="modal-sheet" onClick={e => e.stopPropagation()}>
+            <div className="modal-handle" />
+            <h3 style={{ fontFamily: 'Oswald, sans-serif', fontSize: '20px', marginBottom: '4px', textTransform: 'uppercase' }}>
+              Live Stream Setup
+            </h3>
+            <p style={{ fontSize: '13px', color: 'var(--gray-500)', marginBottom: '16px', lineHeight: '1.5' }}>
+              Start a free YouTube Live stream from the YouTube Studio app, then paste the URL below.
+            </p>
+
+            <div className="form-group">
+              <label className="form-label">YouTube URL</label>
+              <input
+                className="form-input"
+                value={streamUrl}
+                onChange={e => setStreamUrl(e.target.value)}
+                placeholder="https://youtube.com/live/..."
+              />
+              {streamUrl && !getYouTubeId(streamUrl) && (
+                <p style={{ fontSize: '12px', color: 'var(--red)', marginTop: '4px' }}>
+                  Couldn't find a YouTube video ID in that URL.
+                </p>
+              )}
+              {streamUrl && getYouTubeId(streamUrl) && (
+                <p style={{ fontSize: '12px', color: '#16A34A', marginTop: '4px' }}>
+                  ✓ Valid YouTube URL
+                </p>
+              )}
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Label (optional)</label>
+              <input
+                className="form-input"
+                value={streamTitle}
+                onChange={e => setStreamTitle(e.target.value)}
+                placeholder="e.g. vs. Blue Jays — Apr 7"
+              />
+            </div>
+
+            <button className="btn-primary" onClick={saveStream} style={{ marginBottom: '8px' }}>
+              Save Stream
+            </button>
+
+            {liveStream?.url && (
+              <button onClick={toggleLive} style={{
+                width: '100%', marginBottom: '8px', padding: '12px', borderRadius: '10px',
+                cursor: 'pointer', fontWeight: '700', fontSize: '15px', border: 'none',
+                background: liveStream?.isLive ? '#DCFCE7' : '#FEE2E2',
+                color: liveStream?.isLive ? '#16A34A' : '#B91C1C'
+              }}>
+                {liveStream?.isLive ? '⏹ Go Offline' : '🔴 Go Live'}
+              </button>
+            )}
+
+            {liveStream?.url && (
+              <button className="btn-secondary" onClick={clearStream} style={{ color: 'var(--red)' }}>
+                Clear Stream
+              </button>
+            )}
+          </div>
+        </div>
+      )}
 
       {toast && <Toast message={toast} onDismiss={() => setToast('')} />}
     </div>

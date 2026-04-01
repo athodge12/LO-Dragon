@@ -28,6 +28,7 @@ export default function Home() {
   const [accessCodes, setAccessCodes] = useState({ coach: 'DRAGONS-COACH', bookkeeper: 'DRAGONS-BOOKS' });
   const [practices, setPractices] = useState(DEFAULT_PRACTICES);
   const [cancelledSlots, setCancelledSlots] = useState({});
+  const [liveStream, setLiveStream] = useState(null);
 
   useEffect(() => {
     const unsubs = [];
@@ -50,6 +51,10 @@ export default function Home() {
 
     unsubs.push(onSnapshot(doc(db, 'settings', 'cancelledPractices'), snap => {
       setCancelledSlots(snap.exists() ? snap.data() : {});
+    }));
+
+    unsubs.push(onSnapshot(doc(db, 'settings', 'liveStream'), snap => {
+      setLiveStream(snap.exists() ? snap.data() : null);
     }));
 
     const gamesQ = query(collection(db, 'games'), orderBy('date', 'desc'));
@@ -154,6 +159,31 @@ export default function Home() {
       } />
 
       <div className="page-content" style={{ paddingBottom: 'calc(var(--bottom-nav-height) + 16px)' }}>
+
+        {/* Live Stream Banner */}
+        {liveStream?.isLive && (
+          <button onClick={() => navigate('/live-scoring')} style={{
+            width: '100%', marginBottom: '14px', padding: '12px 16px',
+            borderRadius: '12px', border: 'none', cursor: 'pointer', textAlign: 'left',
+            background: 'linear-gradient(135deg, #1a1a1a, #111)',
+            display: 'flex', alignItems: 'center', gap: '12px'
+          }}>
+            <span style={{
+              width: 10, height: 10, borderRadius: '50%', background: '#ff4444',
+              flexShrink: 0, boxShadow: '0 0 6px #ff4444'
+            }} />
+            <div style={{ flex: 1 }}>
+              <div style={{ fontFamily: 'Oswald, sans-serif', fontWeight: '700', fontSize: '15px', color: '#ff4444', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                Live Now
+              </div>
+              {liveStream.title && (
+                <div style={{ fontSize: '12px', color: 'rgba(255,255,255,0.6)', marginTop: '1px' }}>{liveStream.title}</div>
+              )}
+            </div>
+            <span style={{ color: 'rgba(255,255,255,0.4)', fontSize: '20px' }}>›</span>
+          </button>
+        )}
+
         {/* Notification Banner */}
         {notification?.text && !dismissedNotif && (
           <div style={{
