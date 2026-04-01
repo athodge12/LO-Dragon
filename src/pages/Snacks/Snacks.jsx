@@ -15,6 +15,7 @@ export default function Snacks() {
   const [selectedFamily, setSelectedFamily] = useState('');
   const [note, setNote] = useState('');
   const [toast, setToast] = useState('');
+  const [deleteConfirm, setDeleteConfirm] = useState(null); // game to delete
 
   useEffect(() => {
     const unsubs = [];
@@ -87,6 +88,16 @@ export default function Snacks() {
     setConfirmGame(null);
   };
 
+  // Coach: delete past game (and its snack assignment)
+  const handleDeleteGame = async (game) => {
+    await deleteDoc(doc(db, 'games', game.id));
+    if (assignments[game.id]) {
+      await deleteDoc(doc(db, 'snacks', game.id));
+    }
+    setToast('Game deleted');
+    setDeleteConfirm(null);
+  };
+
   // Parent: remove themselves
   const removeSelf = async (gameId) => {
     await deleteDoc(doc(db, 'snacks', gameId));
@@ -102,7 +113,7 @@ export default function Snacks() {
 
   const formatDate = (d) => new Date(d + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', weekday: 'short' });
 
-  const GameRow = ({ game }) => {
+  const GameRow = ({ game, onDelete }) => {
     const assigned = assignments[game.id];
     const isMe = assigned?.familyId === myId;
     const isOpen = !assigned?.familyId;
@@ -140,6 +151,13 @@ export default function Snacks() {
         </div>
 
         <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
+          {onDelete && isCoach && (
+            <button onClick={() => onDelete(game)} style={{
+              fontSize: '11px', color: '#ef4444', background: 'none',
+              border: '1px solid #fecaca', borderRadius: '6px',
+              padding: '2px 8px', cursor: 'pointer', marginBottom: '2px'
+            }}>Delete</button>
+          )}
           {assigned?.familyId ? (
             <>
               <div style={{ fontSize: '13px', fontWeight: '700', color: isMe ? 'var(--red)' : 'var(--gray-700)' }}>
@@ -233,7 +251,7 @@ export default function Snacks() {
               Recent Games
             </p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              {past.map(g => <GameRow key={g.id} game={g} />)}
+              {past.map(g => <GameRow key={g.id} game={g} onDelete={isCoach ? setDeleteConfirm : null} />)}
             </div>
           </div>
         )}
@@ -306,6 +324,36 @@ export default function Snacks() {
               Yes, I'll Bring Drinks!
             </button>
             <button className="btn-secondary" onClick={() => setConfirmGame(null)} style={{ marginTop: '8px' }}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Delete game confirm modal */}
+      {deleteConfirm && (
+        <div className="modal-overlay" onClick={() => setDeleteConfirm(null)}>
+          <div className="modal-sheet" onClick={e => e.stopPropagation()}>
+            <div className="modal-handle" />
+            <h3 style={{ fontFamily: 'Oswald, sans-serif', fontSize: '20px', marginBottom: '4px', textTransform: 'uppercase' }}>
+              Delete Game?
+            </h3>
+            <p style={{ fontSize: '14px', color: 'var(--gray-500)', marginBottom: '20px' }}>
+              vs {deleteConfirm.opponent} · {formatDate(deleteConfirm.date)}
+            </p>
+            <p style={{ fontSize: '13px', color: 'var(--gray-600)', marginBottom: '20px' }}>
+              This will permanently remove this game and its drinks assignment from the schedule.
+            </p>
+            <button
+              onClick={() => handleDeleteGame(deleteConfirm)}
+              style={{
+                width: '100%', padding: '14px', border: 'none', borderRadius: '10px',
+                background: '#ef4444', color: 'white', fontWeight: '700', fontSize: '15px', cursor: 'pointer'
+              }}
+            >
+              Yes, Delete Game
+            </button>
+            <button className="btn-secondary" onClick={() => setDeleteConfirm(null)} style={{ marginTop: '8px' }}>
               Cancel
             </button>
           </div>
