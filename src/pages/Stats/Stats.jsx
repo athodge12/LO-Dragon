@@ -17,7 +17,7 @@ export default function Stats() {
   const [editingPlayer, setEditingPlayer] = useState(null);
   const [editStats, setEditStats] = useState({});
   const [editFieldingPos, setEditFieldingPos] = useState(FIELDING_POSITIONS[0]);
-  const [editFieldingStats, setEditFieldingStats] = useState({ innings: 0, errors: 0 });
+  const [editFieldingStats, setEditFieldingStats] = useState({ innings: 0, putouts: 0, assists: 0, errors: 0 });
   const [editSection, setEditSection] = useState('batting'); // 'batting' | 'fielding'
   const [toast, setToast] = useState('');
   const [tab, setTab] = useState('current');
@@ -74,7 +74,7 @@ export default function Stats() {
     const pos = FIELDING_POSITIONS[0];
     setEditFieldingPos(pos);
     const f = allStats[player.id]?.fielding || {};
-    setEditFieldingStats(f[pos] || { innings: 0, errors: 0 });
+    setEditFieldingStats(f[pos] || { innings: 0, putouts: 0, assists: 0, errors: 0 });
     setEditSection('batting');
   };
 
@@ -124,11 +124,13 @@ export default function Stats() {
     const snap = await getDoc(ref);
     const current = snap.exists() ? snap.data() : {};
     const existing = current.fielding || {};
-    const innings = parseInt(editFieldingStats.innings) || 0;
-    const errors = parseInt(editFieldingStats.errors) || 0;
+    const innings  = parseInt(editFieldingStats.innings)  || 0;
+    const putouts  = parseInt(editFieldingStats.putouts)  || 0;
+    const assists  = parseInt(editFieldingStats.assists)  || 0;
+    const errors   = parseInt(editFieldingStats.errors)   || 0;
     await setDoc(ref, {
       ...current,
-      fielding: { ...existing, [editFieldingPos]: { innings, errors } }
+      fielding: { ...existing, [editFieldingPos]: { innings, putouts, assists, errors } }
     }, { merge: true });
     setToast('Fielding stats saved!');
   };
@@ -263,6 +265,7 @@ export default function Stats() {
                               fontSize: '10px', fontWeight: '700', lineHeight: '1.3'
                             }}>
                               <div>{pf.innings}inn</div>
+                              <div>{(pf.putouts||0)+(pf.assists||0)}outs</div>
                               <div>{pf.errors}E</div>
                             </div>
                           ) : (
@@ -439,8 +442,10 @@ export default function Stats() {
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
               {[
-                { abbr: 'Inn', name: 'Innings', desc: 'Total innings played at that position across all games.' },
-                { abbr: 'E',   name: 'Errors',  desc: 'Any play that should have resulted in an out but didn\'t. This includes misplaying the ball, dropping a catch, OR taking too long between fielding and throwing — if a player holds the ball too long and the runner is safe on a play that should have been an out, that counts as an error.' },
+                { abbr: 'Inn', name: 'Innings',        desc: 'Total innings played at that position across all games.' },
+                { abbr: 'PO',  name: 'Putout',         desc: 'The player directly made the out — catching a fly ball, catching a throw at a base, or tagging a runner.' },
+                { abbr: 'A',   name: 'Assist',         desc: 'The player fielded the ball and threw it to another player who made the out.' },
+                { abbr: 'E',   name: 'Errors',         desc: 'Any play that should have resulted in an out but didn\'t — misplaying the ball, dropping a catch, or taking too long to throw.' },
               ].map(s => (
                 <div key={s.abbr} style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
                   <span style={{
@@ -542,26 +547,35 @@ export default function Stats() {
                     const pos = e.target.value;
                     setEditFieldingPos(pos);
                     const f = allStats[editingPlayer]?.fielding || {};
-                    setEditFieldingStats(f[pos] || { innings: 0, errors: 0 });
+                    setEditFieldingStats(f[pos] || { innings: 0, putouts: 0, assists: 0, errors: 0 });
                   }}>
                     {FIELDING_POSITIONS.map(pos => <option key={pos} value={pos}>{pos}</option>)}
                   </select>
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                  <div className="form-group" style={{ marginBottom: 0 }}>
-                    <label className="form-label">Innings Played</label>
-                    <input className="form-input" type="number" min="0" step="1"
-                      value={editFieldingStats.innings}
-                      onChange={e => setEditFieldingStats(s => ({ ...s, innings: e.target.value }))}
-                      style={{ textAlign: 'center', fontSize: '18px', fontFamily: 'Oswald, sans-serif' }} />
+                  {[
+                    { key: 'innings', label: 'Innings Played',    hint: 'How many innings at this spot' },
+                    { key: 'putouts', label: 'Putouts (PO)',       hint: 'Outs they directly made — fly ball catch, tag, catch at base' },
+                    { key: 'assists', label: 'Assists (A)',        hint: 'Threw to another player who made the out' },
+                    { key: 'errors',  label: 'Errors (E)',         hint: 'Play should have been an out but wasn\'t' },
+                  ].map(field => (
+                    <div key={field.key} className="form-group" style={{ marginBottom: 0 }}>
+                      <label className="form-label">{field.label}</label>
+                      <input className="form-input" type="number" min="0" step="1"
+                        value={editFieldingStats[field.key] ?? 0}
+                        onChange={e => setEditFieldingStats(s => ({ ...s, [field.key]: e.target.value }))}
+                        style={{ textAlign: 'center', fontSize: '18px', fontFamily: 'Oswald, sans-serif' }} />
+                      <div style={{ fontSize: '10px', color: 'var(--gray-400)', marginTop: '3px', lineHeight: '1.3' }}>{field.hint}</div>
+                    </div>
+                  ))}
+                </div>
+                {/* Live plays-made total */}
+                <div style={{ background: '#DCFCE7', border: '1px solid #86EFAC', borderRadius: '10px', padding: '10px', textAlign: 'center', marginTop: '12px' }}>
+                  <div style={{ fontSize: '10px', fontWeight: '700', color: '#16A34A', textTransform: 'uppercase', marginBottom: '2px' }}>Total Plays Made (auto)</div>
+                  <div style={{ fontFamily: 'Oswald, sans-serif', fontSize: '26px', fontWeight: '700', color: '#16A34A', lineHeight: 1 }}>
+                    {(parseInt(editFieldingStats.putouts)||0) + (parseInt(editFieldingStats.assists)||0)}
                   </div>
-                  <div className="form-group" style={{ marginBottom: 0 }}>
-                    <label className="form-label">Errors</label>
-                    <input className="form-input" type="number" min="0" step="1"
-                      value={editFieldingStats.errors}
-                      onChange={e => setEditFieldingStats(s => ({ ...s, errors: e.target.value }))}
-                      style={{ textAlign: 'center', fontSize: '18px', fontFamily: 'Oswald, sans-serif' }} />
-                  </div>
+                  <div style={{ fontSize: '10px', color: '#16A34A', marginTop: '2px' }}>PO + A</div>
                 </div>
                 <button className="btn-primary" onClick={() => saveFielding(editingPlayer)} style={{ marginTop: '16px' }}>Save Fielding Stats</button>
               </>
