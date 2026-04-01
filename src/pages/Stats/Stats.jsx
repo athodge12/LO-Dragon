@@ -17,7 +17,7 @@ export default function Stats() {
   const [editingPlayer, setEditingPlayer] = useState(null);
   const [editStats, setEditStats] = useState({});
   const [editFieldingPos, setEditFieldingPos] = useState(FIELDING_POSITIONS[0]);
-  const [editFieldingStats, setEditFieldingStats] = useState({ games: 0, errors: 0 });
+  const [editFieldingStats, setEditFieldingStats] = useState({ innings: 0, errors: 0 });
   const [editSection, setEditSection] = useState('batting'); // 'batting' | 'fielding'
   const [toast, setToast] = useState('');
   const [tab, setTab] = useState('current');
@@ -61,7 +61,7 @@ export default function Stats() {
     const pos = FIELDING_POSITIONS[0];
     setEditFieldingPos(pos);
     const f = allStats[player.id]?.fielding || {};
-    setEditFieldingStats(f[pos] || { games: 0, errors: 0 });
+    setEditFieldingStats(f[pos] || { innings: 0, errors: 0 });
     setEditSection('batting');
   };
 
@@ -102,11 +102,11 @@ export default function Stats() {
     const snap = await getDoc(ref);
     const current = snap.exists() ? snap.data() : {};
     const existing = current.fielding || {};
-    const games = parseInt(editFieldingStats.games) || 0;
+    const innings = parseInt(editFieldingStats.innings) || 0;
     const errors = parseInt(editFieldingStats.errors) || 0;
     await setDoc(ref, {
       ...current,
-      fielding: { ...existing, [editFieldingPos]: { games, errors } }
+      fielding: { ...existing, [editFieldingPos]: { innings, errors } }
     }, { merge: true });
     setToast('Fielding stats saved!');
   };
@@ -142,10 +142,10 @@ export default function Stats() {
 
   // Fielding cell color: green=good, yellow=ok, red=rough, gray=never played
   const fieldingColor = (f) => {
-    if (!f || !f.games) return { bg: 'var(--gray-100)', text: 'var(--gray-300)' };
-    const errPerGame = f.errors / f.games;
-    if (errPerGame === 0) return { bg: '#DCFCE7', text: '#16A34A' };
-    if (errPerGame <= 0.5) return { bg: '#FEF9C3', text: '#92400E' };
+    if (!f || !f.innings) return { bg: 'var(--gray-100)', text: 'var(--gray-300)' };
+    const errPer3Inn = f.errors / f.innings * 3; // errors per 3 innings
+    if (errPer3Inn === 0) return { bg: '#DCFCE7', text: '#16A34A' };
+    if (errPer3Inn <= 1) return { bg: '#FEF9C3', text: '#92400E' };
     return { bg: '#FEE2E2', text: '#B91C1C' };
   };
 
@@ -227,13 +227,13 @@ export default function Stats() {
                       const colors = fieldingColor(pf);
                       return (
                         <td key={pos} style={{ padding: '6px 4px', textAlign: 'center' }}>
-                          {pf?.games ? (
+                          {pf?.innings ? (
                             <div style={{
                               background: colors.bg, color: colors.text,
                               borderRadius: '6px', padding: '3px 4px',
                               fontSize: '10px', fontWeight: '700', lineHeight: '1.3'
                             }}>
-                              <div>{pf.games}G</div>
+                              <div>{pf.innings}inn</div>
                               <div>{pf.errors}E</div>
                             </div>
                           ) : (
@@ -258,9 +258,9 @@ export default function Stats() {
       {/* Legend */}
       <div style={{ display: 'flex', gap: '12px', marginTop: '10px', flexWrap: 'wrap' }}>
         {[
-          { color: '#DCFCE7', text: '#16A34A', label: '0 errors/game' },
-          { color: '#FEF9C3', text: '#92400E', label: '≤0.5 errors/game' },
-          { color: '#FEE2E2', text: '#B91C1C', label: '>0.5 errors/game' },
+          { color: '#DCFCE7', text: '#16A34A', label: '0 errors' },
+          { color: '#FEF9C3', text: '#92400E', label: '≤1 error/3 inn' },
+          { color: '#FEE2E2', text: '#B91C1C', label: '>1 error/3 inn' },
           { color: 'var(--gray-100)', text: 'var(--gray-400)', label: 'Never played' },
         ].map(l => (
           <div key={l.label} style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '11px', color: 'var(--gray-500)' }}>
@@ -401,8 +401,8 @@ export default function Stats() {
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
               {[
-                { abbr: 'G',  name: 'Games',  desc: 'Number of games played at that position.' },
-                { abbr: 'E',  name: 'Errors', desc: 'Mistakes made in the field at that position.' },
+                { abbr: 'Inn', name: 'Innings', desc: 'Total innings played at that position across all games.' },
+                { abbr: 'E',   name: 'Errors',  desc: 'Mistakes made in the field at that position.' },
               ].map(s => (
                 <div key={s.abbr} style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
                   <span style={{
@@ -485,17 +485,17 @@ export default function Stats() {
                     const pos = e.target.value;
                     setEditFieldingPos(pos);
                     const f = allStats[editingPlayer]?.fielding || {};
-                    setEditFieldingStats(f[pos] || { games: 0, errors: 0 });
+                    setEditFieldingStats(f[pos] || { innings: 0, errors: 0 });
                   }}>
                     {FIELDING_POSITIONS.map(pos => <option key={pos} value={pos}>{pos}</option>)}
                   </select>
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                   <div className="form-group" style={{ marginBottom: 0 }}>
-                    <label className="form-label">Games Played</label>
+                    <label className="form-label">Innings Played</label>
                     <input className="form-input" type="number" min="0" step="1"
-                      value={editFieldingStats.games}
-                      onChange={e => setEditFieldingStats(s => ({ ...s, games: e.target.value }))}
+                      value={editFieldingStats.innings}
+                      onChange={e => setEditFieldingStats(s => ({ ...s, innings: e.target.value }))}
                       style={{ textAlign: 'center', fontSize: '18px', fontFamily: 'Oswald, sans-serif' }} />
                   </div>
                   <div className="form-group" style={{ marginBottom: 0 }}>
