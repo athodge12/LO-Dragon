@@ -463,16 +463,25 @@ export default function Stats() {
                     </div>
                   ))}
                 </div>
-                <div style={{ background: 'var(--gray-50)', borderRadius: '8px', padding: '10px 12px', marginTop: '12px', fontSize: '13px', color: 'var(--gray-500)' }}>
-                  Total Hits: <strong style={{ color: 'var(--black)' }}>
-                    {(parseInt(editStats.singles) || 0) + (parseInt(editStats.doubles) || 0) + (parseInt(editStats.triples) || 0) + (parseInt(editStats.hr) || 0)}
-                  </strong>
-                  &nbsp;· AVG: <strong style={{ color: 'var(--red)' }}>
-                    {editStats.ab > 0
-                      ? '.' + String(Math.round(((parseInt(editStats.singles)||0)+(parseInt(editStats.doubles)||0)+(parseInt(editStats.triples)||0)+(parseInt(editStats.hr)||0)) / parseInt(editStats.ab) * 1000)).padStart(3,'0')
-                      : '.000'}
-                  </strong>
-                </div>
+                {(() => {
+                  const h = (parseInt(editStats.singles)||0)+(parseInt(editStats.doubles)||0)+(parseInt(editStats.triples)||0)+(parseInt(editStats.hr)||0);
+                  const ab = parseInt(editStats.ab) || 0;
+                  const avg = ab > 0 ? '.'+String(Math.round(h/ab*1000)).padStart(3,'0') : '.000';
+                  return (
+                    <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
+                      <div style={{ flex: 1, background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: '10px', padding: '10px', textAlign: 'center' }}>
+                        <div style={{ fontSize: '11px', fontWeight: '700', color: 'var(--gray-500)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '2px' }}>Total Hits (auto)</div>
+                        <div style={{ fontFamily: 'Oswald, sans-serif', fontSize: '28px', fontWeight: '700', color: 'var(--red)', lineHeight: 1 }}>{h}</div>
+                        <div style={{ fontSize: '11px', color: 'var(--gray-400)', marginTop: '2px' }}>1B+2B+3B+HR</div>
+                      </div>
+                      <div style={{ flex: 1, background: 'var(--gray-50)', border: '1px solid var(--gray-200)', borderRadius: '10px', padding: '10px', textAlign: 'center' }}>
+                        <div style={{ fontSize: '11px', fontWeight: '700', color: 'var(--gray-500)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '2px' }}>AVG (auto)</div>
+                        <div style={{ fontFamily: 'Oswald, sans-serif', fontSize: '28px', fontWeight: '700', color: 'var(--black)', lineHeight: 1 }}>{avg}</div>
+                        <div style={{ fontSize: '11px', color: 'var(--gray-400)', marginTop: '2px' }}>H ÷ AB</div>
+                      </div>
+                    </div>
+                  );
+                })()}
                 <button className="btn-primary" onClick={() => saveStats(editingPlayer)} style={{ marginTop: '16px' }}>Save Batting Stats</button>
               </>
             )}
