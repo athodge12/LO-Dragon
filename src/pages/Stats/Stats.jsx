@@ -402,7 +402,7 @@ export default function Stats() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
               {[
                 { abbr: 'Inn', name: 'Innings', desc: 'Total innings played at that position across all games.' },
-                { abbr: 'E',   name: 'Errors',  desc: 'If a play should have been made and wasn\'t — that\'s an error. Example: a routine ground ball the fielder misses, or dropping an easy catch.' },
+                { abbr: 'E',   name: 'Errors',  desc: 'Any play that should have resulted in an out but didn\'t. This includes misplaying the ball, dropping a catch, OR taking too long between fielding and throwing — if a player holds the ball too long and the runner is safe on a play that should have been an out, that counts as an error.' },
               ].map(s => (
                 <div key={s.abbr} style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
                   <span style={{
