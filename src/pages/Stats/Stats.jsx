@@ -23,6 +23,14 @@ export default function Stats() {
   const [tab, setTab] = useState('current');
   const [showNewSeasonModal, setShowNewSeasonModal] = useState(false);
   const [newSeasonYear, setNewSeasonYear] = useState('');
+  const [showLogGame, setShowLogGame] = useState(false);
+  const [logStep, setLogStep] = useState(0);         // 0=pick game, 1..N=per-player
+  const [logGame, setLogGame] = useState(null);       // selected game object
+  const [manualGame, setManualGame] = useState({ opponent: '', date: '' });
+  const [logEntries, setLogEntries] = useState({});   // { [playerId]: { ab, singles, ... } }
+  const [isSavingLog, setIsSavingLog] = useState(false);
+  const [games, setGames] = useState([]);
+  const [expandedLogGame, setExpandedLogGame] = useState(null);
 
   useEffect(() => {
     const unsubs = [];
@@ -36,6 +44,9 @@ export default function Stats() {
     }));
     unsubs.push(onSnapshot(doc(db, 'settings', 'season'), snap => {
       setSeason(snap.exists() ? snap.data() : { year: '2026' });
+    }));
+    unsubs.push(onSnapshot(query(collection(db, 'games'), orderBy('date', 'desc')), snap => {
+      setGames(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     }));
     return () => unsubs.forEach(u => u());
   }, []);
@@ -147,6 +158,104 @@ export default function Stats() {
     setShowNewSeasonModal(false);
     setNewSeasonYear('');
     setToast(`${newSeasonYear} season started!`);
+  };
+
+  const recalcFromLogs = (allLogs, year, currentSeasons) => {
+    const seasonLogs = Object.values(allLogs).filter(g => g.year === year);
+    if (seasonLogs.length === 0) return currentSeasons;
+    const totals = seasonLogs.reduce((acc, g) => ({
+      ab:      (acc.ab      || 0) + (g.ab      || 0),
+      singles: (acc.singles || 0) + (g.singles || 0),
+      doubles: (acc.doubles || 0) + (g.doubles || 0),
+      triples: (acc.triples || 0) + (g.triples || 0),
+      hr:      (acc.hr      || 0) + (g.hr      || 0),
+      hits:    (acc.hits    || 0) + (g.hits    || 0),
+      rbi:     (acc.rbi     || 0) + (g.rbi     || 0),
+      k:       (acc.k       || 0) + (g.k       || 0),
+      bb:      (acc.bb      || 0) + (g.bb      || 0),
+      runs:    (acc.runs    || 0) + (g.runs    || 0),
+    }), {});
+    totals.avg = totals.ab > 0 ? totals.hits / totals.ab : 0;
+    totals.obp = calcOBP(totals.hits || 0, totals.bb || 0, totals.ab || 0);
+    return { ...currentSeasons, [year]: totals };
+  };
+
+  const logGameEntry = async () => {
+    setIsSavingLog(true);
+    const game = logGame;
+    const year = currentYear;
+    const safeId = (game.id || 'manual_' + (game.date || Date.now())).replace(/[^a-zA-Z0-9_-]/g, '_');
+    const gameKey = `${year}_${safeId}`;
+    for (const player of players) {
+      const e = logEntries[player.id] || {};
+      const singles = parseInt(e.singles) || 0;
+      const doubles = parseInt(e.doubles) || 0;
+      const triples = parseInt(e.triples) || 0;
+      const hr      = parseInt(e.hr)      || 0;
+      const ab      = parseInt(e.ab)      || 0;
+      const rbi     = parseInt(e.rbi)     || 0;
+      const k       = parseInt(e.k)       || 0;
+      const bb      = parseInt(e.bb)      || 0;
+      const runs    = parseInt(e.runs)    || 0;
+      const hits    = singles + doubles + triples + hr;
+      const ref = doc(db, 'playerStats', player.id);
+      const snap = await getDoc(ref);
+      const current = snap.exists() ? snap.data() : {};
+      const updatedLogs = { ...(current.gameLogs || {}), [gameKey]: { gameId: safeId, date: game.date, opponent: game.opponent, year, ab, singles, doubles, triples, hr, hits, rbi, k, bb, runs } };
+      const updatedSeasons = recalcFromLogs(updatedLogs, year, current.seasons || {});
+      const career = Object.values(updatedSeasons).reduce((acc, s) => ({
+        ab:      (acc.ab      || 0) + (s.ab      || 0),
+        hits:    (acc.hits    || 0) + (s.hits    || 0),
+        singles: (acc.singles || 0) + (s.singles || 0),
+        doubles: (acc.doubles || 0) + (s.doubles || 0),
+        triples: (acc.triples || 0) + (s.triples || 0),
+        hr:      (acc.hr      || 0) + (s.hr      || 0),
+        rbi:     (acc.rbi     || 0) + (s.rbi     || 0),
+        k:       (acc.k       || 0) + (s.k       || 0),
+        bb:      (acc.bb      || 0) + (s.bb      || 0),
+        runs:    (acc.runs    || 0) + (s.runs    || 0),
+      }), {});
+      career.avg = career.ab > 0 ? career.hits / career.ab : 0;
+      career.obp = calcOBP(career.hits || 0, career.bb || 0, career.ab || 0);
+      await setDoc(ref, { ...current, gameLogs: updatedLogs, seasons: updatedSeasons, career }, { merge: true });
+    }
+    setIsSavingLog(false);
+    setShowLogGame(false);
+    setLogStep(0);
+    setLogGame(null);
+    setLogEntries({});
+    setToast(`Game vs ${game.opponent} logged for ${players.length} players!`);
+  };
+
+  const deleteGameLog = async (gameKey) => {
+    for (const player of players) {
+      const ref = doc(db, 'playerStats', player.id);
+      const snap = await getDoc(ref);
+      if (!snap.exists()) continue;
+      const current = snap.data();
+      const updatedLogs = { ...(current.gameLogs || {}) };
+      const deletedEntry = updatedLogs[gameKey];
+      if (!deletedEntry) continue;
+      delete updatedLogs[gameKey];
+      const year = deletedEntry.year || gameKey.split('_')[0];
+      const updatedSeasons = recalcFromLogs(updatedLogs, year, current.seasons || {});
+      const career = Object.values(updatedSeasons).reduce((acc, s) => ({
+        ab:      (acc.ab      || 0) + (s.ab      || 0),
+        hits:    (acc.hits    || 0) + (s.hits    || 0),
+        singles: (acc.singles || 0) + (s.singles || 0),
+        doubles: (acc.doubles || 0) + (s.doubles || 0),
+        triples: (acc.triples || 0) + (s.triples || 0),
+        hr:      (acc.hr      || 0) + (s.hr      || 0),
+        rbi:     (acc.rbi     || 0) + (s.rbi     || 0),
+        k:       (acc.k       || 0) + (s.k       || 0),
+        bb:      (acc.bb      || 0) + (s.bb      || 0),
+        runs:    (acc.runs    || 0) + (s.runs    || 0),
+      }), {});
+      career.avg = career.ab > 0 ? career.hits / career.ab : 0;
+      career.obp = calcOBP(career.hits || 0, career.bb || 0, career.ab || 0);
+      await setDoc(ref, { ...current, gameLogs: updatedLogs, seasons: updatedSeasons, career }, { merge: true });
+    }
+    setToast('Game log deleted. Season totals updated.');
   };
 
   const calcTeamTotals = (fn) => players.reduce((acc, p) => {
@@ -359,15 +468,127 @@ export default function Stats() {
     );
   };
 
+  // Build a sorted list of unique game keys across all players
+  const allGameKeys = [...new Set(
+    Object.values(allStats).flatMap(s => Object.keys(s.gameLogs || {}))
+  )].sort((a, b) => {
+    const dateA = Object.values(allStats).find(s => s.gameLogs?.[a])?.gameLogs?.[a]?.date || '';
+    const dateB = Object.values(allStats).find(s => s.gameLogs?.[b])?.gameLogs?.[b]?.date || '';
+    return dateB.localeCompare(dateA);
+  });
+
+  const GameLogView = () => {
+    const [deleteConfirmKey, setDeleteConfirmKey] = useState(null);
+    if (allGameKeys.length === 0) {
+      return <div className="empty-state"><p>No games logged yet. Tap "Log Game" to add one.</p></div>;
+    }
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+        {allGameKeys.map(gameKey => {
+          // Get metadata from first player that has this entry
+          const firstEntry = Object.values(allStats).find(s => s.gameLogs?.[gameKey])?.gameLogs?.[gameKey];
+          if (!firstEntry) return null;
+          const playerCount = players.filter(p => {
+            const e = allStats[p.id]?.gameLogs?.[gameKey];
+            return e && (e.ab > 0 || e.hits > 0);
+          }).length;
+          const isExpanded = expandedLogGame === gameKey;
+          return (
+            <div key={gameKey} className="card" style={{ padding: 0, overflow: 'hidden' }}>
+              <div
+                onClick={() => setExpandedLogGame(isExpanded ? null : gameKey)}
+                style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', cursor: 'pointer', background: 'white' }}
+              >
+                <div>
+                  <div style={{ fontFamily: 'Oswald, sans-serif', fontSize: '16px', fontWeight: '700' }}>vs {firstEntry.opponent}</div>
+                  <div style={{ fontSize: '12px', color: 'var(--gray-500)', marginTop: '2px' }}>
+                    {firstEntry.date} &middot; {playerCount} player{playerCount !== 1 ? 's' : ''} logged
+                  </div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  {canEdit && (
+                    <button onClick={e => { e.stopPropagation(); setDeleteConfirmKey(gameKey); }}
+                      style={{ background: '#FEE2E2', border: 'none', borderRadius: '6px', padding: '4px 10px', fontSize: '12px', fontWeight: '700', color: '#B91C1C', cursor: 'pointer' }}>
+                      Delete
+                    </button>
+                  )}
+                  <span style={{ fontSize: '18px', color: 'var(--gray-400)' }}>{isExpanded ? '▲' : '▼'}</span>
+                </div>
+              </div>
+              {isExpanded && (
+                <div style={{ borderTop: '1px solid var(--gray-100)', overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '540px' }}>
+                    <thead>
+                      <tr style={{ background: 'var(--gray-50)' }}>
+                        <th style={{ padding: '8px 12px', textAlign: 'left', fontSize: '11px', fontWeight: '700', color: 'var(--gray-500)', textTransform: 'uppercase' }}>Player</th>
+                        {['AB','H','1B','2B','3B','HR','RBI','R','K','BB'].map(h => (
+                          <th key={h} style={{ padding: '8px 5px', textAlign: 'center', fontSize: '11px', fontWeight: '700', color: 'var(--gray-500)', textTransform: 'uppercase' }}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {players.map((player, i) => {
+                        const e = allStats[player.id]?.gameLogs?.[gameKey] || {};
+                        return (
+                          <tr key={player.id} style={{ borderTop: '1px solid var(--gray-100)', background: i % 2 === 0 ? 'white' : 'var(--gray-50)' }}>
+                            <td style={{ padding: '8px 12px', fontWeight: '600', fontSize: '13px' }}>{getPlayerName(player)}</td>
+                            {[e.ab||0, e.hits||0, e.singles||0, e.doubles||0, e.triples||0, e.hr||0, e.rbi||0, e.runs||0, e.k||0, e.bb||0].map((v, idx) => (
+                              <td key={idx} style={{ padding: '8px 5px', textAlign: 'center', fontSize: '13px' }}>{v}</td>
+                            ))}
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          );
+        })}
+        {deleteConfirmKey && (
+          <div className="modal-overlay" onClick={() => setDeleteConfirmKey(null)}>
+            <div className="modal-sheet" onClick={e => e.stopPropagation()}>
+              <div className="modal-handle" />
+              <h3 style={{ fontFamily: 'Oswald, sans-serif', fontSize: '20px', marginBottom: '8px' }}>Delete Game Log?</h3>
+              <p style={{ fontSize: '14px', color: 'var(--gray-500)', marginBottom: '16px', lineHeight: '1.5' }}>
+                This will remove all player entries for this game and recalculate season totals. This cannot be undone.
+              </p>
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <button onClick={() => setDeleteConfirmKey(null)} style={{ flex: 1, padding: '12px', borderRadius: '10px', border: '1px solid var(--gray-200)', background: 'white', cursor: 'pointer', fontWeight: '600' }}>Cancel</button>
+                <button onClick={async () => { await deleteGameLog(deleteConfirmKey); setDeleteConfirmKey(null); }} style={{ flex: 1, padding: '12px', borderRadius: '10px', border: 'none', background: 'var(--red)', color: 'white', cursor: 'pointer', fontWeight: '700' }}>Delete</button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  // Current player being logged (1-indexed logStep)
+  const currentLogPlayer = logStep >= 1 ? players[logStep - 1] : null;
+  const currentLogEntry = currentLogPlayer ? (logEntries[currentLogPlayer.id] || { ab:0, singles:0, doubles:0, triples:0, hr:0, rbi:0, k:0, bb:0, runs:0 }) : {};
+  const setLogEntry = (key, val) => {
+    if (!currentLogPlayer) return;
+    setLogEntries(prev => ({ ...prev, [currentLogPlayer.id]: { ...(prev[currentLogPlayer.id] || { ab:0,singles:0,doubles:0,triples:0,hr:0,rbi:0,k:0,bb:0,runs:0 }), [key]: val } }));
+  };
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
       <Header title="Stats" actions={canEdit && (
-        <button onClick={() => setShowNewSeasonModal(true)} style={{
-          background: 'rgba(255,255,255,0.15)', border: 'none', borderRadius: '8px',
-          padding: '0 12px', height: 36, color: 'white', cursor: 'pointer',
-          fontFamily: 'Oswald, sans-serif', fontSize: '13px', fontWeight: '600',
-          textTransform: 'uppercase', letterSpacing: '0.5px', whiteSpace: 'nowrap'
-        }}>New Season</button>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <button onClick={() => { setShowLogGame(true); setLogStep(0); setLogGame(null); setLogEntries({}); }} style={{
+            background: 'rgba(255,255,255,0.2)', border: 'none', borderRadius: '8px',
+            padding: '0 12px', height: 36, color: 'white', cursor: 'pointer',
+            fontFamily: 'Oswald, sans-serif', fontSize: '13px', fontWeight: '600',
+            textTransform: 'uppercase', letterSpacing: '0.5px', whiteSpace: 'nowrap'
+          }}>+ Log Game</button>
+          <button onClick={() => setShowNewSeasonModal(true)} style={{
+            background: 'rgba(255,255,255,0.15)', border: 'none', borderRadius: '8px',
+            padding: '0 12px', height: 36, color: 'white', cursor: 'pointer',
+            fontFamily: 'Oswald, sans-serif', fontSize: '13px', fontWeight: '600',
+            textTransform: 'uppercase', letterSpacing: '0.5px', whiteSpace: 'nowrap'
+          }}>New Season</button>
+        </div>
       )} />
 
       <div className="page-content">
@@ -399,12 +620,14 @@ export default function Stats() {
           <button className={`tab ${tab === 'career' ? 'active' : ''}`} onClick={() => setTab('career')}>All-Time</button>
           <button className={`tab ${tab === 'fielding' ? 'active' : ''}`} onClick={() => setTab('fielding')}>Fielding</button>
           <button className={`tab ${tab === 'history' ? 'active' : ''}`} onClick={() => setTab('history')}>History</button>
+          <button className={`tab ${tab === 'log' ? 'active' : ''}`} onClick={() => setTab('log')}>Game Log</button>
         </div>
 
         {tab === 'current' && <BattingTable getStats={getCurrentSeason} showEdit={true} />}
         {tab === 'career' && <BattingTable getStats={getCareer} showEdit={false} />}
         {tab === 'fielding' && <RotationView />}
         {tab === 'history' && <SeasonHistory />}
+        {tab === 'log' && <GameLogView />}
 
         {/* Stat Glossary */}
         <div className="card" style={{ marginTop: '14px' }}>
@@ -578,6 +801,137 @@ export default function Stats() {
                   <div style={{ fontSize: '10px', color: '#16A34A', marginTop: '2px' }}>PO + A</div>
                 </div>
                 <button className="btn-primary" onClick={() => saveFielding(editingPlayer)} style={{ marginTop: '16px' }}>Save Fielding Stats</button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Log Game Modal */}
+      {showLogGame && (
+        <div className="modal-overlay" onClick={() => { setShowLogGame(false); setLogStep(0); }}>
+          <div className="modal-sheet" onClick={e => e.stopPropagation()} style={{ maxHeight: '90vh', overflowY: 'auto' }}>
+            <div className="modal-handle" />
+
+            {/* Step 0: Pick Game */}
+            {logStep === 0 && (
+              <>
+                <h3 style={{ fontFamily: 'Oswald, sans-serif', fontSize: '20px', marginBottom: '4px', textTransform: 'uppercase' }}>Log a Game</h3>
+                <p style={{ color: 'var(--gray-500)', fontSize: '14px', marginBottom: '14px' }}>Pick the game you played or enter manually.</p>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px' }}>
+                  {games.slice(0, 10).map(g => (
+                    <button key={g.id} onClick={() => { setLogGame({ id: g.id, opponent: g.opponent || g.title || 'Game', date: g.date || '', year: currentYear }); setLogStep(1); }}
+                      style={{ textAlign: 'left', padding: '12px 14px', borderRadius: '10px', border: '1px solid var(--gray-200)', background: 'white', cursor: 'pointer' }}>
+                      <div style={{ fontWeight: '700', fontSize: '14px' }}>vs {g.opponent || g.title || 'Game'}</div>
+                      <div style={{ fontSize: '12px', color: 'var(--gray-500)', marginTop: '2px' }}>{g.date || ''}</div>
+                    </button>
+                  ))}
+                </div>
+                <div style={{ borderTop: '1px solid var(--gray-200)', paddingTop: '14px' }}>
+                  <p style={{ fontSize: '13px', fontWeight: '700', color: 'var(--gray-600)', marginBottom: '10px' }}>Or enter manually:</p>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '12px' }}>
+                    <div className="form-group" style={{ marginBottom: 0 }}>
+                      <label className="form-label">Opponent</label>
+                      <input className="form-input" placeholder="e.g. Tigers" value={manualGame.opponent} onChange={e => setManualGame(m => ({ ...m, opponent: e.target.value }))} />
+                    </div>
+                    <div className="form-group" style={{ marginBottom: 0 }}>
+                      <label className="form-label">Date</label>
+                      <input className="form-input" type="date" value={manualGame.date} onChange={e => setManualGame(m => ({ ...m, date: e.target.value }))} />
+                    </div>
+                  </div>
+                  <button className="btn-primary" disabled={!manualGame.opponent.trim() || !manualGame.date}
+                    onClick={() => { setLogGame({ id: 'manual_' + manualGame.date, opponent: manualGame.opponent.trim(), date: manualGame.date, year: currentYear }); setLogStep(1); }}>
+                    Use Manual Entry
+                  </button>
+                </div>
+              </>
+            )}
+
+            {/* Steps 1..N: Per-player stats */}
+            {logStep >= 1 && currentLogPlayer && (
+              <>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
+                  <div>
+                    <div style={{ fontSize: '12px', color: 'var(--gray-500)', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                      vs {logGame?.opponent} &middot; {logGame?.date}
+                    </div>
+                    <div style={{ fontFamily: 'Oswald, sans-serif', fontSize: '20px', fontWeight: '700', textTransform: 'uppercase' }}>
+                      {getPlayerName(currentLogPlayer)}
+                    </div>
+                  </div>
+                  <div style={{ fontSize: '12px', color: 'var(--gray-400)', textAlign: 'right', paddingTop: '4px' }}>
+                    Player {logStep} of {players.length}
+                  </div>
+                </div>
+                {/* Progress bar */}
+                <div style={{ height: '4px', background: 'var(--gray-100)', borderRadius: '2px', marginBottom: '16px' }}>
+                  <div style={{ height: '100%', width: `${(logStep / players.length) * 100}%`, background: 'var(--red)', borderRadius: '2px', transition: 'width 0.2s' }} />
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px', marginBottom: '12px' }}>
+                  {[
+                    { key: 'ab',      label: 'AB' },
+                    { key: 'singles', label: '1B' },
+                    { key: 'doubles', label: '2B' },
+                    { key: 'triples', label: '3B' },
+                    { key: 'hr',      label: 'HR' },
+                    { key: 'rbi',     label: 'RBI' },
+                    { key: 'runs',    label: 'R' },
+                    { key: 'k',       label: 'K' },
+                    { key: 'bb',      label: 'BB' },
+                  ].map(f => (
+                    <div key={f.key} className="form-group" style={{ marginBottom: 0 }}>
+                      <label className="form-label">{f.label}</label>
+                      <input className="form-input" type="number" min="0" step="1"
+                        value={currentLogEntry[f.key] ?? 0}
+                        onChange={e => setLogEntry(f.key, e.target.value)}
+                        style={{ textAlign: 'center', fontSize: '20px', fontFamily: 'Oswald, sans-serif', padding: '8px 4px' }} />
+                    </div>
+                  ))}
+                </div>
+                {/* Live auto-calc */}
+                {(() => {
+                  const h  = (parseInt(currentLogEntry.singles)||0)+(parseInt(currentLogEntry.doubles)||0)+(parseInt(currentLogEntry.triples)||0)+(parseInt(currentLogEntry.hr)||0);
+                  const ab = parseInt(currentLogEntry.ab) || 0;
+                  const bb = parseInt(currentLogEntry.bb) || 0;
+                  const avg = ab > 0 ? '.'+String(Math.round(h/ab*1000)).padStart(3,'0') : '.000';
+                  const obp = '.'+String(Math.round(calcOBP(h,bb,ab)*1000)).padStart(3,'0');
+                  return (
+                    <div style={{ display: 'flex', gap: '8px', marginBottom: '14px' }}>
+                      <div style={{ flex: 1, background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: '8px', padding: '8px', textAlign: 'center' }}>
+                        <div style={{ fontSize: '10px', fontWeight: '700', color: 'var(--gray-500)', textTransform: 'uppercase' }}>H</div>
+                        <div style={{ fontFamily: 'Oswald, sans-serif', fontSize: '22px', fontWeight: '700', color: 'var(--red)' }}>{h}</div>
+                      </div>
+                      <div style={{ flex: 1, background: 'var(--gray-50)', border: '1px solid var(--gray-200)', borderRadius: '8px', padding: '8px', textAlign: 'center' }}>
+                        <div style={{ fontSize: '10px', fontWeight: '700', color: 'var(--gray-500)', textTransform: 'uppercase' }}>AVG</div>
+                        <div style={{ fontFamily: 'Oswald, sans-serif', fontSize: '22px', fontWeight: '700' }}>{avg}</div>
+                      </div>
+                      <div style={{ flex: 1, background: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: '8px', padding: '8px', textAlign: 'center' }}>
+                        <div style={{ fontSize: '10px', fontWeight: '700', color: 'var(--gray-500)', textTransform: 'uppercase' }}>OBP</div>
+                        <div style={{ fontFamily: 'Oswald, sans-serif', fontSize: '22px', fontWeight: '700', color: 'var(--blue)' }}>{obp}</div>
+                      </div>
+                    </div>
+                  );
+                })()}
+                <div style={{ display: 'flex', gap: '10px' }}>
+                  <button onClick={() => {
+                    // Skip = keep zeros (already default)
+                    if (logStep < players.length) { setLogStep(s => s + 1); }
+                    else { logGameEntry(); }
+                  }} style={{ flex: 1, padding: '12px', borderRadius: '10px', border: '1px solid var(--gray-200)', background: 'white', cursor: 'pointer', fontWeight: '600', fontSize: '14px' }}>
+                    Skip (0s)
+                  </button>
+                  <button disabled={isSavingLog} onClick={() => {
+                    if (logStep < players.length) { setLogStep(s => s + 1); }
+                    else { logGameEntry(); }
+                  }} style={{ flex: 2, padding: '12px', borderRadius: '10px', border: 'none', background: 'var(--red)', color: 'white', cursor: 'pointer', fontWeight: '700', fontSize: '14px' }}>
+                    {isSavingLog ? 'Saving...' : logStep < players.length ? 'Save & Next' : 'Finish & Save All'}
+                  </button>
+                </div>
+                {logStep > 1 && (
+                  <button onClick={() => setLogStep(s => s - 1)} style={{ marginTop: '8px', width: '100%', background: 'none', border: 'none', color: 'var(--gray-400)', cursor: 'pointer', fontSize: '13px' }}>
+                    ← Back
+                  </button>
+                )}
               </>
             )}
           </div>
