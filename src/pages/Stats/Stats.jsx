@@ -368,6 +368,56 @@ export default function Stats() {
         {tab === 'career' && <BattingTable getStats={getCareer} showEdit={false} />}
         {tab === 'fielding' && <RotationView />}
         {tab === 'history' && <SeasonHistory />}
+
+        {/* Stat Glossary */}
+        <div className="card" style={{ marginTop: '14px' }}>
+          <div style={{ fontFamily: 'Oswald, sans-serif', fontSize: '14px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '10px', color: 'var(--gray-700)' }}>
+            📖 Stat Guide
+          </div>
+          {tab !== 'fielding' ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              {[
+                { abbr: 'AVG', name: 'Batting Average', desc: 'Hits divided by At Bats. .300 is excellent.' },
+                { abbr: 'AB',  name: 'At Bats',         desc: 'Number of times a player batted (excluding walks).' },
+                { abbr: 'H',   name: 'Hits',            desc: 'Total hits — 1B + 2B + 3B + HR combined.' },
+                { abbr: '1B',  name: 'Single',          desc: 'Hit where the batter reaches 1st base.' },
+                { abbr: '2B',  name: 'Double',          desc: 'Hit where the batter reaches 2nd base.' },
+                { abbr: '3B',  name: 'Triple',          desc: 'Hit where the batter reaches 3rd base.' },
+                { abbr: 'HR',  name: 'Home Run',        desc: 'Batter rounds all bases and scores.' },
+                { abbr: 'RBI', name: 'Runs Batted In',  desc: 'Number of runs scored due to the batter\'s hit.' },
+              ].map(s => (
+                <div key={s.abbr} style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+                  <span style={{
+                    minWidth: '36px', fontFamily: 'Oswald, sans-serif', fontWeight: '700',
+                    fontSize: '13px', color: 'var(--red)', paddingTop: '1px'
+                  }}>{s.abbr}</span>
+                  <div>
+                    <span style={{ fontWeight: '700', fontSize: '13px', color: 'var(--black)' }}>{s.name}</span>
+                    <span style={{ fontSize: '12px', color: 'var(--gray-500)', marginLeft: '6px' }}>{s.desc}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              {[
+                { abbr: 'G',  name: 'Games',  desc: 'Number of games played at that position.' },
+                { abbr: 'E',  name: 'Errors', desc: 'Mistakes made in the field at that position.' },
+              ].map(s => (
+                <div key={s.abbr} style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+                  <span style={{
+                    minWidth: '36px', fontFamily: 'Oswald, sans-serif', fontWeight: '700',
+                    fontSize: '13px', color: 'var(--red)', paddingTop: '1px'
+                  }}>{s.abbr}</span>
+                  <div>
+                    <span style={{ fontWeight: '700', fontSize: '13px', color: 'var(--black)' }}>{s.name}</span>
+                    <span style={{ fontSize: '12px', color: 'var(--gray-500)', marginLeft: '6px' }}>{s.desc}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Edit Modal */}
