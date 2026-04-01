@@ -101,16 +101,26 @@ function FieldingEntries({ entries = [], onAdd, onUpdate, onRemove }) {
 
 // ----------------------------------------------------------------
 // Main export
+// liveMode = true when initialGame is provided (LiveScoring):
+//   step 0 = player grid, step 1 = editing selected player, return to grid after save
+// liveMode = false (Stats page):
+//   step 0 = game picker, step 1..N = linear step through all players
 // ----------------------------------------------------------------
 export default function LogGameModal({ players, currentYear, games = [], initialGame = null, onClose, onSaved }) {
-  const [logStep, setLogStep] = useState(initialGame ? 1 : 0);
+  const liveMode = !!initialGame;
+  const [logStep, setLogStep] = useState(liveMode ? 0 : 0); // 0 = grid/picker, 1 = player entry
   const [logGame, setLogGame] = useState(initialGame);
   const [manualGame, setManualGame] = useState({ opponent: '', date: new Date().toISOString().slice(0, 10) });
   const [logEntries, setLogEntries] = useState({});
   const [isSaving, setIsSaving] = useState(false);
-  const [playerTab, setPlayerTab] = useState('batting'); // 'batting' | 'fielding'
+  const [playerTab, setPlayerTab] = useState('batting');
+  const [selectedPlayerId, setSelectedPlayerId] = useState(null); // liveMode only
 
-  const currentPlayer = logStep >= 1 ? players[logStep - 1] : null;
+  // In liveMode: currentPlayer is whoever was tapped on the grid
+  // In stepMode: currentPlayer is players[logStep - 1]
+  const currentPlayer = liveMode
+    ? (selectedPlayerId ? players.find(p => p.id === selectedPlayerId) : null)
+    : (logStep >= 1 ? players[logStep - 1] : null);
 
   const getEntry = (playerId) => logEntries[playerId] || { ...BLANK_BATTING, fieldingThisGame: [] };
 
@@ -147,8 +157,19 @@ export default function LogGameModal({ players, currentYear, games = [], initial
     }));
   };
 
+  const hasStats = (id) => {
+    const e = logEntries[id];
+    if (!e) return false;
+    return e.ab > 0 || e.singles > 0 || e.doubles > 0 || e.triples > 0 || e.hr > 0 || e.rbi > 0 || e.k > 0 || e.bb > 0 || e.runs > 0 || (e.fieldingThisGame || []).length > 0;
+  };
+
   const advance = () => {
-    if (logStep < players.length) {
+    if (liveMode) {
+      // Return to player grid after entering one player's stats
+      setSelectedPlayerId(null);
+      setLogStep(0);
+      setPlayerTab('batting');
+    } else if (logStep < players.length) {
       setLogStep(s => s + 1);
       setPlayerTab('batting');
     } else {
@@ -236,8 +257,50 @@ export default function LogGameModal({ players, currentYear, games = [], initial
       <div className="modal-sheet" onClick={e => e.stopPropagation()} style={{ maxHeight: '92vh', overflowY: 'auto' }}>
         <div className="modal-handle" />
 
-        {/* ── Step 0: Pick game ── */}
-        {logStep === 0 && (
+        {/* ── Live mode: Player grid ── */}
+        {liveMode && logStep === 0 && (
+          <>
+            <div style={{ marginBottom: '12px' }}>
+              <div style={{ fontSize: '11px', color: 'var(--gray-500)', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                Live Stats
+              </div>
+              <div style={{ fontFamily: 'Oswald, sans-serif', fontSize: '20px', fontWeight: '700', textTransform: 'uppercase' }}>
+                vs {logGame?.opponent} &middot; {logGame?.date}
+              </div>
+              <div style={{ fontSize: '12px', color: 'var(--gray-500)', marginTop: '2px' }}>
+                Tap a player to enter their stats
+              </div>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', marginBottom: '16px' }}>
+              {players.map(p => {
+                const logged = hasStats(p.id);
+                return (
+                  <button key={p.id} onClick={() => { setSelectedPlayerId(p.id); setLogStep(1); setPlayerTab('batting'); }}
+                    style={{
+                      padding: '10px 6px', borderRadius: '10px', cursor: 'pointer', textAlign: 'center',
+                      border: `2px solid ${logged ? '#16A34A' : 'var(--gray-200)'}`,
+                      background: logged ? '#DCFCE7' : 'white', position: 'relative'
+                    }}>
+                    {logged && <div style={{ position: 'absolute', top: 4, right: 6, fontSize: '12px', color: '#16A34A', fontWeight: '700' }}>✓</div>}
+                    <div style={{ fontFamily: 'Oswald, sans-serif', fontSize: '13px', fontWeight: '700', color: logged ? '#16A34A' : 'var(--black)', lineHeight: '1.2' }}>
+                      {getPlayerName(p)}
+                    </div>
+                    {p.jerseyNumber && <div style={{ fontSize: '10px', color: logged ? '#16A34A' : 'var(--gray-400)', marginTop: '2px' }}>#{p.jerseyNumber}</div>}
+                  </button>
+                );
+              })}
+            </div>
+            <button disabled={isSaving} onClick={handleFinish} style={{
+              width: '100%', padding: '14px', borderRadius: '10px', border: 'none',
+              background: 'var(--red)', color: 'white', fontWeight: '700', fontSize: '15px', cursor: 'pointer'
+            }}>
+              {isSaving ? 'Saving...' : `Save Game Log (${Object.keys(logEntries).filter(id => hasStats(id)).length} players logged)`}
+            </button>
+          </>
+        )}
+
+        {/* ── Step 0: Pick game (step-through mode only) ── */}
+        {!liveMode && logStep === 0 && (
           <>
             <h3 style={{ fontFamily: 'Oswald, sans-serif', fontSize: '20px', marginBottom: '4px', textTransform: 'uppercase' }}>Log a Game</h3>
             <p style={{ color: 'var(--gray-500)', fontSize: '14px', marginBottom: '14px' }}>Pick a game or enter manually.</p>
@@ -271,7 +334,7 @@ export default function LogGameModal({ players, currentYear, games = [], initial
           </>
         )}
 
-        {/* ── Steps 1..N: Per-player ── */}
+        {/* ── Per-player stats entry ── */}
         {logStep >= 1 && currentPlayer && (
           <>
             {/* Header */}
@@ -285,15 +348,19 @@ export default function LogGameModal({ players, currentYear, games = [], initial
                   {currentPlayer.jerseyNumber && <span style={{ fontSize: '14px', color: 'var(--gray-400)', marginLeft: '6px' }}>#{currentPlayer.jerseyNumber}</span>}
                 </div>
               </div>
-              <div style={{ fontSize: '12px', color: 'var(--gray-400)', textAlign: 'right', paddingTop: '4px' }}>
-                {logStep} of {players.length}
-              </div>
+              {!liveMode && (
+                <div style={{ fontSize: '12px', color: 'var(--gray-400)', textAlign: 'right', paddingTop: '4px' }}>
+                  {logStep} of {players.length}
+                </div>
+              )}
             </div>
 
-            {/* Progress bar */}
-            <div style={{ height: '4px', background: 'var(--gray-100)', borderRadius: '2px', marginBottom: '14px' }}>
-              <div style={{ height: '100%', width: `${(logStep / players.length) * 100}%`, background: 'var(--red)', borderRadius: '2px', transition: 'width 0.2s' }} />
-            </div>
+            {/* Progress bar (step-through mode only) */}
+            {!liveMode && (
+              <div style={{ height: '4px', background: 'var(--gray-100)', borderRadius: '2px', marginBottom: '14px' }}>
+                <div style={{ height: '100%', width: `${(logStep / players.length) * 100}%`, background: 'var(--red)', borderRadius: '2px', transition: 'width 0.2s' }} />
+              </div>
+            )}
 
             {/* Batting / Fielding tabs */}
             <div style={{ display: 'flex', gap: '6px', marginBottom: '14px' }}>
@@ -365,20 +432,24 @@ export default function LogGameModal({ players, currentYear, games = [], initial
 
             {/* Action buttons */}
             <div style={{ display: 'flex', gap: '10px' }}>
-              <button onClick={advance} style={{
-                flex: 1, padding: '12px', borderRadius: '10px',
-                border: '1px solid var(--gray-200)', background: 'white',
-                cursor: 'pointer', fontWeight: '600', fontSize: '14px'
-              }}>Skip (zeros)</button>
+              {!liveMode && (
+                <button onClick={advance} style={{
+                  flex: 1, padding: '12px', borderRadius: '10px',
+                  border: '1px solid var(--gray-200)', background: 'white',
+                  cursor: 'pointer', fontWeight: '600', fontSize: '14px'
+                }}>Skip (zeros)</button>
+              )}
               <button disabled={isSaving} onClick={advance} style={{
                 flex: 2, padding: '12px', borderRadius: '10px', border: 'none',
                 background: 'var(--red)', color: 'white', cursor: 'pointer',
                 fontWeight: '700', fontSize: '14px'
               }}>
-                {isSaving ? 'Saving...' : logStep < players.length ? 'Save & Next →' : 'Finish & Save All'}
+                {isSaving ? 'Saving...' :
+                  liveMode ? '← Back to Roster' :
+                  logStep < players.length ? 'Save & Next →' : 'Finish & Save All'}
               </button>
             </div>
-            {logStep > 1 && (
+            {!liveMode && logStep > 1 && (
               <button onClick={() => { setLogStep(s => s - 1); setPlayerTab('batting'); }}
                 style={{ marginTop: '8px', width: '100%', background: 'none', border: 'none', color: 'var(--gray-400)', cursor: 'pointer', fontSize: '13px' }}>
                 ← Back

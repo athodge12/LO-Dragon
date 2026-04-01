@@ -34,10 +34,6 @@ export default function Home() {
   useEffect(() => {
     const unsubs = [];
 
-    unsubs.push(onSnapshot(doc(db, 'settings', 'nextGame'), snap => {
-      if (snap.exists()) setNextGame(snap.data());
-    }));
-
     unsubs.push(onSnapshot(doc(db, 'settings', 'notification'), snap => {
       if (snap.exists()) setNotification(snap.data());
     }));
@@ -90,7 +86,15 @@ export default function Home() {
   };
 
   const saveNextGame = async (data) => {
-    await setDoc(doc(db, 'settings', 'nextGame'), data);
+    if (nextGame?.id) {
+      // Update the existing game document in the games collection
+      await setDoc(doc(db, 'games', nextGame.id), data, { merge: true });
+    } else {
+      // Create a new game in the games collection
+      await addDoc(collection(db, 'games'), { ...data, createdAt: new Date().toISOString() });
+    }
+    // Clear the old settings/nextGame so it doesn't conflict
+    await setDoc(doc(db, 'settings', 'nextGame'), {});
     setToast('Next game updated!');
     setEditModal(null);
   };
