@@ -6,7 +6,7 @@ import Header from '../../components/Layout/Header';
 import Toast from '../../components/UI/Toast';
 
 export default function Snacks() {
-  const { isCoach, currentUser, userProfile } = useAuth();
+  const { isCoach, isAdmin, currentUser, userProfile } = useAuth();
   const [games, setGames] = useState([]);
   const [assignments, setAssignments] = useState({});
   const [parents, setParents] = useState([]);
@@ -151,7 +151,7 @@ export default function Snacks() {
         </div>
 
         <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
-          {onDelete && isCoach && (
+          {onDelete && isAdmin && (
             <button onClick={() => onDelete(game)} style={{
               fontSize: '11px', color: '#ef4444', background: 'none',
               border: '1px solid #fecaca', borderRadius: '6px',
@@ -251,7 +251,7 @@ export default function Snacks() {
               Recent Games
             </p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              {past.map(g => <GameRow key={g.id} game={g} onDelete={isCoach ? setDeleteConfirm : null} />)}
+              {past.map(g => <GameRow key={g.id} game={g} onDelete={isAdmin ? setDeleteConfirm : null} />)}
             </div>
           </div>
         )}
