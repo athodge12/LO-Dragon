@@ -5,6 +5,26 @@ import { useAuth } from '../../contexts/AuthContext';
 import Header from '../../components/Layout/Header';
 import Toast from '../../components/UI/Toast';
 
+const DAY_MAP = { Sunday: 0, Monday: 1, Tuesday: 2, Wednesday: 3, Thursday: 4, Friday: 5, Saturday: 6 };
+
+function getUpcomingPracticeDates(slot, weeksAhead = 12) {
+  const targetDay = DAY_MAP[slot.day];
+  if (targetDay === undefined) return [];
+  const dates = [];
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const current = new Date(today);
+  const daysUntil = (targetDay - current.getDay() + 7) % 7;
+  current.setDate(current.getDate() + (daysUntil === 0 ? 0 : daysUntil));
+  const endDate = slot.endDate ? new Date(slot.endDate + 'T23:59:59') : null;
+  for (let i = 0; i < weeksAhead; i++) {
+    if (endDate && current > endDate) break;
+    dates.push(current.toISOString().split('T')[0]);
+    current.setDate(current.getDate() + 7);
+  }
+  return dates;
+}
+
 export default function Attendance() {
   const { isCoach, isBookkeeper } = useAuth();
   const canEdit = isCoach || isBookkeeper;
@@ -12,9 +32,16 @@ export default function Attendance() {
   const [players, setPlayers] = useState([]);
   const [activeSession, setActiveSession] = useState(null);
   const [showNewModal, setShowNewModal] = useState(false);
+  const [showManualForm, setShowManualForm] = useState(false);
   const [newForm, setNewForm] = useState({ date: '', type: 'Practice', label: '' });
   const [toast, setToast] = useState('');
-  const [viewTab, setViewTab] = useState('sessions'); // 'sessions' | 'summary'
+  const [viewTab, setViewTab] = useState('sessions');
+
+  // Schedule data for the event picker
+  const [games, setGames] = useState([]);
+  const [practiceSchedule, setPracticeSchedule] = useState([]);
+  const [cancelledSlots, setCancelledSlots] = useState({});
+  const [allRsvps, setAllRsvps] = useState([]);
 
   useEffect(() => {
     const unsubs = [];
@@ -27,8 +54,66 @@ export default function Attendance() {
         .filter(p => p.name)
         .sort((a, b) => a.name.localeCompare(b.name)));
     }));
+    unsubs.push(onSnapshot(query(collection(db, 'games'), orderBy('date')), snap => {
+      setGames(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    }));
+    unsubs.push(onSnapshot(doc(db, 'settings', 'practiceSchedule'), snap => {
+      if (snap.exists() && snap.data().practices) setPracticeSchedule(snap.data().practices);
+    }));
+    unsubs.push(onSnapshot(doc(db, 'settings', 'cancelledPractices'), snap => {
+      setCancelledSlots(snap.exists() ? snap.data() : {});
+    }));
+    unsubs.push(onSnapshot(collection(db, 'rsvps'), snap => {
+      setAllRsvps(snap.docs.map(d => d.data()));
+    }));
     return () => unsubs.forEach(u => u());
   }, []);
+
+  // Build schedule events (upcoming + recent 30 days)
+  const today = new Date().toISOString().split('T')[0];
+  const thirtyDaysAgo = new Date(Date.now() - 30 * 86400000).toISOString().split('T')[0];
+
+  const practiceEvents = practiceSchedule.flatMap((slot, i) => {
+    if (slot.type === 'onetime') {
+      if (!slot.date) return [];
+      return [{
+        id: `practice-${i}-${slot.date}`,
+        type: 'Practice',
+        date: slot.date,
+        slotIndex: i,
+        label: slot.focus ? `Practice – ${slot.focus}` : 'Practice',
+        time: slot.time,
+        cancelled: !!cancelledSlots[i]
+      }];
+    }
+    return getUpcomingPracticeDates(slot).map(date => ({
+      id: `practice-${i}-${date}`,
+      type: 'Practice',
+      date,
+      slotIndex: i,
+      label: slot.focus ? `Practice – ${slot.focus}` : 'Practice',
+      time: slot.time,
+      cancelled: !!cancelledSlots[i]
+    }));
+  });
+
+  const gameEvents = games.map(g => ({
+    id: g.id,
+    type: 'Game',
+    date: g.date,
+    label: `vs ${g.opponent}`,
+    time: g.time,
+    cancelled: !!g.cancelled
+  }));
+
+  const scheduleEvents = [...gameEvents, ...practiceEvents]
+    .filter(e => !e.cancelled && e.date >= thirtyDaysAgo)
+    .sort((a, b) => a.date.localeCompare(b.date));
+
+  const upcomingEvents = scheduleEvents.filter(e => e.date >= today);
+  const recentEvents = scheduleEvents.filter(e => e.date < today);
+
+  const sessionedIds = new Set(sessions.map(s => s.sourceId).filter(Boolean));
 
   const createSession = async () => {
     if (!newForm.date) return;
@@ -42,7 +127,36 @@ export default function Attendance() {
     });
     setNewForm({ date: '', type: 'Practice', label: '' });
     setShowNewModal(false);
+    setShowManualForm(false);
     setToast('Session created!');
+  };
+
+  const createSessionFromEvent = async (event) => {
+    // Build name→playerId map for RSVP pre-fill
+    const nameToId = {};
+    players.forEach(p => { nameToId[p.name.toLowerCase().trim()] = p.id; });
+
+    // Pre-fill present from "yes" RSVPs
+    const records = {};
+    const eventField = event.type === 'Game' ? 'gameId' : 'practiceId';
+    allRsvps
+      .filter(r => r[eventField] === event.id && r.status === 'yes')
+      .forEach(r => {
+        const pid = nameToId[(r.playerName || '').toLowerCase().trim()];
+        if (pid) records[pid] = 'present';
+      });
+
+    await addDoc(collection(db, 'attendance'), {
+      date: event.date,
+      type: event.type,
+      label: event.label,
+      records,
+      sourceId: event.id,
+      createdAt: new Date().toISOString()
+    });
+    setShowNewModal(false);
+    const preCount = Object.keys(records).length;
+    setToast(preCount > 0 ? `Session created – ${preCount} player${preCount !== 1 ? 's' : ''} pre-marked from RSVPs` : 'Session created!');
   };
 
   const toggleAttendance = async (session, playerId) => {
@@ -51,7 +165,6 @@ export default function Attendance() {
     const next = current === 'present' ? 'absent' : 'present';
     const updatedRecords = { ...(session.records || {}), [playerId]: next };
     await setDoc(doc(db, 'attendance', session.id), { ...session, records: updatedRecords });
-    // Update local activeSession immediately for snappy UI
     setActiveSession(s => s ? { ...s, records: updatedRecords } : s);
   };
 
@@ -71,7 +184,6 @@ export default function Attendance() {
   const absentCount = (session) =>
     Object.values(session.records || {}).filter(v => v === 'absent').length;
 
-  // Per-player attendance summary
   const playerSummary = players.map(player => {
     const total = sessions.length;
     const present = sessions.filter(s => s.records?.[player.id] === 'present').length;
@@ -81,10 +193,50 @@ export default function Attendance() {
     return { ...player, present, absent, total, marked, pct };
   }).sort((a, b) => (b.pct ?? -1) - (a.pct ?? -1));
 
+  const EventPickerRow = ({ event }) => {
+    const already = sessionedIds.has(event.id);
+    const dateObj = new Date(event.date + 'T12:00:00');
+    return (
+      <button
+        onClick={() => !already && createSessionFromEvent(event)}
+        style={{
+          width: '100%', background: already ? 'var(--gray-50)' : 'white',
+          border: `1px solid ${already ? 'var(--gray-100)' : 'var(--gray-200)'}`,
+          borderRadius: '10px', padding: '10px 12px', cursor: already ? 'default' : 'pointer',
+          display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '6px', textAlign: 'left'
+        }}
+      >
+        <div style={{
+          background: event.type === 'Game' ? 'var(--red)' : '#1D4ED8',
+          color: 'white', borderRadius: '8px', padding: '4px 8px', textAlign: 'center',
+          minWidth: '44px', flexShrink: 0
+        }}>
+          <div style={{ fontSize: '9px', fontWeight: '700', textTransform: 'uppercase' }}>
+            {dateObj.toLocaleDateString('en-US', { month: 'short' })}
+          </div>
+          <div style={{ fontSize: '18px', fontWeight: '700', fontFamily: 'Oswald, sans-serif', lineHeight: 1 }}>
+            {dateObj.getDate()}
+          </div>
+        </div>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontWeight: '700', fontSize: '14px', color: already ? 'var(--gray-400)' : 'var(--black)' }}>
+            {event.type === 'Game' ? '⚾' : '🏋️'} {event.label}
+          </div>
+          {event.time && <div style={{ fontSize: '12px', color: 'var(--gray-400)', marginTop: '1px' }}>{event.time}</div>}
+        </div>
+        {already ? (
+          <span style={{ fontSize: '18px' }}>✅</span>
+        ) : (
+          <span style={{ fontSize: '18px', color: 'var(--gray-300)' }}>+</span>
+        )}
+      </button>
+    );
+  };
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
       <Header title="Attendance" back="/" actions={canEdit && !activeSession && (
-        <button onClick={() => setShowNewModal(true)} style={{
+        <button onClick={() => { setShowNewModal(true); setShowManualForm(false); }} style={{
           background: 'rgba(255,255,255,0.15)', border: 'none', borderRadius: '8px',
           width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center',
           color: 'white', cursor: 'pointer', fontSize: '20px'
@@ -116,7 +268,6 @@ export default function Attendance() {
             )}
           </div>
 
-          {/* Attendance stats bar */}
           <div style={{
             background: 'var(--gray-50)', padding: '10px 16px',
             display: 'flex', gap: '16px', borderBottom: '1px solid var(--gray-200)'
@@ -192,9 +343,7 @@ export default function Attendance() {
           </div>
         </div>
       ) : (
-        /* List view */
         <div className="page-content">
-          {/* Tabs */}
           <div style={{ display: 'flex', marginBottom: '14px', background: 'var(--gray-100)', borderRadius: '10px', padding: '3px' }}>
             {['sessions', 'summary'].map(tab => (
               <button key={tab} onClick={() => setViewTab(tab)} style={{
@@ -243,7 +392,6 @@ export default function Attendance() {
                         <div style={{ fontSize: '12px', color: 'var(--gray-500)', marginTop: '2px' }}>
                           {formatDate(session.date)}
                         </div>
-                        {/* Mini progress bar */}
                         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '6px' }}>
                           <div style={{ flex: 1, background: 'var(--gray-200)', borderRadius: '4px', height: '4px', overflow: 'hidden' }}>
                             <div style={{ width: `${pct}%`, height: '100%', background: '#16A34A', borderRadius: '4px', transition: 'width 0.3s' }} />
@@ -260,7 +408,6 @@ export default function Attendance() {
               </div>
             )
           ) : (
-            /* Player summary */
             players.length === 0 ? (
               <div className="empty-state"><p>No players on roster yet.</p></div>
             ) : (
@@ -303,44 +450,91 @@ export default function Attendance() {
         </div>
       )}
 
-      {/* New Session Modal */}
+      {/* New Session Modal — event picker */}
       {showNewModal && (
-        <div className="modal-overlay" onClick={() => setShowNewModal(false)}>
-          <div className="modal-sheet" onClick={e => e.stopPropagation()}>
+        <div className="modal-overlay" onClick={() => { setShowNewModal(false); setShowManualForm(false); }}>
+          <div className="modal-sheet" onClick={e => e.stopPropagation()} style={{ maxHeight: '85vh', overflowY: 'auto' }}>
             <div className="modal-handle" />
-            <h3 style={{ fontFamily: 'Oswald, sans-serif', fontSize: '20px', marginBottom: '16px', textTransform: 'uppercase' }}>
+            <h3 style={{ fontFamily: 'Oswald, sans-serif', fontSize: '20px', marginBottom: '4px', textTransform: 'uppercase' }}>
               New Session
             </h3>
-            <div className="form-group">
-              <label className="form-label">Type</label>
-              <div style={{ display: 'flex', gap: '8px' }}>
-                {['Practice', 'Game'].map(t => (
-                  <button key={t} type="button" onClick={() => setNewForm(f => ({ ...f, type: t }))} style={{
-                    flex: 1, padding: '10px', borderRadius: '10px', cursor: 'pointer',
-                    border: `2px solid ${newForm.type === t ? 'var(--red)' : 'var(--gray-200)'}`,
-                    background: newForm.type === t ? '#FEF2F2' : 'white',
-                    fontWeight: '700', fontSize: '14px',
-                    color: newForm.type === t ? 'var(--red)' : 'var(--gray-500)'
-                  }}>{t === 'Game' ? '⚾ Game' : '🏋️ Practice'}</button>
-                ))}
-              </div>
-            </div>
-            <div className="form-group">
-              <label className="form-label">Date</label>
-              <input className="form-input" type="date" value={newForm.date} onChange={e => setNewForm(f => ({ ...f, date: e.target.value }))} required />
-            </div>
-            <div className="form-group">
-              <label className="form-label">Label (optional)</label>
-              <input
-                className="form-input"
-                value={newForm.label}
-                onChange={e => setNewForm(f => ({ ...f, label: e.target.value }))}
-                placeholder={newForm.type === 'Game' ? 'e.g. vs Tigers' : 'e.g. Tuesday Practice'}
-              />
-            </div>
-            <button className="btn-primary" onClick={createSession} disabled={!newForm.date}>
-              Create Session
-            </button>
+
+            {!showManualForm ? (
+              <>
+                <p style={{ fontSize: '13px', color: 'var(--gray-500)', marginBottom: '14px' }}>
+                  Pick a game or practice from the schedule
+                </p>
+
+                {upcomingEvents.length > 0 && (
+                  <>
+                    <p style={{ fontSize: '11px', fontWeight: '700', color: 'var(--gray-400)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>Upcoming</p>
+                    {upcomingEvents.map(e => <EventPickerRow key={e.id} event={e} />)}
+                  </>
+                )}
+
+                {recentEvents.length > 0 && (
+                  <>
+                    <p style={{ fontSize: '11px', fontWeight: '700', color: 'var(--gray-400)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px', marginTop: upcomingEvents.length ? '12px' : 0 }}>Recent</p>
+                    {recentEvents.map(e => <EventPickerRow key={e.id} event={e} />)}
+                  </>
+                )}
+
+                {upcomingEvents.length === 0 && recentEvents.length === 0 && (
+                  <div style={{ textAlign: 'center', padding: '24px 0', color: 'var(--gray-400)', fontSize: '14px' }}>
+                    No games or practices found on the schedule
+                  </div>
+                )}
+
+                <div style={{ borderTop: '1px solid var(--gray-100)', marginTop: '16px', paddingTop: '14px' }}>
+                  <button onClick={() => setShowManualForm(true)} style={{
+                    width: '100%', padding: '11px', borderRadius: '10px', cursor: 'pointer',
+                    background: 'transparent', border: '1.5px dashed var(--gray-300)',
+                    color: 'var(--gray-500)', fontWeight: '600', fontSize: '14px'
+                  }}>
+                    + Create manually
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <button onClick={() => setShowManualForm(false)} style={{
+                  background: 'none', border: 'none', cursor: 'pointer',
+                  color: 'var(--gray-500)', fontSize: '13px', fontWeight: '600',
+                  padding: '0 0 12px 0', display: 'block'
+                }}>← Back to schedule</button>
+
+                <div className="form-group">
+                  <label className="form-label">Type</label>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    {['Practice', 'Game'].map(t => (
+                      <button key={t} type="button" onClick={() => setNewForm(f => ({ ...f, type: t }))} style={{
+                        flex: 1, padding: '10px', borderRadius: '10px', cursor: 'pointer',
+                        border: `2px solid ${newForm.type === t ? 'var(--red)' : 'var(--gray-200)'}`,
+                        background: newForm.type === t ? '#FEF2F2' : 'white',
+                        fontWeight: '700', fontSize: '14px',
+                        color: newForm.type === t ? 'var(--red)' : 'var(--gray-500)'
+                      }}>{t === 'Game' ? '⚾ Game' : '🏋️ Practice'}</button>
+                    ))}
+                  </div>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Date</label>
+                  <input className="form-input" type="date" value={newForm.date} onChange={e => setNewForm(f => ({ ...f, date: e.target.value }))} required />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Label (optional)</label>
+                  <input
+                    className="form-input"
+                    value={newForm.label}
+                    onChange={e => setNewForm(f => ({ ...f, label: e.target.value }))}
+                    placeholder={newForm.type === 'Game' ? 'e.g. vs Tigers' : 'e.g. Tuesday Practice'}
+                  />
+                </div>
+                <button className="btn-primary" onClick={createSession} disabled={!newForm.date}>
+                  Create Session
+                </button>
+              </>
+            )}
           </div>
         </div>
       )}
