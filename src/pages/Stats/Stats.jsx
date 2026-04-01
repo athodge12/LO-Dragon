@@ -402,7 +402,7 @@ export default function Stats() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
               {[
                 { abbr: 'Inn', name: 'Innings', desc: 'Total innings played at that position across all games.' },
-                { abbr: 'E',   name: 'Errors',  desc: 'Mistakes made in the field at that position.' },
+                { abbr: 'E',   name: 'Errors',  desc: 'If a play should have been made and wasn\'t — that\'s an error. Example: a routine ground ball the fielder misses, or dropping an easy catch.' },
               ].map(s => (
                 <div key={s.abbr} style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
                   <span style={{
