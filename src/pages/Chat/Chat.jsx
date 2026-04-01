@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { collection, onSnapshot, addDoc, query, orderBy, setDoc, doc } from 'firebase/firestore';
+import { collection, onSnapshot, addDoc, query, orderBy, setDoc, doc, deleteDoc, updateDoc } from 'firebase/firestore';
 import { db } from '../../firebase/config';
 import { useAuth } from '../../contexts/AuthContext';
 import Header from '../../components/Layout/Header';
@@ -23,7 +23,10 @@ function RoleBadge({ role }) {
   );
 }
 
-function MessageList({ messages, currentUser, bottomRef }) {
+function MessageList({ messages, currentUser, isAdmin, bottomRef, onDelete, onEdit }) {
+  const [editingId, setEditingId] = useState(null);
+  const [editText, setEditText] = useState('');
+
   const formatTime = (iso) => {
     const d = new Date(iso);
     const now = new Date();
@@ -32,6 +35,23 @@ function MessageList({ messages, currentUser, bottomRef }) {
     }
     return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ' ' +
       d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+  };
+
+  const startEdit = (msg) => {
+    setEditingId(msg.id);
+    setEditText(msg.text);
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+    setEditText('');
+  };
+
+  const saveEdit = (msg) => {
+    if (editText.trim() && editText.trim() !== msg.text) {
+      onEdit(msg, editText.trim());
+    }
+    cancelEdit();
   };
 
   return (
@@ -47,6 +67,9 @@ function MessageList({ messages, currentUser, bottomRef }) {
       )}
       {messages.map(msg => {
         const isMe = msg.authorId === currentUser?.uid;
+        const canAct = isMe || isAdmin;
+        const isEditing = editingId === msg.id;
+
         return (
           <div key={msg.id} style={{
             display: 'flex',
@@ -69,16 +92,64 @@ function MessageList({ messages, currentUser, bottomRef }) {
                 </span>
                 {!isMe && <RoleBadge role={msg.role} />}
               </div>
-              <div style={{
-                background: isMe ? 'var(--red)' : 'var(--gray-100)',
-                color: isMe ? 'white' : 'var(--black)',
-                padding: '10px 14px', borderRadius: isMe ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
-                fontSize: '15px', lineHeight: '1.4'
-              }}>{msg.text}</div>
-              <div style={{
-                fontSize: '10px', color: 'var(--gray-400)', marginTop: '3px',
-                textAlign: isMe ? 'right' : 'left'
-              }}>{formatTime(msg.createdAt)}</div>
+
+              {isEditing ? (
+                <div>
+                  <textarea
+                    value={editText}
+                    onChange={e => setEditText(e.target.value)}
+                    autoFocus
+                    rows={2}
+                    style={{
+                      width: '100%', padding: '10px 14px', borderRadius: '12px',
+                      border: '1.5px solid var(--red)', fontSize: '15px', resize: 'none',
+                      outline: 'none', fontFamily: 'Source Sans 3, sans-serif',
+                      lineHeight: '1.4', boxSizing: 'border-box'
+                    }}
+                  />
+                  <div style={{ display: 'flex', gap: '6px', marginTop: '4px', justifyContent: isMe ? 'flex-end' : 'flex-start' }}>
+                    <button onClick={() => saveEdit(msg)} style={{
+                      fontSize: '12px', fontWeight: '700', padding: '4px 10px',
+                      borderRadius: '8px', border: 'none', cursor: 'pointer',
+                      background: 'var(--red)', color: 'white'
+                    }}>Save</button>
+                    <button onClick={cancelEdit} style={{
+                      fontSize: '12px', fontWeight: '600', padding: '4px 10px',
+                      borderRadius: '8px', border: '1px solid var(--gray-200)',
+                      cursor: 'pointer', background: 'white', color: 'var(--gray-500)'
+                    }}>Cancel</button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div style={{
+                    background: isMe ? 'var(--red)' : 'var(--gray-100)',
+                    color: isMe ? 'white' : 'var(--black)',
+                    padding: '10px 14px', borderRadius: isMe ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
+                    fontSize: '15px', lineHeight: '1.4'
+                  }}>
+                    {msg.text}
+                    {msg.edited && (
+                      <span style={{ fontSize: '10px', opacity: 0.6, marginLeft: '6px' }}>(edited)</span>
+                    )}
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '3px', justifyContent: isMe ? 'flex-end' : 'flex-start' }}>
+                    <span style={{ fontSize: '10px', color: 'var(--gray-400)' }}>{formatTime(msg.createdAt)}</span>
+                    {canAct && (
+                      <>
+                        <button onClick={() => startEdit(msg)} style={{
+                          fontSize: '10px', color: 'var(--gray-400)', background: 'none',
+                          border: 'none', cursor: 'pointer', padding: '0', fontWeight: '600'
+                        }}>Edit</button>
+                        <button onClick={() => onDelete(msg)} style={{
+                          fontSize: '10px', color: '#B91C1C', background: 'none',
+                          border: 'none', cursor: 'pointer', padding: '0', fontWeight: '600'
+                        }}>Delete</button>
+                      </>
+                    )}
+                  </div>
+                </>
+              )}
             </div>
           </div>
         );
@@ -89,7 +160,7 @@ function MessageList({ messages, currentUser, bottomRef }) {
 }
 
 export default function Chat() {
-  const { currentUser, userProfile, isCoach, isFan, chatDisplayName } = useAuth();
+  const { currentUser, userProfile, isCoach, isFan, isActualAdmin, chatDisplayName } = useAuth();
   const [activeTab, setActiveTab] = useState(isFan ? 'fanzone' : 'team');
   const [teamMessages, setTeamMessages] = useState([]);
   const [fanMessages, setFanMessages] = useState([]);
@@ -125,8 +196,8 @@ export default function Chat() {
 
   const sendMessage = async () => {
     if (!text.trim()) return;
-    const collection_name = activeTab === 'team' ? 'messages' : 'fanMessages';
-    await addDoc(collection(db, collection_name), {
+    const col = activeTab === 'team' ? 'messages' : 'fanMessages';
+    await addDoc(collection(db, col), {
       text: text.trim(),
       authorId: currentUser.uid,
       authorName: chatDisplayName,
@@ -134,6 +205,16 @@ export default function Chat() {
       createdAt: new Date().toISOString()
     });
     setText('');
+  };
+
+  const handleDelete = async (msg) => {
+    const col = activeTab === 'team' ? 'messages' : 'fanMessages';
+    await deleteDoc(doc(db, col, msg.id));
+  };
+
+  const handleEdit = async (msg, newText) => {
+    const col = activeTab === 'team' ? 'messages' : 'fanMessages';
+    await updateDoc(doc(db, col, msg.id), { text: newText, edited: true });
   };
 
   const postPinned = async () => {
@@ -152,9 +233,7 @@ export default function Chat() {
   };
 
   const currentMessages = activeTab === 'team' ? teamMessages : fanMessages;
-  const placeholder = activeTab === 'fanzone'
-    ? 'Cheer on the Dragons...'
-    : 'Message the team...';
+  const placeholder = activeTab === 'fanzone' ? 'Cheer on the Dragons...' : 'Message the team...';
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
@@ -175,37 +254,27 @@ export default function Chat() {
         background: 'white'
       }}>
         {!isFan && (
-          <button
-            onClick={() => setActiveTab('team')}
-            style={{
-              flex: 1, padding: '12px', border: 'none', background: 'none',
-              cursor: 'pointer', fontFamily: 'Oswald, sans-serif', fontSize: '14px',
-              fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.5px',
-              color: activeTab === 'team' ? 'var(--red)' : 'var(--gray-400)',
-              borderBottom: activeTab === 'team' ? '2px solid var(--red)' : '2px solid transparent',
-              marginBottom: '-1px'
-            }}
-          >
-            Team Chat
-          </button>
-        )}
-        <button
-          onClick={() => setActiveTab('fanzone')}
-          style={{
+          <button onClick={() => setActiveTab('team')} style={{
             flex: 1, padding: '12px', border: 'none', background: 'none',
             cursor: 'pointer', fontFamily: 'Oswald, sans-serif', fontSize: '14px',
             fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.5px',
-            color: activeTab === 'fanzone' ? 'var(--red)' : 'var(--gray-400)',
-            borderBottom: activeTab === 'fanzone' ? '2px solid var(--red)' : '2px solid transparent',
+            color: activeTab === 'team' ? 'var(--red)' : 'var(--gray-400)',
+            borderBottom: activeTab === 'team' ? '2px solid var(--red)' : '2px solid transparent',
             marginBottom: '-1px'
-          }}
-        >
-          Fan Zone
-        </button>
+          }}>Team Chat</button>
+        )}
+        <button onClick={() => setActiveTab('fanzone')} style={{
+          flex: 1, padding: '12px', border: 'none', background: 'none',
+          cursor: 'pointer', fontFamily: 'Oswald, sans-serif', fontSize: '14px',
+          fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.5px',
+          color: activeTab === 'fanzone' ? 'var(--red)' : 'var(--gray-400)',
+          borderBottom: activeTab === 'fanzone' ? '2px solid var(--red)' : '2px solid transparent',
+          marginBottom: '-1px'
+        }}>Fan Zone</button>
       </div>
 
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', paddingTop: '45px' }}>
-        {/* Pinned announcement — team chat only */}
+        {/* Pinned announcement */}
         {activeTab === 'team' && pinned?.text && (
           <div style={{
             background: '#FFF5F5', borderBottom: '1px solid #FECACA',
@@ -234,7 +303,14 @@ export default function Chat() {
           </div>
         )}
 
-        <MessageList messages={currentMessages} currentUser={currentUser} bottomRef={bottomRef} />
+        <MessageList
+          messages={currentMessages}
+          currentUser={currentUser}
+          isAdmin={isActualAdmin}
+          bottomRef={bottomRef}
+          onDelete={handleDelete}
+          onEdit={handleEdit}
+        />
 
         {/* Input */}
         <div style={{
