@@ -47,7 +47,7 @@ export default function PlayerProfile() {
   const [ratings, setRatings] = useState({});
   const [editing, setEditing] = useState(false);
   const [editForm, setEditForm] = useState({});
-  const [linkedParent, setLinkedParent] = useState(null);
+  const [claimants, setClaimants] = useState([]);
   const [toast, setToast] = useState('');
 
   useEffect(() => {
@@ -71,19 +71,26 @@ export default function PlayerProfile() {
     return () => unsubs.forEach(u => u());
   }, [id]);
 
-  // When player loads, find the parent who claimed them
+  // When player loads, look up all users who have claimed this player via claimedBy UID map
   useEffect(() => {
     if (!player) return;
-    const playerName = (player.name || player.childName || `${player.firstName || ''} ${player.lastName || ''}`.trim()).toLowerCase();
+    const claimedByMap = (player.claimedBy && typeof player.claimedBy === 'object') ? player.claimedBy : {};
+    const uids = Object.keys(claimedByMap);
+    if (uids.length === 0) { setClaimants([]); return; }
     const unsub = onSnapshot(collection(db, 'users'), snap => {
-      const match = snap.docs
-        .map(d => ({ id: d.id, ...d.data() }))
-        .find(u => {
-          if (u.role !== 'parent' && !u.roles?.includes('parent')) return false;
-          const cn = (u.childName || '').toLowerCase().trim();
-          return cn && (playerName.includes(cn) || cn.includes(playerName));
-        });
-      setLinkedParent(match || null);
+      const results = uids.map(uid => {
+        const userDoc = snap.docs.find(d => d.id === uid);
+        const userData = userDoc ? userDoc.data() : {};
+        const claimEntry = claimedByMap[uid];
+        return {
+          uid,
+          name: `${userData.firstName || ''} ${userData.lastName || ''}`.trim() || claimEntry?.name || 'Unknown',
+          relationship: claimEntry?.relationship || '',
+          phone: userData.phone || '',
+          email: userData.email || ''
+        };
+      });
+      setClaimants(results);
     });
     return () => unsub();
   }, [player]);
@@ -261,28 +268,34 @@ export default function PlayerProfile() {
           <div className="section-header">
             <span className="section-title">📞 Parent Contact</span>
           </div>
-          {linkedParent ? (
-            <div style={{ fontSize: '14px', color: 'var(--gray-700)' }}>
-              <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
-                <span style={{ color: 'var(--gray-400)', width: '70px', flexShrink: 0 }}>Parent</span>
-                <span style={{ fontWeight: '600' }}>{`${linkedParent.firstName || ''} ${linkedParent.lastName || ''}`.trim() || 'Unknown'}</span>
-              </div>
-              {linkedParent.phone && (
-                <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
-                  <span style={{ color: 'var(--gray-400)', width: '70px', flexShrink: 0 }}>Phone</span>
-                  <a href={`tel:${linkedParent.phone}`} style={{ fontWeight: '600', color: 'var(--red)' }}>{linkedParent.phone}</a>
+          {claimants.length > 0 ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+              {claimants.map(c => (
+                <div key={c.uid} style={{ fontSize: '14px', color: 'var(--gray-700)' }}>
+                  <div style={{ display: 'flex', gap: '8px', marginBottom: '6px' }}>
+                    <span style={{ color: 'var(--gray-400)', width: '80px', flexShrink: 0 }}>
+                      {c.relationship || 'Parent'}
+                    </span>
+                    <span style={{ fontWeight: '700' }}>{c.name}</span>
+                  </div>
+                  {c.phone && (
+                    <div style={{ display: 'flex', gap: '8px', marginBottom: '6px' }}>
+                      <span style={{ color: 'var(--gray-400)', width: '80px', flexShrink: 0 }}>Phone</span>
+                      <a href={`tel:${c.phone}`} style={{ fontWeight: '600', color: 'var(--red)' }}>{c.phone}</a>
+                    </div>
+                  )}
+                  {c.email && (
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <span style={{ color: 'var(--gray-400)', width: '80px', flexShrink: 0 }}>Email</span>
+                      <a href={`mailto:${c.email}`} style={{ fontWeight: '600', color: 'var(--red)', wordBreak: 'break-all' }}>{c.email}</a>
+                    </div>
+                  )}
                 </div>
-              )}
-              {linkedParent.email && (
-                <div style={{ display: 'flex', gap: '8px' }}>
-                  <span style={{ color: 'var(--gray-400)', width: '70px', flexShrink: 0 }}>Email</span>
-                  <a href={`mailto:${linkedParent.email}`} style={{ fontWeight: '600', color: 'var(--red)', wordBreak: 'break-all' }}>{linkedParent.email}</a>
-                </div>
-              )}
+              ))}
             </div>
           ) : (
             <div style={{ fontSize: '14px', color: 'var(--gray-400)', textAlign: 'center', padding: '12px 0' }}>
-              No parent account linked yet
+              No parent has claimed this player yet
             </div>
           )}
         </div>
