@@ -111,6 +111,13 @@ export default function LogPracticeModal({ players, practiceSchedule = [], onClo
     await setDoc(doc(db, 'settings', 'practiceHitZones_' + practiceDate), updated);
   };
 
+  const undoZone = async (e, key) => {
+    e.stopPropagation();
+    const updated = { ...hitZones, [key]: Math.max(0, (hitZones[key] || 0) - 1) };
+    setHitZones(updated);
+    await setDoc(doc(db, 'settings', 'practiceHitZones_' + practiceDate), updated);
+  };
+
   const savePlayer = async (id) => {
     setIsSaving(true);
     const e = getEntry(id);
@@ -171,6 +178,7 @@ export default function LogPracticeModal({ players, practiceSchedule = [], onClo
   };
 
   const getPlayerName = p => p?.childName || `${p?.firstName||''} ${p?.lastName||''}`.trim() || 'Player';
+  const getFirstName  = p => p?.firstName || p?.childName?.split(' ')[0] || getPlayerName(p);
 
   const upcomingPractices = practiceSchedule
     .map((slot, i) => ({ slot, i }))
@@ -254,30 +262,50 @@ export default function LogPracticeModal({ players, practiceSchedule = [], onClo
           {/* Outfield row */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '6px', marginBottom: '6px' }}>
             {row0.map(z => (
-              <button key={z.key} onClick={() => tapZone(z.key)} style={{
-                padding: '10px 4px', borderRadius: '10px', border: 'none', cursor: 'pointer', textAlign: 'center',
-                background: hitZones[z.key] > 0 ? '#FEF2F2' : 'var(--gray-100)',
-                borderBottom: hitZones[z.key] > 0 ? `3px solid var(--red)` : '3px solid transparent',
-              }}>
-                <div style={{ fontSize: '10px', fontWeight: '700', color: 'var(--gray-500)', textTransform: 'uppercase' }}>{z.label}</div>
-                <div style={{ fontFamily: 'Oswald, sans-serif', fontSize: '22px', fontWeight: '700', color: hitZones[z.key] > 0 ? 'var(--red)' : 'var(--gray-300)', lineHeight: 1 }}>{hitZones[z.key]}</div>
-              </button>
+              <div key={z.key} style={{ position: 'relative' }}>
+                <button onClick={() => tapZone(z.key)} style={{
+                  width: '100%', padding: '10px 4px', borderRadius: '10px', border: 'none', cursor: 'pointer', textAlign: 'center',
+                  background: hitZones[z.key] > 0 ? '#FEF2F2' : 'var(--gray-100)',
+                  borderBottom: hitZones[z.key] > 0 ? `3px solid var(--red)` : '3px solid transparent',
+                }}>
+                  <div style={{ fontSize: '10px', fontWeight: '700', color: 'var(--gray-500)', textTransform: 'uppercase' }}>{z.label}</div>
+                  <div style={{ fontFamily: 'Oswald, sans-serif', fontSize: '22px', fontWeight: '700', color: hitZones[z.key] > 0 ? 'var(--red)' : 'var(--gray-300)', lineHeight: 1 }}>{hitZones[z.key]}</div>
+                </button>
+                {hitZones[z.key] > 0 && (
+                  <button onClick={e => undoZone(e, z.key)} style={{
+                    position: 'absolute', bottom: 5, left: 4, width: 18, height: 18,
+                    borderRadius: '4px', border: 'none', background: 'rgba(220,38,38,0.15)',
+                    color: 'var(--red)', fontSize: '13px', lineHeight: 1, cursor: 'pointer',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '700', padding: 0,
+                  }}>−</button>
+                )}
+              </div>
             ))}
           </div>
           {/* Infield row */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '6px' }}>
             {row1.map(z => (
-              <button key={z.key} onClick={() => tapZone(z.key)} style={{
-                padding: '10px 4px', borderRadius: '10px', border: 'none', cursor: 'pointer', textAlign: 'center',
-                background: hitZones[z.key] > 0 ? '#FFF7ED' : 'var(--gray-100)',
-                borderBottom: hitZones[z.key] > 0 ? '3px solid #F59E0B' : '3px solid transparent',
-              }}>
-                <div style={{ fontSize: '10px', fontWeight: '700', color: 'var(--gray-500)', textTransform: 'uppercase' }}>{z.label}</div>
-                <div style={{ fontFamily: 'Oswald, sans-serif', fontSize: '22px', fontWeight: '700', color: hitZones[z.key] > 0 ? '#D97706' : 'var(--gray-300)', lineHeight: 1 }}>{hitZones[z.key]}</div>
-              </button>
+              <div key={z.key} style={{ position: 'relative' }}>
+                <button onClick={() => tapZone(z.key)} style={{
+                  width: '100%', padding: '10px 4px', borderRadius: '10px', border: 'none', cursor: 'pointer', textAlign: 'center',
+                  background: hitZones[z.key] > 0 ? '#FFF7ED' : 'var(--gray-100)',
+                  borderBottom: hitZones[z.key] > 0 ? '3px solid #F59E0B' : '3px solid transparent',
+                }}>
+                  <div style={{ fontSize: '10px', fontWeight: '700', color: 'var(--gray-500)', textTransform: 'uppercase' }}>{z.label}</div>
+                  <div style={{ fontFamily: 'Oswald, sans-serif', fontSize: '22px', fontWeight: '700', color: hitZones[z.key] > 0 ? '#D97706' : 'var(--gray-300)', lineHeight: 1 }}>{hitZones[z.key]}</div>
+                </button>
+                {hitZones[z.key] > 0 && (
+                  <button onClick={e => undoZone(e, z.key)} style={{
+                    position: 'absolute', bottom: 5, left: 4, width: 18, height: 18,
+                    borderRadius: '4px', border: 'none', background: 'rgba(217,119,6,0.15)',
+                    color: '#D97706', fontSize: '13px', lineHeight: 1, cursor: 'pointer',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '700', padding: 0,
+                  }}>−</button>
+                )}
+              </div>
             ))}
           </div>
-          <p style={{ fontSize: '11px', color: 'var(--gray-400)', marginTop: '6px', textAlign: 'center' }}>Tap zone to add a hit · auto-saves instantly</p>
+          <p style={{ fontSize: '11px', color: 'var(--gray-400)', marginTop: '6px', textAlign: 'center' }}>Tap zone to add · tap − to remove · auto-saves</p>
         </div>
 
         <div style={{ height: '1px', background: 'var(--gray-200)', marginBottom: '16px' }} />
@@ -388,7 +416,7 @@ export default function LogPracticeModal({ players, practiceSchedule = [], onClo
                   }}>
                   {saved && <div style={{ position: 'absolute', top: 4, right: 6, fontSize: '12px', color: '#16A34A', fontWeight: '700' }}>✓</div>}
                   <div style={{ fontFamily: 'Oswald, sans-serif', fontSize: '13px', fontWeight: '700', lineHeight: '1.2', color: saved ? '#16A34A' : 'var(--black)' }}>
-                    {getPlayerName(p)}
+                    {getFirstName(p)}
                   </div>
                   {p.jerseyNumber && <div style={{ fontSize: '10px', color: 'var(--gray-400)', marginTop: '2px' }}>#{p.jerseyNumber}</div>}
                   {hasData && <div style={{ fontSize: '10px', color: saved ? '#16A34A' : 'var(--red)', fontWeight: '700', marginTop: '2px' }}>{calcAvg(e.batting)}</div>}
