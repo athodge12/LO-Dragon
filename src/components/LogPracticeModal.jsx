@@ -83,7 +83,10 @@ export default function LogPracticeModal({ players, practiceSchedule = [], onClo
   const setBat = (id, key, delta) => {
     const e = getEntry(id);
     const val = Math.max(0, (e.batting[key] || 0) + delta);
-    setEntries(prev => ({ ...prev, [id]: { ...e, batting: { ...e.batting, [key]: val }, saved: false } }));
+    const isHit = ['singles', 'doubles', 'triples', 'hr'].includes(key);
+    const abDelta = isHit ? delta : 0;
+    const newAb = Math.max(0, (e.batting.ab || 0) + abDelta);
+    setEntries(prev => ({ ...prev, [id]: { ...e, batting: { ...e.batting, [key]: val, ...(isHit ? { ab: newAb } : {}) }, saved: false } }));
   };
 
   const addPos = (id, pos) => {
