@@ -4,7 +4,7 @@ import { db } from '../../firebase/config';
 import { useAuth } from '../../contexts/AuthContext';
 import Header from '../../components/Layout/Header';
 
-function PollMessage({ msg, currentUser, onVote, canAct, onDelete }) {
+function PollMessage({ msg, currentUser, onVote, canAct, isCoach, pinnedId, onPin, onDelete }) {
   const votes = msg.votes || {};
   const totalVotes = msg.options.reduce((s, _, i) => s + (votes[i]?.length || 0), 0);
   const myVote = msg.options.findIndex((_, i) => (votes[i] || []).includes(currentUser?.uid));
@@ -51,12 +51,20 @@ function PollMessage({ msg, currentUser, onVote, canAct, onDelete }) {
       <div style={{ fontSize: '11px', color: 'var(--gray-400)', marginTop: '8px' }}>
         {totalVotes} vote{totalVotes !== 1 ? 's' : ''} · {msg.authorName}
       </div>
-      {canAct && (
-        <button onClick={() => onDelete(msg)} style={{
-          fontSize: '11px', color: '#B91C1C', background: 'none',
-          border: 'none', cursor: 'pointer', padding: '4px 0 0', fontWeight: '600', display: 'block'
-        }}>Delete Poll</button>
-      )}
+      <div style={{ display: 'flex', gap: '10px', marginTop: '4px' }}>
+        {isCoach && (
+          <button onClick={() => onPin(msg)} style={{
+            fontSize: '11px', color: pinnedId === msg.id ? 'var(--red)' : 'var(--gray-400)',
+            background: 'none', border: 'none', cursor: 'pointer', padding: '0', fontWeight: '600'
+          }}>{pinnedId === msg.id ? '📌 Pinned' : '📌 Pin'}</button>
+        )}
+        {canAct && (
+          <button onClick={() => onDelete(msg)} style={{
+            fontSize: '11px', color: '#B91C1C', background: 'none',
+            border: 'none', cursor: 'pointer', padding: '0', fontWeight: '600'
+          }}>Delete Poll</button>
+        )}
+      </div>
     </div>
   );
 }
@@ -135,7 +143,7 @@ function MessageList({ messages, currentUser, isAdmin, isCoach, pinnedId, bottom
                 color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center',
                 fontSize: '13px', fontWeight: '700', fontFamily: 'Oswald, sans-serif', flexShrink: 0
               }}>{(msg.authorName || '?')[0].toUpperCase()}</div>
-              <PollMessage msg={msg} currentUser={currentUser} onVote={onVote} canAct={isAdmin || msg.authorId === currentUser?.uid} onDelete={onDelete} />
+              <PollMessage msg={msg} currentUser={currentUser} onVote={onVote} canAct={isAdmin || msg.authorId === currentUser?.uid} isCoach={isCoach} pinnedId={pinnedId} onPin={onPin} onDelete={onDelete} />
             </div>
           );
         }
@@ -318,13 +326,15 @@ export default function Chat() {
   };
 
   const handlePin = async (msg) => {
-    // Tapping the pinned message's pin button unpins it
     if (pinnedMsgId === msg.id) {
       await setDoc(doc(db, 'settings', 'pinnedMessage'), { text: '' });
       return;
     }
+    const displayText = msg.type === 'poll'
+      ? `📊 Poll: ${msg.question}`
+      : msg.text;
     await setDoc(doc(db, 'settings', 'pinnedMessage'), {
-      text: msg.text,
+      text: displayText,
       msgId: msg.id,
       authorName: msg.authorName,
       createdAt: new Date().toISOString()
