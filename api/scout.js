@@ -1,11 +1,17 @@
+/**
+ * Vercel serverless function — generates AI scouting report using Google Gemini Flash.
+ *
+ * Required Vercel environment variable:
+ *   GEMINI_API_KEY  — free key from aistudio.google.com → "Get API key"
+ */
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+  const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
-    return res.status(500).json({ error: 'API key not configured' });
+    return res.status(500).json({ error: 'GEMINI_API_KEY not configured' });
   }
 
   const { playerName, stats = {}, career = {}, ratings = {} } = req.body || {};
@@ -44,30 +50,28 @@ ${ratingLines || '  (no ratings yet)'}
 Write a 3–4 sentence scouting report. Lead with a clear strength, mention one area of focus, and close with an encouraging statement about their development. Be specific to the stats and ratings provided. Do not use bullet points — write in paragraph form.`;
 
   try {
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 350,
-        messages: [{ role: 'user', content: prompt }],
-      }),
-    });
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: { maxOutputTokens: 350, temperature: 0.7 },
+        }),
+      }
+    );
 
     const data = await response.json();
     if (!response.ok) {
-      return res.status(502).json({ error: data.error?.message || 'Claude API error' });
+      return res.status(502).json({ error: data.error?.message || 'Gemini API error' });
     }
 
-    const report = data.content?.[0]?.text?.trim();
-    if (!report) return res.status(502).json({ error: 'Empty response from Claude' });
+    const report = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+    if (!report) return res.status(502).json({ error: 'Empty response from Gemini' });
 
     res.status(200).json({ report });
-  } catch (err) {
+  } catch {
     res.status(500).json({ error: 'Failed to generate report' });
   }
 }
