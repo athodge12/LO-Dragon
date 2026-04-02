@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { collection, onSnapshot, doc, setDoc, getDoc, query, orderBy } from 'firebase/firestore';
+import { collection, onSnapshot, doc, setDoc, getDoc, getDocs, query, orderBy } from 'firebase/firestore';
 import { db } from '../../firebase/config';
 import { useAuth } from '../../contexts/AuthContext';
 import Header from '../../components/Layout/Header';
@@ -9,6 +9,15 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, LineCh
 
 const FIELDING_POSITIONS = ['Catcher','1st Base','2nd Base','3rd Base','Shortstop','Left Field','Left Center','Right Center','Right Field'];
 const POS_SHORT = { 'Catcher':'C','1st Base':'1B','2nd Base':'2B','3rd Base':'3B','Shortstop':'SS','Left Field':'LF','Left Center':'LC','Right Center':'RC','Right Field':'RF' };
+
+const PRACTICE_HIT_ZONES = [
+  { key: 'lf',         label: 'LF', row: 0 }, { key: 'lc',         label: 'LC', row: 0 },
+  { key: 'cf',         label: 'CF', row: 0 }, { key: 'rc',         label: 'RC', row: 0 },
+  { key: 'rf',         label: 'RF', row: 0 }, { key: 'thirdBase',  label: '3B', row: 1 },
+  { key: 'ss',         label: 'SS', row: 1 }, { key: 'pitcher',    label: 'P',  row: 1 },
+  { key: 'secondBase', label: '2B', row: 1 }, { key: 'firstBase',  label: '1B', row: 1 },
+];
+const BLANK_ZONES = { lf:0, lc:0, cf:0, rc:0, rf:0, thirdBase:0, ss:0, pitcher:0, secondBase:0, firstBase:0 };
 
 export default function Stats() {
   const { isCoach, isBookkeeper } = useAuth();
@@ -672,26 +681,132 @@ export default function Stats() {
     );
   };
 
-  const PracticeStatsView = () => {
-    const fmtAvg = (agg) => {
-      if (!agg?.ab) return '.---';
-      return '.' + String(Math.round((agg.avg ?? (agg.hits / agg.ab)) * 1000)).padStart(3, '0');
+  const PracticeReviewView = () => {
+    const [selectedDate, setSelectedDate] = useState(null);
+    const [hitZones, setHitZones] = useState(BLANK_ZONES);
+    const [loadingZones, setLoadingZones] = useState(false);
+
+    // All practice dates across all players, newest first
+    const allDates = [...new Set(
+      players.flatMap(p => Object.keys(allStats[p.id]?.practiceLogs || {}))
+    )].sort((a, b) => b.localeCompare(a));
+
+    // Label for each date (from the first player that has a log entry for it)
+    const dateLabels = {};
+    allDates.forEach(date => {
+      const p = players.find(pl => allStats[pl.id]?.practiceLogs?.[date]?.label);
+      dateLabels[date] = p ? allStats[p.id].practiceLogs[date].label : date;
+    });
+
+    useEffect(() => {
+      if (allDates.length === 0) { setHitZones(BLANK_ZONES); return; }
+      setLoadingZones(true);
+      if (selectedDate) {
+        getDoc(doc(db, 'settings', 'practiceHitZones_' + selectedDate)).then(snap => {
+          setHitZones(snap.exists() ? { ...BLANK_ZONES, ...snap.data() } : BLANK_ZONES);
+          setLoadingZones(false);
+        });
+      } else {
+        Promise.all(allDates.map(d => getDoc(doc(db, 'settings', 'practiceHitZones_' + d)))).then(snaps => {
+          const totals = { ...BLANK_ZONES };
+          snaps.forEach(snap => {
+            if (!snap.exists()) return;
+            Object.keys(BLANK_ZONES).forEach(k => { totals[k] = (totals[k] || 0) + (snap.data()[k] || 0); });
+          });
+          setHitZones(totals);
+          setLoadingZones(false);
+        });
+      }
+    }, [selectedDate, allDates.join(',')]); // eslint-disable-line
+
+    const fmtAvg = (entry) => {
+      if (!entry?.ab) return '.---';
+      const hits = entry.hits ?? ((entry.singles||0)+(entry.doubles||0)+(entry.triples||0)+(entry.hr||0));
+      return '.' + String(Math.round((hits / entry.ab) * 1000)).padStart(3, '0');
     };
 
-    // Players with any practice data
-    const withPractice = players.filter(p => allStats[p.id]?.practiceAgg);
-
-    if (withPractice.length === 0) return (
+    if (allDates.length === 0) return (
       <div className="empty-state" style={{ marginTop: '24px' }}>
         <p style={{ fontSize: '32px' }}>🏋️</p>
         <p>No practice stats yet</p>
-        <p style={{ fontSize: '13px', color: 'var(--gray-400)', marginTop: '4px' }}>Tap 📊 Stats on the Practice page during practice to start logging.</p>
+        <p style={{ fontSize: '13px', color: 'var(--gray-400)', marginTop: '4px' }}>Tap Stats on the Practice page during practice to start logging.</p>
       </div>
     );
 
+    const totalHits = Object.values(hitZones).reduce((s, v) => s + v, 0);
+    const row0 = PRACTICE_HIT_ZONES.filter(z => z.row === 0);
+    const row1 = PRACTICE_HIT_ZONES.filter(z => z.row === 1);
+
+    // Batting rows for the selected view
+    const battingRows = players
+      .map(p => ({ p, entry: selectedDate ? allStats[p.id]?.practiceLogs?.[selectedDate] : allStats[p.id]?.practiceAgg }))
+      .filter(({ entry }) => entry && (entry.ab > 0 || (entry.hits ?? 0) > 0));
+
     return (
       <div style={{ marginTop: '14px' }}>
-        {/* Hitting at Practice */}
+
+        {/* Date selector */}
+        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '16px' }}>
+          <button onClick={() => setSelectedDate(null)} style={{
+            padding: '6px 14px', borderRadius: '20px', cursor: 'pointer', fontWeight: '700', fontSize: '12px', whiteSpace: 'nowrap',
+            border: `1.5px solid ${selectedDate === null ? 'var(--red)' : 'var(--gray-200)'}`,
+            background: selectedDate === null ? '#FEF2F2' : 'white',
+            color: selectedDate === null ? 'var(--red)' : 'var(--gray-500)',
+          }}>All</button>
+          {allDates.map(date => (
+            <button key={date} onClick={() => setSelectedDate(date)} style={{
+              padding: '6px 14px', borderRadius: '20px', cursor: 'pointer', fontWeight: '700', fontSize: '12px', whiteSpace: 'nowrap',
+              border: `1.5px solid ${selectedDate === date ? 'var(--red)' : 'var(--gray-200)'}`,
+              background: selectedDate === date ? '#FEF2F2' : 'white',
+              color: selectedDate === date ? 'var(--red)' : 'var(--gray-500)',
+            }}>{dateLabels[date]}</button>
+          ))}
+        </div>
+
+        {/* Hit Zone Grid */}
+        <div style={{ fontFamily: 'Oswald, sans-serif', fontSize: '15px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '10px' }}>
+          Hit Zones
+        </div>
+        <div className="card" style={{ marginBottom: '16px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+            <span style={{ fontSize: '12px', fontWeight: '600', color: 'var(--gray-500)' }}>
+              {selectedDate ? (dateLabels[selectedDate] || selectedDate) : 'All Practices Combined'}
+            </span>
+            <span style={{ fontSize: '12px', color: 'var(--gray-400)' }}>{totalHits} total hits</span>
+          </div>
+          {loadingZones ? (
+            <p style={{ textAlign: 'center', color: 'var(--gray-400)', fontSize: '13px', padding: '12px 0' }}>Loading…</p>
+          ) : (
+            <>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '6px', marginBottom: '6px' }}>
+                {row0.map(z => (
+                  <div key={z.key} style={{
+                    padding: '10px 4px', borderRadius: '10px', textAlign: 'center',
+                    background: hitZones[z.key] > 0 ? '#FEF2F2' : 'var(--gray-100)',
+                    borderBottom: hitZones[z.key] > 0 ? '3px solid var(--red)' : '3px solid transparent',
+                  }}>
+                    <div style={{ fontSize: '10px', fontWeight: '700', color: 'var(--gray-500)', textTransform: 'uppercase' }}>{z.label}</div>
+                    <div style={{ fontFamily: 'Oswald, sans-serif', fontSize: '22px', fontWeight: '700', color: hitZones[z.key] > 0 ? 'var(--red)' : 'var(--gray-300)', lineHeight: 1 }}>{hitZones[z.key]}</div>
+                  </div>
+                ))}
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '6px' }}>
+                {row1.map(z => (
+                  <div key={z.key} style={{
+                    padding: '10px 4px', borderRadius: '10px', textAlign: 'center',
+                    background: hitZones[z.key] > 0 ? '#FFF7ED' : 'var(--gray-100)',
+                    borderBottom: hitZones[z.key] > 0 ? '3px solid #F59E0B' : '3px solid transparent',
+                  }}>
+                    <div style={{ fontSize: '10px', fontWeight: '700', color: 'var(--gray-500)', textTransform: 'uppercase' }}>{z.label}</div>
+                    <div style={{ fontFamily: 'Oswald, sans-serif', fontSize: '22px', fontWeight: '700', color: hitZones[z.key] > 0 ? '#D97706' : 'var(--gray-300)', lineHeight: 1 }}>{hitZones[z.key]}</div>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* Hitting table */}
         <div style={{ fontFamily: 'Oswald, sans-serif', fontSize: '15px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '10px' }}>
           🏏 Hitting at Practice
         </div>
@@ -705,19 +820,20 @@ export default function Stats() {
               </tr>
             </thead>
             <tbody>
-              {withPractice.map((p, i) => {
-                const agg = allStats[p.id].practiceAgg;
-                const hits = (agg.singles||0)+(agg.doubles||0)+(agg.triples||0)+(agg.hr||0);
+              {battingRows.length === 0 ? (
+                <tr><td colSpan={8} style={{ padding: '16px', textAlign: 'center', color: 'var(--gray-400)', fontSize: '13px' }}>No batting data for this practice</td></tr>
+              ) : battingRows.map(({ p, entry }, i) => {
+                const hits = entry.hits ?? ((entry.singles||0)+(entry.doubles||0)+(entry.triples||0)+(entry.hr||0));
                 return (
-                  <tr key={p.id} style={{ borderBottom: i < withPractice.length - 1 ? '1px solid var(--gray-100)' : 'none' }}>
+                  <tr key={p.id} style={{ borderBottom: i < battingRows.length - 1 ? '1px solid var(--gray-100)' : 'none' }}>
                     <td style={{ padding: '8px 6px', fontWeight: '700' }}>{getPlayerName(p)}</td>
-                    <td style={{ padding: '8px 6px', textAlign: 'center', fontFamily: 'Oswald, sans-serif', fontWeight: '700', color: 'var(--red)' }}>{fmtAvg(agg)}</td>
-                    <td style={{ padding: '8px 6px', textAlign: 'center' }}>{agg.ab||0}</td>
+                    <td style={{ padding: '8px 6px', textAlign: 'center', fontFamily: 'Oswald, sans-serif', fontWeight: '700', color: 'var(--red)' }}>{fmtAvg(entry)}</td>
+                    <td style={{ padding: '8px 6px', textAlign: 'center' }}>{entry.ab||0}</td>
                     <td style={{ padding: '8px 6px', textAlign: 'center' }}>{hits}</td>
-                    <td style={{ padding: '8px 6px', textAlign: 'center' }}>{agg.hr||0}</td>
-                    <td style={{ padding: '8px 6px', textAlign: 'center' }}>{agg.rbi||0}</td>
-                    <td style={{ padding: '8px 6px', textAlign: 'center' }}>{agg.k||0}</td>
-                    <td style={{ padding: '8px 6px', textAlign: 'center' }}>{agg.bb||0}</td>
+                    <td style={{ padding: '8px 6px', textAlign: 'center' }}>{entry.hr||0}</td>
+                    <td style={{ padding: '8px 6px', textAlign: 'center' }}>{entry.rbi||0}</td>
+                    <td style={{ padding: '8px 6px', textAlign: 'center' }}>{entry.k||0}</td>
+                    <td style={{ padding: '8px 6px', textAlign: 'center' }}>{entry.bb||0}</td>
                   </tr>
                 );
               })}
@@ -725,15 +841,18 @@ export default function Stats() {
           </table>
         </div>
 
-        {/* Fielding at Practice — by position */}
+        {/* Fielding by position */}
         <div style={{ fontFamily: 'Oswald, sans-serif', fontSize: '15px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '10px' }}>
           🧤 Fielding at Practice
         </div>
         {FIELDING_POSITIONS.map(pos => {
-          const rows = withPractice
-            .map(p => ({ p, f: allStats[p.id]?.practiceAgg?.fielding?.[pos] }))
+          const rows = players
+            .map(p => {
+              const src = selectedDate ? allStats[p.id]?.practiceLogs?.[selectedDate]?.fielding : allStats[p.id]?.practiceAgg?.fielding;
+              return { p, f: src?.[pos] };
+            })
             .filter(({ f }) => f && f.innings > 0)
-            .sort((a, b) => (a.f.errors || 0) - (b.f.errors || 0));
+            .sort((a, b) => (a.f.errors||0) - (b.f.errors||0));
           if (!rows.length) return null;
           return (
             <div key={pos} style={{ marginBottom: '14px' }}>
@@ -829,7 +948,7 @@ export default function Stats() {
         {tab === 'fielding' && <RotationView />}
         {tab === 'history' && <SeasonHistory />}
         {tab === 'log' && <GameLogView />}
-        {tab === 'practice' && isCoach && <PracticeStatsView />}
+        {tab === 'practice' && isCoach && <PracticeReviewView />}
 
         {/* Stat Glossary */}
         <div className="card" style={{ marginTop: '14px' }}>
