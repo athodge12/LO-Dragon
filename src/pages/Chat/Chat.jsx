@@ -88,7 +88,7 @@ function RoleBadge({ role }) {
   );
 }
 
-function MessageList({ messages, currentUser, isAdmin, isCoach, pinnedId, bottomRef, onDelete, onEdit, onVote, onPin }) {
+function MessageList({ messages, currentUser, isAdmin, isCoach, pinnedId, highlightedId, bottomRef, onDelete, onEdit, onVote, onPin }) {
   const [editingId, setEditingId] = useState(null);
   const [editText, setEditText] = useState('');
 
@@ -137,7 +137,7 @@ function MessageList({ messages, currentUser, isAdmin, isCoach, pinnedId, bottom
 
         if (msg.type === 'poll') {
           return (
-            <div key={msg.id} style={{ display: 'flex', flexDirection: 'row', gap: '8px', alignItems: 'flex-end' }}>
+            <div key={msg.id} id={msg.id} style={{ display: 'flex', flexDirection: 'row', gap: '8px', alignItems: 'flex-end', borderRadius: '12px', transition: 'background 0.4s', background: highlightedId === msg.id ? '#FEF2F2' : 'transparent' }}>
               <div style={{
                 width: 32, height: 32, borderRadius: '50%', background: 'var(--red)',
                 color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -149,10 +149,13 @@ function MessageList({ messages, currentUser, isAdmin, isCoach, pinnedId, bottom
         }
 
         return (
-          <div key={msg.id} style={{
+          <div key={msg.id} id={msg.id} style={{
             display: 'flex',
             flexDirection: isMe ? 'row-reverse' : 'row',
-            gap: '8px', alignItems: 'flex-end'
+            gap: '8px', alignItems: 'flex-end',
+            borderRadius: '12px', padding: '4px',
+            transition: 'background 0.4s',
+            background: highlightedId === msg.id ? '#FEF2F2' : 'transparent'
           }}>
             {!isMe && (
               <div style={{
@@ -256,6 +259,7 @@ export default function Chat() {
   const [showPollModal, setShowPollModal] = useState(false);
   const [pollQuestion, setPollQuestion] = useState('');
   const [pollOptions, setPollOptions] = useState(['', '']);
+  const [jumpHighlight, setJumpHighlight] = useState(null);
   const bottomRef = useRef(null);
 
   useEffect(() => {
@@ -408,15 +412,25 @@ export default function Chat() {
 
       {/* Pinned message — fixed below the tabs so it never scrolls away */}
       {activeTab === 'team' && pinned?.text && (
-        <div style={{
-          position: 'fixed',
-          top: 'calc(var(--header-height) + 45px)',
-          left: '50%', transform: 'translateX(-50%)',
-          width: '100%', maxWidth: 'var(--max-width)',
-          background: '#FFF5F5', borderBottom: '2px solid #FECACA',
-          padding: '10px 16px', display: 'flex', gap: '10px', alignItems: 'flex-start',
-          zIndex: 9, boxSizing: 'border-box'
-        }}>
+        <div
+          onClick={() => {
+            if (!pinnedMsgId) return;
+            const el = document.getElementById(pinnedMsgId);
+            if (el) {
+              el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              setJumpHighlight(pinnedMsgId);
+              setTimeout(() => setJumpHighlight(null), 1500);
+            }
+          }}
+          style={{
+            position: 'fixed',
+            top: 'calc(var(--header-height) + 45px)',
+            left: '50%', transform: 'translateX(-50%)',
+            width: '100%', maxWidth: 'var(--max-width)',
+            background: '#FFF5F5', borderBottom: '2px solid #FECACA',
+            padding: '10px 16px', display: 'flex', gap: '10px', alignItems: 'flex-start',
+            zIndex: 9, boxSizing: 'border-box', cursor: 'pointer'
+          }}>
           <span style={{ fontSize: '16px', flexShrink: 0, marginTop: '1px' }}>📌</span>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: '10px', fontWeight: '700', color: 'var(--red)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '2px' }}>
@@ -454,6 +468,7 @@ export default function Chat() {
           isAdmin={isActualAdmin}
           isCoach={isCoach && activeTab === 'team'}
           pinnedId={pinnedMsgId}
+          highlightedId={jumpHighlight}
           bottomRef={bottomRef}
           onDelete={handleDelete}
           onEdit={handleEdit}
