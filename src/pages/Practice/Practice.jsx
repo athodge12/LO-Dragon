@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
-import { doc, onSnapshot, setDoc, collection, getDocs, writeBatch } from 'firebase/firestore';
+import { doc, onSnapshot, setDoc, collection, getDocs, writeBatch, query, orderBy } from 'firebase/firestore';
 import { db } from '../../firebase/config';
 import { useAuth } from '../../contexts/AuthContext';
 import Header from '../../components/Layout/Header';
 import Toast from '../../components/UI/Toast';
+import LogPracticeModal from '../../components/LogPracticeModal';
 import { DRILLS as SEED_DRILLS, CATEGORIES, TUESDAY_PLAN, THURSDAY_PLAN } from '../../data/drills';
 
 const DAY_MAP = { Sunday: 0, Monday: 1, Tuesday: 2, Wednesday: 3, Thursday: 4, Friday: 5, Saturday: 6 };
@@ -36,6 +37,8 @@ export default function Practice() {
   const [toast, setToast] = useState('');
   const [customPlan, setCustomPlan] = useState({ duration: 75, drills: [] });
   const [practiceDetailModal, setPracticeDetailModal] = useState(null);
+  const [showPracticeStats, setShowPracticeStats] = useState(false);
+  const [players, setPlayers] = useState([]);
 
   useEffect(() => {
     // Seed drills collection from static data if it's empty
@@ -68,7 +71,10 @@ export default function Practice() {
       }),
       onSnapshot(doc(db, 'settings', 'cancelledPractices'), snap => {
         setCancelledSlots(snap.exists() ? snap.data() : {});
-      })
+      }),
+      onSnapshot(query(collection(db, 'roster'), orderBy('createdAt')), snap => {
+        setPlayers(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      }),
     ];
     return () => unsubs.forEach(u => u());
   }, []);
@@ -112,7 +118,12 @@ export default function Practice() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
-      <Header title="Practice" />
+      <Header title="Practice" actions={isCoach && (
+        <button onClick={() => setShowPracticeStats(true)} style={{
+          background: 'rgba(255,255,255,0.15)', border: 'none', borderRadius: '8px',
+          padding: '0 12px', height: 36, color: 'white', cursor: 'pointer', fontSize: '13px', fontWeight: '700'
+        }}>📊 Stats</button>
+      )} />
 
       <div className="page-content">
 
@@ -346,6 +357,14 @@ export default function Practice() {
         />
       )}
 
+      {showPracticeStats && (
+        <LogPracticeModal
+          players={players}
+          practiceSchedule={practiceSchedule}
+          onClose={() => setShowPracticeStats(false)}
+          onSaved={msg => { setToast(msg); setShowPracticeStats(false); }}
+        />
+      )}
       {toast && <Toast message={toast} onDismiss={() => setToast('')} />}
     </div>
   );

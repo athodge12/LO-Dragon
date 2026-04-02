@@ -59,6 +59,8 @@ export default function PlayerProfile() {
   const [toast, setToast] = useState('');
   const [scoutingReport, setScoutingReport] = useState(null);
   const [reportLoading, setReportLoading] = useState(false);
+  const [practiceAgg, setPracticeAgg] = useState(null);
+  const [practiceOpen, setPracticeOpen] = useState(false);
 
   useEffect(() => {
     const unsubs = [];
@@ -71,6 +73,7 @@ export default function PlayerProfile() {
         setCareer(data.career || {});
         setRatings(data.ratings || {});
         setScoutingReport(data.scoutingReport || null);
+        setPracticeAgg(data.practiceAgg || null);
         // currentSeason updated below once we know the year
         unsubs.push(onSnapshot(doc(db, 'settings', 'season'), yearSnap => {
           const year = yearSnap.exists() ? yearSnap.data().year : '2026';
@@ -342,6 +345,60 @@ export default function PlayerProfile() {
             </div>
           )}
         </div>
+
+        {/* Practice Stats — coaches only */}
+        {isCoach && practiceAgg && (
+          <div className="card" style={{ marginBottom: '14px' }}>
+            <button onClick={() => setPracticeOpen(o => !o)} style={{
+              width: '100%', background: 'none', border: 'none', cursor: 'pointer', padding: 0,
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center'
+            }}>
+              <span style={{ fontFamily: 'Oswald, sans-serif', fontSize: '15px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.3px' }}>
+                🏋️ Practice Stats
+              </span>
+              <span style={{ fontSize: '18px', color: 'var(--gray-400)', transform: practiceOpen ? 'rotate(90deg)' : 'none', transition: 'transform 0.2s' }}>›</span>
+            </button>
+
+            {practiceOpen && (
+              <div style={{ marginTop: '12px' }}>
+                {/* Batting summary */}
+                <div style={{ fontSize: '11px', fontWeight: '700', color: 'var(--gray-500)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>Batting</div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '1px', background: 'var(--gray-200)', borderRadius: '8px', overflow: 'hidden', marginBottom: '14px' }}>
+                  {[
+                    { label: 'AVG', value: practiceAgg.ab > 0 ? '.' + String(Math.round((practiceAgg.avg ?? (practiceAgg.hits / practiceAgg.ab)) * 1000)).padStart(3,'0') : '.---' },
+                    { label: 'AB',  value: practiceAgg.ab   || 0 },
+                    { label: 'H',   value: (practiceAgg.singles||0)+(practiceAgg.doubles||0)+(practiceAgg.triples||0)+(practiceAgg.hr||0) },
+                    { label: 'HR',  value: practiceAgg.hr   || 0 },
+                    { label: 'RBI', value: practiceAgg.rbi  || 0 },
+                    { label: 'K',   value: practiceAgg.k    || 0 },
+                    { label: 'BB',  value: practiceAgg.bb   || 0 },
+                    { label: 'R',   value: practiceAgg.runs || 0 },
+                  ].map(({ label, value }) => (
+                    <div key={label} style={{ background: 'white', padding: '10px 6px', textAlign: 'center' }}>
+                      <div style={{ fontFamily: 'Oswald, sans-serif', fontSize: '18px', fontWeight: '700' }}>{value}</div>
+                      <div style={{ fontSize: '10px', color: 'var(--gray-500)', textTransform: 'uppercase', letterSpacing: '0.5px', marginTop: '2px' }}>{label}</div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Fielding breakdown */}
+                {practiceAgg.fielding && Object.keys(practiceAgg.fielding).length > 0 && (
+                  <>
+                    <div style={{ fontSize: '11px', fontWeight: '700', color: 'var(--gray-500)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>Fielding</div>
+                    {Object.entries(practiceAgg.fielding).map(([pos, f]) => (
+                      <div key={pos} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid var(--gray-100)' }}>
+                        <span style={{ fontWeight: '700', fontSize: '13px' }}>{pos}</span>
+                        <span style={{ fontSize: '13px', color: 'var(--gray-500)' }}>
+                          {f.innings}inn · {f.putouts}PO · {f.assists}A · <span style={{ color: f.errors > 0 ? 'var(--red)' : '#16A34A', fontWeight: '700' }}>{f.errors}E</span>
+                        </span>
+                      </div>
+                    ))}
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* AI Scouting Report */}
         <div className="card" style={{

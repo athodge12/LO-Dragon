@@ -672,6 +672,104 @@ export default function Stats() {
     );
   };
 
+  const PracticeStatsView = () => {
+    const fmtAvg = (agg) => {
+      if (!agg?.ab) return '.---';
+      return '.' + String(Math.round((agg.avg ?? (agg.hits / agg.ab)) * 1000)).padStart(3, '0');
+    };
+
+    // Players with any practice data
+    const withPractice = players.filter(p => allStats[p.id]?.practiceAgg);
+
+    if (withPractice.length === 0) return (
+      <div className="empty-state" style={{ marginTop: '24px' }}>
+        <p style={{ fontSize: '32px' }}>🏋️</p>
+        <p>No practice stats yet</p>
+        <p style={{ fontSize: '13px', color: 'var(--gray-400)', marginTop: '4px' }}>Tap 📊 Stats on the Practice page during practice to start logging.</p>
+      </div>
+    );
+
+    return (
+      <div style={{ marginTop: '14px' }}>
+        {/* Hitting at Practice */}
+        <div style={{ fontFamily: 'Oswald, sans-serif', fontSize: '15px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '10px' }}>
+          🏏 Hitting at Practice
+        </div>
+        <div className="card" style={{ padding: 0, overflow: 'hidden', marginBottom: '16px' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+            <thead>
+              <tr style={{ background: 'var(--gray-50)' }}>
+                {['Player','AVG','AB','H','HR','RBI','K','BB'].map(h => (
+                  <th key={h} style={{ padding: '8px 6px', fontWeight: '700', color: 'var(--gray-500)', fontSize: '11px', textTransform: 'uppercase', textAlign: h === 'Player' ? 'left' : 'center', borderBottom: '1px solid var(--gray-200)' }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {withPractice.map((p, i) => {
+                const agg = allStats[p.id].practiceAgg;
+                const hits = (agg.singles||0)+(agg.doubles||0)+(agg.triples||0)+(agg.hr||0);
+                return (
+                  <tr key={p.id} style={{ borderBottom: i < withPractice.length - 1 ? '1px solid var(--gray-100)' : 'none' }}>
+                    <td style={{ padding: '8px 6px', fontWeight: '700' }}>{getPlayerName(p)}</td>
+                    <td style={{ padding: '8px 6px', textAlign: 'center', fontFamily: 'Oswald, sans-serif', fontWeight: '700', color: 'var(--red)' }}>{fmtAvg(agg)}</td>
+                    <td style={{ padding: '8px 6px', textAlign: 'center' }}>{agg.ab||0}</td>
+                    <td style={{ padding: '8px 6px', textAlign: 'center' }}>{hits}</td>
+                    <td style={{ padding: '8px 6px', textAlign: 'center' }}>{agg.hr||0}</td>
+                    <td style={{ padding: '8px 6px', textAlign: 'center' }}>{agg.rbi||0}</td>
+                    <td style={{ padding: '8px 6px', textAlign: 'center' }}>{agg.k||0}</td>
+                    <td style={{ padding: '8px 6px', textAlign: 'center' }}>{agg.bb||0}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Fielding at Practice — by position */}
+        <div style={{ fontFamily: 'Oswald, sans-serif', fontSize: '15px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '10px' }}>
+          🧤 Fielding at Practice
+        </div>
+        {FIELDING_POSITIONS.map(pos => {
+          const rows = withPractice
+            .map(p => ({ p, f: allStats[p.id]?.practiceAgg?.fielding?.[pos] }))
+            .filter(({ f }) => f && f.innings > 0)
+            .sort((a, b) => (a.f.errors || 0) - (b.f.errors || 0));
+          if (!rows.length) return null;
+          return (
+            <div key={pos} style={{ marginBottom: '14px' }}>
+              <div style={{ fontWeight: '700', fontSize: '13px', color: 'var(--gray-600)', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ background: 'var(--gray-100)', borderRadius: '6px', padding: '2px 8px', fontFamily: 'Oswald, sans-serif' }}>{POS_SHORT[pos]}</span>
+                {pos}
+              </div>
+              <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                  <thead>
+                    <tr style={{ background: 'var(--gray-50)' }}>
+                      {['Player','Inn','PO','A','E'].map(h => (
+                        <th key={h} style={{ padding: '6px 8px', fontWeight: '700', color: 'var(--gray-500)', fontSize: '11px', textTransform: 'uppercase', textAlign: h === 'Player' ? 'left' : 'center', borderBottom: '1px solid var(--gray-200)' }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rows.map(({ p, f }, i) => (
+                      <tr key={p.id} style={{ borderBottom: i < rows.length - 1 ? '1px solid var(--gray-100)' : 'none' }}>
+                        <td style={{ padding: '7px 8px', fontWeight: '700' }}>{getPlayerName(p)}</td>
+                        <td style={{ padding: '7px 8px', textAlign: 'center' }}>{f.innings||0}</td>
+                        <td style={{ padding: '7px 8px', textAlign: 'center' }}>{f.putouts||0}</td>
+                        <td style={{ padding: '7px 8px', textAlign: 'center' }}>{f.assists||0}</td>
+                        <td style={{ padding: '7px 8px', textAlign: 'center', fontWeight: '700', color: (f.errors||0) > 2 ? 'var(--red)' : (f.errors||0) > 0 ? '#D97706' : '#16A34A' }}>{f.errors||0}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
       <Header title="Stats" actions={canEdit && (
@@ -722,6 +820,7 @@ export default function Stats() {
           <button className={`tab ${tab === 'fielding' ? 'active' : ''}`} onClick={() => setTab('fielding')}>Fielding</button>
           <button className={`tab ${tab === 'history' ? 'active' : ''}`} onClick={() => setTab('history')}>History</button>
           <button className={`tab ${tab === 'log' ? 'active' : ''}`} onClick={() => setTab('log')}>Game Log</button>
+          {isCoach && <button className={`tab ${tab === 'practice' ? 'active' : ''}`} onClick={() => setTab('practice')}>Practice</button>}
         </div>
 
         {tab === 'current' && <BattingTable getStats={getCurrentSeason} showEdit={true} />}
@@ -730,6 +829,7 @@ export default function Stats() {
         {tab === 'fielding' && <RotationView />}
         {tab === 'history' && <SeasonHistory />}
         {tab === 'log' && <GameLogView />}
+        {tab === 'practice' && isCoach && <PracticeStatsView />}
 
         {/* Stat Glossary */}
         <div className="card" style={{ marginTop: '14px' }}>
