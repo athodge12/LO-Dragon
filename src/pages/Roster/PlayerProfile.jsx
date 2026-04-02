@@ -57,6 +57,8 @@ export default function PlayerProfile() {
   const [editForm, setEditForm] = useState({});
   const [claimants, setClaimants] = useState([]);
   const [toast, setToast] = useState('');
+  const [scoutingReport, setScoutingReport] = useState(null);
+  const [reportLoading, setReportLoading] = useState(false);
 
   useEffect(() => {
     const unsubs = [];
@@ -68,6 +70,7 @@ export default function PlayerProfile() {
         const data = snap.data();
         setCareer(data.career || {});
         setRatings(data.ratings || {});
+        setScoutingReport(data.scoutingReport || null);
         // currentSeason updated below once we know the year
         unsubs.push(onSnapshot(doc(db, 'settings', 'season'), yearSnap => {
           const year = yearSnap.exists() ? yearSnap.data().year : '2026';
@@ -116,6 +119,31 @@ export default function PlayerProfile() {
     await setDoc(ref, { ...current, ratings: newRatings }, { merge: true });
     setRatings(newRatings);
     setToast('Ratings saved!');
+  };
+
+  const generateReport = async () => {
+    setReportLoading(true);
+    try {
+      const res = await fetch('/api/scout', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          playerName: player?.childName || player?.firstName || 'Player',
+          stats: currentSeason,
+          career,
+          ratings,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.report) throw new Error(data.error || 'Failed');
+      await setDoc(doc(db, 'playerStats', id), { scoutingReport: data.report }, { merge: true });
+      setScoutingReport(data.report);
+      setToast('Scouting report generated!');
+    } catch {
+      setToast('Could not generate report. Check API key is set in Vercel.');
+    } finally {
+      setReportLoading(false);
+    }
   };
 
   const radarData = radarCategories.map(cat => ({ category: cat, value: ratings[cat] || 5 }));
@@ -315,12 +343,12 @@ export default function PlayerProfile() {
           )}
         </div>
 
-        {/* AI Scouting Placeholder */}
+        {/* AI Scouting Report */}
         <div className="card" style={{
           background: 'linear-gradient(135deg, #1e1e2e, #2d1b4e)',
           border: 'none', marginBottom: '14px'
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
             <span style={{ fontSize: '20px' }}>🤖</span>
             <span style={{ fontFamily: 'Oswald, sans-serif', fontSize: '16px', color: 'white', textTransform: 'uppercase' }}>
               AI Scouting Report
@@ -328,11 +356,46 @@ export default function PlayerProfile() {
             <span style={{
               background: '#7C3AED', color: 'white', fontSize: '10px',
               padding: '2px 8px', borderRadius: '10px', fontWeight: '700'
-            }}>COMING SOON</span>
+            }}>Claude AI</span>
           </div>
-          <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.6)', lineHeight: '1.5' }}>
-            Powered by Claude AI — personalized scouting reports based on stats, ratings, and game performance.
-          </p>
+
+          {scoutingReport ? (
+            <>
+              <p style={{ fontSize: '14px', color: 'rgba(255,255,255,0.9)', lineHeight: '1.7', marginBottom: '12px' }}>
+                {scoutingReport}
+              </p>
+              {isCoach && (
+                <button onClick={generateReport} disabled={reportLoading} style={{
+                  background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)',
+                  borderRadius: '8px', padding: '7px 14px', color: 'rgba(255,255,255,0.7)',
+                  fontSize: '12px', fontWeight: '600', cursor: reportLoading ? 'not-allowed' : 'pointer'
+                }}>
+                  {reportLoading ? '⏳ Generating...' : '🔄 Regenerate'}
+                </button>
+              )}
+            </>
+          ) : (
+            <>
+              <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.5)', lineHeight: '1.5', marginBottom: '12px' }}>
+                Personalized scouting report based on stats, ratings, and game performance.
+              </p>
+              {isCoach && (
+                <button onClick={generateReport} disabled={reportLoading} style={{
+                  background: reportLoading ? 'rgba(124,58,237,0.5)' : '#7C3AED',
+                  border: 'none', borderRadius: '8px', padding: '10px 18px',
+                  color: 'white', fontSize: '14px', fontWeight: '700',
+                  cursor: reportLoading ? 'not-allowed' : 'pointer', width: '100%'
+                }}>
+                  {reportLoading ? '⏳ Generating Report...' : '✨ Generate Report'}
+                </button>
+              )}
+              {!isCoach && (
+                <p style={{ fontSize: '13px', color: 'rgba(255,255,255,0.4)', fontStyle: 'italic' }}>
+                  Coach will generate a scouting report here.
+                </p>
+              )}
+            </>
+          )}
         </div>
       </div>
 
