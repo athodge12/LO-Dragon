@@ -433,6 +433,22 @@ function DrillModal({ drill, onClose }) {
           <p style={{ fontSize: '14px', color: '#92400E', lineHeight: '1.5' }}>{drill.tip}</p>
         </div>
 
+        {drill.youtube && (
+          <a
+            href={drill.youtube}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+              width: '100%', padding: '13px', borderRadius: '10px', marginBottom: '10px',
+              background: '#FF0000', color: 'white', fontWeight: '700', fontSize: '15px',
+              textDecoration: 'none', boxSizing: 'border-box'
+            }}
+          >
+            ▶ Watch Example on YouTube
+          </a>
+        )}
+
         <button className="btn-secondary" onClick={onClose} style={{ width: '100%' }}>Close</button>
       </div>
     </div>
