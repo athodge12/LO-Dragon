@@ -4,6 +4,63 @@ import { db } from '../../firebase/config';
 import { useAuth } from '../../contexts/AuthContext';
 import Header from '../../components/Layout/Header';
 
+function PollMessage({ msg, currentUser, onVote, canAct, onDelete }) {
+  const votes = msg.votes || {};
+  const totalVotes = msg.options.reduce((s, _, i) => s + (votes[i]?.length || 0), 0);
+  const myVote = msg.options.findIndex((_, i) => (votes[i] || []).includes(currentUser?.uid));
+
+  return (
+    <div style={{
+      background: 'white', border: '1.5px solid var(--gray-200)',
+      borderRadius: '14px', padding: '14px', maxWidth: '300px'
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '10px' }}>
+        <span style={{ fontSize: '16px' }}>📊</span>
+        <span style={{ fontWeight: '700', fontSize: '15px', color: 'var(--black)', lineHeight: '1.3' }}>{msg.question}</span>
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '7px' }}>
+        {msg.options.map((opt, i) => {
+          const count = votes[i]?.length || 0;
+          const pct = totalVotes > 0 ? Math.round((count / totalVotes) * 100) : 0;
+          const isMyVote = myVote === i;
+          return (
+            <button key={i} onClick={() => onVote(msg, i)} style={{
+              width: '100%', textAlign: 'left', border: `1.5px solid ${isMyVote ? 'var(--red)' : 'var(--gray-200)'}`,
+              borderRadius: '8px', padding: '0', cursor: 'pointer', overflow: 'hidden',
+              background: isMyVote ? '#FEF2F2' : 'var(--gray-50)', position: 'relative'
+            }}>
+              {totalVotes > 0 && (
+                <div style={{
+                  position: 'absolute', top: 0, left: 0, height: '100%',
+                  width: `${pct}%`, background: isMyVote ? 'rgba(204,27,27,0.12)' : 'rgba(0,0,0,0.05)',
+                  borderRadius: '6px', transition: 'width 0.3s'
+                }} />
+              )}
+              <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 10px' }}>
+                <span style={{ fontSize: '13px', fontWeight: isMyVote ? '700' : '500', color: isMyVote ? 'var(--red)' : 'var(--black)' }}>
+                  {isMyVote ? '✓ ' : ''}{opt}
+                </span>
+                <span style={{ fontSize: '12px', color: 'var(--gray-400)', fontWeight: '600' }}>
+                  {totalVotes > 0 ? `${pct}%` : ''}
+                </span>
+              </div>
+            </button>
+          );
+        })}
+      </div>
+      <div style={{ fontSize: '11px', color: 'var(--gray-400)', marginTop: '8px' }}>
+        {totalVotes} vote{totalVotes !== 1 ? 's' : ''} · {msg.authorName}
+      </div>
+      {canAct && (
+        <button onClick={() => onDelete(msg)} style={{
+          fontSize: '11px', color: '#B91C1C', background: 'none',
+          border: 'none', cursor: 'pointer', padding: '4px 0 0', fontWeight: '600', display: 'block'
+        }}>Delete Poll</button>
+      )}
+    </div>
+  );
+}
+
 const ROLE_BADGE = {
   coach: { label: 'Coach', color: 'var(--red)', bg: '#FEE2E2' },
   bookkeeper: { label: 'Bookkeeper', color: '#7C3AED', bg: '#EDE9FE' },
@@ -23,7 +80,7 @@ function RoleBadge({ role }) {
   );
 }
 
-function MessageList({ messages, currentUser, isAdmin, bottomRef, onDelete, onEdit }) {
+function MessageList({ messages, currentUser, isAdmin, bottomRef, onDelete, onEdit, onVote }) {
   const [editingId, setEditingId] = useState(null);
   const [editText, setEditText] = useState('');
 
@@ -69,6 +126,19 @@ function MessageList({ messages, currentUser, isAdmin, bottomRef, onDelete, onEd
         const isMe = msg.authorId === currentUser?.uid;
         const canAct = isMe || isAdmin;
         const isEditing = editingId === msg.id;
+
+        if (msg.type === 'poll') {
+          return (
+            <div key={msg.id} style={{ display: 'flex', flexDirection: 'row', gap: '8px', alignItems: 'flex-end' }}>
+              <div style={{
+                width: 32, height: 32, borderRadius: '50%', background: 'var(--red)',
+                color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: '13px', fontWeight: '700', fontFamily: 'Oswald, sans-serif', flexShrink: 0
+              }}>{(msg.authorName || '?')[0].toUpperCase()}</div>
+              <PollMessage msg={msg} currentUser={currentUser} onVote={onVote} canAct={isAdmin || msg.authorId === currentUser?.uid} onDelete={onDelete} />
+            </div>
+          );
+        }
 
         return (
           <div key={msg.id} style={{
@@ -168,6 +238,9 @@ export default function Chat() {
   const [pinned, setPinned] = useState(null);
   const [pinnedText, setPinnedText] = useState('');
   const [showPinModal, setShowPinModal] = useState(false);
+  const [showPollModal, setShowPollModal] = useState(false);
+  const [pollQuestion, setPollQuestion] = useState('');
+  const [pollOptions, setPollOptions] = useState(['', '']);
   const bottomRef = useRef(null);
 
   useEffect(() => {
@@ -230,6 +303,36 @@ export default function Chat() {
 
   const clearPinned = async () => {
     await setDoc(doc(db, 'settings', 'pinnedMessage'), { text: '' });
+  };
+
+  const createPoll = async () => {
+    const opts = pollOptions.map(o => o.trim()).filter(Boolean);
+    if (!pollQuestion.trim() || opts.length < 2) return;
+    await addDoc(collection(db, 'messages'), {
+      type: 'poll',
+      question: pollQuestion.trim(),
+      options: opts,
+      votes: {},
+      authorId: currentUser.uid,
+      authorName: chatDisplayName,
+      role: userProfile?.role || 'coach',
+      createdAt: new Date().toISOString()
+    });
+    setPollQuestion('');
+    setPollOptions(['', '']);
+    setShowPollModal(false);
+  };
+
+  const handleVote = async (msg, optionIdx) => {
+    if (!currentUser) return;
+    const votes = msg.votes || {};
+    const newVotes = {};
+    msg.options.forEach((_, i) => {
+      newVotes[i] = (votes[i] || []).filter(uid => uid !== currentUser.uid);
+    });
+    const alreadyVoted = (votes[optionIdx] || []).includes(currentUser.uid);
+    if (!alreadyVoted) newVotes[optionIdx] = [...newVotes[optionIdx], currentUser.uid];
+    await updateDoc(doc(db, 'messages', msg.id), { votes: newVotes });
   };
 
   const currentMessages = activeTab === 'team' ? teamMessages : fanMessages;
@@ -310,6 +413,7 @@ export default function Chat() {
           bottomRef={bottomRef}
           onDelete={handleDelete}
           onEdit={handleEdit}
+          onVote={handleVote}
         />
 
         {/* Input */}
@@ -321,6 +425,14 @@ export default function Chat() {
           display: 'flex', gap: '8px', alignItems: 'center',
           boxSizing: 'border-box'
         }}>
+          {isCoach && activeTab === 'team' && (
+            <button onClick={() => setShowPollModal(true)} title="Create Poll" style={{
+              width: 40, height: 40, borderRadius: '50%', flexShrink: 0,
+              background: 'var(--gray-100)', border: '1.5px solid var(--gray-200)',
+              cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: '18px'
+            }}>📊</button>
+          )}
           <textarea
             value={text}
             onChange={e => setText(e.target.value)}
@@ -347,6 +459,51 @@ export default function Chat() {
           </button>
         </div>
       </div>
+
+      {/* Poll Modal */}
+      {showPollModal && (
+        <div className="modal-overlay" onClick={() => setShowPollModal(false)}>
+          <div className="modal-sheet" onClick={e => e.stopPropagation()} style={{ maxHeight: '85vh', overflowY: 'auto' }}>
+            <div className="modal-handle" />
+            <h3 style={{ fontFamily: 'Oswald, sans-serif', fontSize: '20px', marginBottom: '16px', textTransform: 'uppercase' }}>
+              📊 Create Poll
+            </h3>
+            <div className="form-group">
+              <label className="form-label">Question</label>
+              <input className="form-input" value={pollQuestion} onChange={e => setPollQuestion(e.target.value)}
+                placeholder="e.g. Which day works best for you?" autoFocus />
+            </div>
+            <label className="form-label">Options</label>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '12px' }}>
+              {pollOptions.map((opt, i) => (
+                <div key={i} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <input className="form-input" style={{ flex: 1, marginBottom: 0 }} value={opt}
+                    onChange={e => setPollOptions(o => o.map((v, j) => j === i ? e.target.value : v))}
+                    placeholder={`Option ${i + 1}`} />
+                  {pollOptions.length > 2 && (
+                    <button onClick={() => setPollOptions(o => o.filter((_, j) => j !== i))} style={{
+                      background: 'none', border: 'none', color: '#B91C1C',
+                      cursor: 'pointer', fontSize: '20px', flexShrink: 0, lineHeight: 1
+                    }}>×</button>
+                  )}
+                </div>
+              ))}
+            </div>
+            {pollOptions.length < 6 && (
+              <button onClick={() => setPollOptions(o => [...o, ''])} style={{
+                width: '100%', padding: '10px', borderRadius: '10px', cursor: 'pointer',
+                background: 'transparent', border: '1.5px dashed var(--gray-300)',
+                color: 'var(--gray-500)', fontWeight: '600', fontSize: '14px', marginBottom: '16px'
+              }}>+ Add Option</button>
+            )}
+            <button className="btn-primary"
+              onClick={createPoll}
+              disabled={!pollQuestion.trim() || pollOptions.filter(o => o.trim()).length < 2}>
+              Post Poll
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Pin Modal */}
       {showPinModal && (
