@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
-import { doc, onSnapshot, setDoc } from 'firebase/firestore';
+import { doc, onSnapshot, setDoc, collection, getDocs, writeBatch } from 'firebase/firestore';
 import { db } from '../../firebase/config';
 import { useAuth } from '../../contexts/AuthContext';
 import Header from '../../components/Layout/Header';
 import Toast from '../../components/UI/Toast';
-import { DRILLS, CATEGORIES, TUESDAY_PLAN, THURSDAY_PLAN } from '../../data/drills';
+import { DRILLS as SEED_DRILLS, CATEGORIES, TUESDAY_PLAN, THURSDAY_PLAN } from '../../data/drills';
 
 const DAY_MAP = { Sunday: 0, Monday: 1, Tuesday: 2, Wednesday: 3, Thursday: 4, Friday: 5, Saturday: 6 };
 const PLANS = [TUESDAY_PLAN, THURSDAY_PLAN];
@@ -30,6 +30,7 @@ export default function Practice() {
   const [progress, setProgress] = useState([{}, {}]);
   const [practiceSchedule, setPracticeSchedule] = useState([]);
   const [cancelledSlots, setCancelledSlots] = useState({});
+  const [drills, setDrills] = useState(SEED_DRILLS);
   const [selectedDrill, setSelectedDrill] = useState(null);
   const [categoryFilter, setCategoryFilter] = useState('All');
   const [toast, setToast] = useState('');
@@ -37,7 +38,25 @@ export default function Practice() {
   const [practiceDetailModal, setPracticeDetailModal] = useState(null);
 
   useEffect(() => {
+    // Seed drills collection from static data if it's empty
+    getDocs(collection(db, 'drills')).then(snap => {
+      if (snap.empty) {
+        const batch = writeBatch(db);
+        SEED_DRILLS.forEach(d => batch.set(doc(db, 'drills', d.id), d));
+        batch.commit();
+      }
+    });
+
     const unsubs = [
+      onSnapshot(collection(db, 'drills'), snap => {
+        if (!snap.empty) {
+          const firestoreDrills = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+          // Keep original order from SEED_DRILLS, append any custom drills at end
+          const ordered = SEED_DRILLS.map(s => firestoreDrills.find(f => f.id === s.id) || s);
+          const custom = firestoreDrills.filter(f => !SEED_DRILLS.find(s => s.id === f.id));
+          setDrills([...ordered, ...custom]);
+        }
+      }),
       onSnapshot(doc(db, 'settings', 'tuesdayProgress'), snap => {
         if (snap.exists()) setProgress(p => { const n = [...p]; n[0] = snap.data(); return n; });
       }),
@@ -78,7 +97,7 @@ export default function Practice() {
     }
   };
 
-  const getDrill = (id) => DRILLS.find(d => d.id === id);
+  const getDrill = (id) => drills.find(d => d.id === id);
 
   // Next 2 upcoming practices from schedule
   const upcomingPractices = practiceSchedule
@@ -206,7 +225,7 @@ export default function Practice() {
               ))}
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              {DRILLS.filter(d => categoryFilter === 'All' || d.category === categoryFilter).map(drill => (
+              {drills.filter(d => categoryFilter === 'All' || d.category === categoryFilter).map(drill => (
                 <DrillCard key={drill.id} drill={drill} onExpand={() => setSelectedDrill(drill)} />
               ))}
             </div>
@@ -214,7 +233,7 @@ export default function Practice() {
         )}
 
         {tab === 'build' && isCoach && (
-          <PracticeBuilder customPlan={customPlan} setCustomPlan={setCustomPlan} setToast={setToast} />
+          <PracticeBuilder drills={drills} customPlan={customPlan} setCustomPlan={setCustomPlan} setToast={setToast} />
         )}
       </div>
 
@@ -318,7 +337,13 @@ export default function Practice() {
 
       {/* Drill Detail Modal */}
       {selectedDrill && (
-        <DrillModal drill={selectedDrill} onClose={() => setSelectedDrill(null)} />
+        <DrillModal
+          drill={selectedDrill}
+          isCoach={isCoach}
+          onClose={() => setSelectedDrill(null)}
+          onSaved={(updated) => setSelectedDrill(updated)}
+          setToast={setToast}
+        />
       )}
 
       {toast && <Toast message={toast} onDismiss={() => setToast('')} />}
@@ -385,10 +410,87 @@ function DrillCard({ drill, index, completed, onToggle, onExpand }) {
   );
 }
 
-function DrillModal({ drill, onClose }) {
+function DrillModal({ drill, isCoach, onClose, onSaved, setToast }) {
+  const [editing, setEditing] = useState(false);
+  const [form, setForm] = useState({
+    title: drill.title,
+    description: drill.description,
+    why: drill.why,
+    tip: drill.tip,
+    youtube: drill.youtube || '',
+    equipment: (drill.equipment || []).join(', ')
+  });
+  const [saving, setSaving] = useState(false);
+
+  const handleSave = async () => {
+    setSaving(true);
+    const updated = {
+      ...drill,
+      title: form.title.trim(),
+      description: form.description.trim(),
+      why: form.why.trim(),
+      tip: form.tip.trim(),
+      youtube: form.youtube.trim(),
+      equipment: form.equipment.split(',').map(e => e.trim()).filter(Boolean)
+    };
+    await setDoc(doc(db, 'drills', drill.id), updated);
+    onSaved(updated);
+    setEditing(false);
+    setSaving(false);
+    setToast('Drill saved!');
+  };
+
+  if (editing) {
+    return (
+      <div className="modal-overlay" onClick={() => setEditing(false)}>
+        <div className="modal-sheet" onClick={e => e.stopPropagation()} style={{ maxHeight: '90vh', overflowY: 'auto' }}>
+          <div className="modal-handle" />
+          <h3 style={{ fontFamily: 'Oswald, sans-serif', fontSize: '20px', textTransform: 'uppercase', marginBottom: '16px' }}>Edit Drill</h3>
+
+          <div className="form-group">
+            <label className="form-label">Title</label>
+            <input className="form-input" value={form.title} onChange={e => setForm(f => ({ ...f, title: e.target.value }))} />
+          </div>
+          <div className="form-group">
+            <label className="form-label">How It Works</label>
+            <textarea className="form-input" rows={3} value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
+              style={{ resize: 'vertical', lineHeight: '1.5' }} />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Why It Works</label>
+            <textarea className="form-input" rows={2} value={form.why} onChange={e => setForm(f => ({ ...f, why: e.target.value }))}
+              style={{ resize: 'vertical', lineHeight: '1.5' }} />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Coach Tip</label>
+            <textarea className="form-input" rows={2} value={form.tip} onChange={e => setForm(f => ({ ...f, tip: e.target.value }))}
+              style={{ resize: 'vertical', lineHeight: '1.5' }} />
+          </div>
+          <div className="form-group">
+            <label className="form-label">Equipment (comma-separated)</label>
+            <input className="form-input" value={form.equipment} onChange={e => setForm(f => ({ ...f, equipment: e.target.value }))}
+              placeholder="e.g. Baseballs, Gloves, Cones" />
+          </div>
+          <div className="form-group">
+            <label className="form-label">YouTube Link</label>
+            <input className="form-input" value={form.youtube} onChange={e => setForm(f => ({ ...f, youtube: e.target.value }))}
+              placeholder="Paste a YouTube URL" />
+          </div>
+
+          <button className="btn-primary" onClick={handleSave} disabled={saving}>
+            {saving ? 'Saving...' : 'Save Drill'}
+          </button>
+          <button className="btn-secondary" onClick={() => setEditing(false)} style={{ marginTop: '8px', width: '100%' }}>
+            Cancel
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-sheet" onClick={e => e.stopPropagation()} style={{ maxHeight: '85vh' }}>
+      <div className="modal-sheet" onClick={e => e.stopPropagation()} style={{ maxHeight: '85vh', overflowY: 'auto' }}>
         <div className="modal-handle" />
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px' }}>
           <div style={{ flex: 1 }}>
@@ -400,6 +502,13 @@ function DrillModal({ drill, onClose }) {
               {drill.isStation && <span className="chip" style={{ background: '#EDE9FE', borderColor: '#C4B5FD', color: '#7C3AED' }}>Station Drill</span>}
             </div>
           </div>
+          {isCoach && (
+            <button onClick={() => setEditing(true)} style={{
+              background: 'var(--gray-100)', border: 'none', borderRadius: '8px',
+              padding: '6px 12px', cursor: 'pointer', fontWeight: '700', fontSize: '13px',
+              color: 'var(--gray-600)', flexShrink: 0, marginLeft: '10px'
+            }}>Edit</button>
+          )}
         </div>
 
         <div style={{ marginBottom: '14px' }}>
@@ -412,7 +521,7 @@ function DrillModal({ drill, onClose }) {
           <p style={{ fontSize: '15px', lineHeight: '1.6', color: 'var(--gray-700)' }}>{drill.why}</p>
         </div>
 
-        {drill.equipment.length > 0 && (
+        {drill.equipment?.length > 0 && (
           <div style={{ marginBottom: '14px' }}>
             <h4 style={{ fontSize: '13px', color: 'var(--gray-500)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>Equipment</h4>
             <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
@@ -455,7 +564,7 @@ function DrillModal({ drill, onClose }) {
   );
 }
 
-function PracticeBuilder({ customPlan, setCustomPlan, setToast }) {
+function PracticeBuilder({ drills, customPlan, setCustomPlan, setToast }) {
   const [selectedDrills, setSelectedDrills] = useState([]);
   const [duration, setDuration] = useState(75);
   const [categoryFilter, setCategoryFilter] = useState('All');
@@ -465,11 +574,11 @@ function PracticeBuilder({ customPlan, setCustomPlan, setToast }) {
   };
 
   const totalTime = selectedDrills.reduce((s, id) => {
-    const d = DRILLS.find(dr => dr.id === id);
+    const d = drills.find(dr => dr.id === id);
     return s + (d?.duration || 0);
   }, 0);
 
-  const visibleDrills = DRILLS.filter(d => categoryFilter === 'All' || d.category === categoryFilter);
+  const visibleDrills = drills.filter(d => categoryFilter === 'All' || d.category === categoryFilter);
 
   return (
     <div>
