@@ -81,6 +81,7 @@ export default function Schedule() {
   const [form, setForm] = useState({ opponent: '', date: '', time: '', location: '', homeAway: 'Home' });
   const [score, setScore] = useState({ us: '', them: '', result: 'W' });
   const [rsvps, setRsvps] = useState({});
+  const [gameWeather, setGameWeather] = useState({});
 
   useEffect(() => {
     const unsubs = [];
@@ -114,6 +115,78 @@ export default function Schedule() {
 
     return () => unsubs.forEach(u => u());
   }, [currentUser]);
+
+  // Weather fetch for upcoming games within 7 days
+  useEffect(() => {
+    const wmoEmoji = (code) => {
+      if (code === 0) return '☀️';
+      if (code <= 3) return '🌤️';
+      if (code <= 48) return '🌫️';
+      if (code <= 67) return '🌧️';
+      if (code <= 77) return '❄️';
+      if (code <= 82) return '🌦️';
+      return '⛈️';
+    };
+
+    const fetchWeather = async () => {
+      const now = new Date();
+      const sevenDays = new Date(now);
+      sevenDays.setDate(sevenDays.getDate() + 7);
+      const todayStr = now.toISOString().split('T')[0];
+      const sevenStr = sevenDays.toISOString().split('T')[0];
+
+      const upcoming = games.filter(g =>
+        !g.result && !g.cancelled && g.location && g.date >= todayStr && g.date <= sevenStr
+      );
+
+      for (const game of upcoming) {
+        try {
+          const geoRes = await fetch(
+            `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(game.location)}&format=json&limit=1&email=app@dragonsbaseball.com`
+          );
+          const geoData = await geoRes.json();
+          if (!geoData.length) continue;
+          const { lat, lon } = geoData[0];
+
+          const wxRes = await fetch(
+            `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&hourly=temperature_2m,weathercode&temperature_unit=fahrenheit&timezone=auto&forecast_days=7`
+          );
+          const wxData = await wxRes.json();
+          const times = wxData.hourly?.time || [];
+          const temps = wxData.hourly?.temperature_2m || [];
+          const codes = wxData.hourly?.weathercode || [];
+
+          // Find hour index closest to game time (default noon)
+          const timeMatch = game.time ? game.time.match(/(\d{1,2}):(\d{2})\s*(AM|PM)?/i) : null;
+          let targetHour = 12;
+          if (timeMatch) {
+            let h = parseInt(timeMatch[1]);
+            const ap = (timeMatch[3] || 'PM').toUpperCase();
+            if (ap === 'PM' && h !== 12) h += 12;
+            if (ap === 'AM' && h === 12) h = 0;
+            targetHour = h;
+          }
+          const targetStr = `${game.date}T${String(targetHour).padStart(2,'0')}:00`;
+          let bestIdx = 0;
+          let bestDiff = Infinity;
+          times.forEach((t, i) => {
+            const diff = Math.abs(new Date(t) - new Date(targetStr));
+            if (diff < bestDiff) { bestDiff = diff; bestIdx = i; }
+          });
+
+          const temp = temps[bestIdx];
+          const code = codes[bestIdx];
+          if (temp != null) {
+            setGameWeather(w => ({ ...w, [game.id]: { temp: Math.round(temp), emoji: wmoEmoji(code) } }));
+          }
+        } catch {
+          // silently skip on error
+        }
+      }
+    };
+
+    if (games.length) fetchWeather();
+  }, [games]);
 
   // Build practice events from schedule (recurring + one-time)
   const practiceEvents = practiceSchedule.flatMap((slot, i) => {
@@ -413,6 +486,11 @@ export default function Schedule() {
             </div>
             {game.time && <div style={{ fontSize: '13px', color: 'var(--gray-500)', marginTop: '2px', textDecoration: game.cancelled ? 'line-through' : 'none' }}>{game.time}</div>}
             {game.location && !game.cancelled && <div style={{ fontSize: '12px', color: 'var(--gray-400)', marginTop: '1px' }}>📍 {game.location}</div>}
+            {gameWeather[game.id] && !game.cancelled && !game.result && (
+              <div style={{ fontSize: '12px', color: 'var(--gray-500)', marginTop: '2px' }}>
+                {gameWeather[game.id].emoji} {gameWeather[game.id].temp}°F
+              </div>
+            )}
             {!game.result && !game.cancelled && (
               <div style={{ display: 'flex', gap: '6px', marginTop: '10px' }}>
                 {[
