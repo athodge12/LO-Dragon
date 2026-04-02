@@ -10,7 +10,7 @@ export const DRILLS = [
     why: 'Gets kids moving, builds team energy, and prepares muscles for activity without boring static stretching.',
     equipment: ['Cones'],
     tip: 'Make it loud and fun! Dragon roars encouraged.',
-    youtube: ''
+    youtube: 'https://www.youtube.com/results?search_query=youth+baseball+dynamic+warmup+kids'
   },
   {
     id: 'arm-circles',
@@ -23,7 +23,7 @@ export const DRILLS = [
     why: 'Properly warms up the shoulder and elbow before throwing. Essential injury prevention at all ages.',
     equipment: ['Baseballs'],
     tip: 'Watch for elbow drop. Encourage high release point even on easy tosses.',
-    youtube: ''
+    youtube: 'https://www.youtube.com/results?search_query=youth+baseball+throwing+warmup+arm+circles+kids'
   },
   {
     id: 'dry-swings',
@@ -36,7 +36,7 @@ export const DRILLS = [
     why: 'Builds muscle memory for the correct swing before introducing a ball.',
     equipment: ['Bats'],
     tip: 'Use the "squish the bug" cue for back foot rotation.',
-    youtube: ''
+    youtube: 'https://www.youtube.com/results?search_query=8u+baseball+batting+stance+dry+swings+kids'
   },
   {
     id: 'dragon-stomp',
@@ -49,7 +49,7 @@ export const DRILLS = [
     why: 'Gets heart rate up, develops coordination, and creates team cohesion through synchronized movement.',
     equipment: [],
     tip: 'Chant the team name during stomps for maximum energy.',
-    youtube: ''
+    youtube: 'https://www.youtube.com/results?search_query=youth+baseball+fun+warmup+kids+coordination'
   },
   {
     id: 'ladder-agility',
@@ -62,7 +62,7 @@ export const DRILLS = [
     why: 'Develops foot speed, coordination, and body awareness — all critical for baseball athleticism.',
     equipment: ['Agility Ladder'],
     tip: 'Speed comes after accuracy. Focus on clean feet first.',
-    youtube: ''
+    youtube: 'https://www.youtube.com/results?search_query=youth+baseball+agility+ladder+drills+kids'
   },
   {
     id: 'groundball-stations',
@@ -75,7 +75,7 @@ export const DRILLS = [
     why: 'Covers multiple ground ball types in one drill while keeping everyone active. Station format maximizes reps.',
     equipment: ['Baseballs', 'Gloves', 'Cones'],
     tip: 'Station 1 focus: get in front. Station 2: let ball travel to glove. Station 3: attack the ball.',
-    youtube: ''
+    youtube: 'https://www.youtube.com/results?search_query=8u+youth+baseball+ground+ball+fielding+drill+kids'
   },
   {
     id: 'pop-fly',
@@ -88,7 +88,7 @@ export const DRILLS = [
     why: 'Makes fly ball practice competitive and teaches communication — the #1 key to avoiding collisions.',
     equipment: ['Baseballs', 'Bat', 'Gloves'],
     tip: 'Reward effort over result. A kid who runs hard and misses beats a kid who watches it land.',
-    youtube: ''
+    youtube: 'https://www.youtube.com/results?search_query=youth+baseball+pop+fly+outfield+drill+kids'
   },
   {
     id: 'bucket-toss',
@@ -101,7 +101,7 @@ export const DRILLS = [
     why: 'Combines fielding with accuracy throwing in a game-like, fun format kids love.',
     equipment: ['Baseballs', 'Bucket', 'Gloves'],
     tip: 'Place the bucket at a realistic throwing distance. Too far = frustration. Too close = no challenge.',
-    youtube: ''
+    youtube: 'https://www.youtube.com/results?search_query=youth+baseball+fielding+bucket+drill+fun+kids'
   },
   {
     id: 'infield-rapid-fire',
@@ -114,7 +114,7 @@ export const DRILLS = [
     why: 'Builds fielding repetitions fast and trains players to stay ready between balls.',
     equipment: ['Baseballs', 'Bat', 'Gloves'],
     tip: 'Say the player\'s name right before you hit. Keeps them alert.',
-    youtube: ''
+    youtube: 'https://www.youtube.com/results?search_query=youth+baseball+infield+rapid+fire+ground+ball+drill'
   },
   {
     id: 'soft-hands',
@@ -127,228 +127,33 @@ export const DRILLS = [
     why: 'Forces players to cushion the ball instead of stabbing at it — the most common youth fielding error.',
     equipment: ['Baseballs', 'Bare hands or open glove'],
     tip: 'Teach "give" with the hands — like catching an egg.',
-    youtube: ''
+    youtube: 'https://www.youtube.com/results?search_query=baseball+soft+hands+fielding+drill+youth'
   },
   {
-    id: 'tee-stations',
-    title: 'Tee Station Rotations',
-    category: 'Hitting',
-    duration: 25,
-    coaches: 3,
-    isStation: true,
-    description: '3 tee stations: (1) inside pitch tee, (2) outside pitch tee, (3) middle tee. Players hit 5-7 swings at each station and rotate. Coaches focus on one mechanic per station.',
-    why: 'Tee work is the foundation of hitting. Stations keep kids moving and allow focused mechanical coaching.',
-    equipment: ['Tees', 'Bats', 'Baseballs', 'Nets or screen'],
-    tip: 'Give one cue per station max. Overcoaching at the tee is the #1 mistake.',
-    youtube: ''
-  },
-  {
-    id: 'wiffle-target',
-    title: 'Wiffle Ball Target Practice',
-    category: 'Hitting',
-    duration: 15,
-    coaches: 1,
-    isStation: false,
-    description: 'Coach flips wiffle balls underhand. Players try to hit them into designated zones (cones). Points for hitting specific targets.',
-    why: 'Wiffle balls reduce fear of getting hit and allow high-volume swings in a small space.',
-    equipment: ['Wiffle balls', 'Bats', 'Cones'],
-    tip: 'Use colored cones for zones. Double points for pulling the ball in the right direction.',
-    youtube: ''
-  },
-  {
-    id: 'one-hand-bat',
-    title: 'One-Hand Bat Drill',
-    category: 'Hitting',
-    duration: 10,
-    coaches: 1,
-    isStation: false,
-    description: 'Batters hit off a tee using only their top hand, then only their bottom hand. Encourages proper extension and contact point.',
-    why: 'Isolates each hand\'s role in the swing and fixes common casting/rolling over problems.',
-    equipment: ['Tees', 'Bats', 'Baseballs'],
-    tip: 'Bottom hand drill: feel the pull. Top hand drill: feel the push through contact.',
-    youtube: ''
-  },
-  {
-    id: 'hip-rotation',
-    title: 'Hip Rotation Drill',
-    category: 'Hitting',
-    duration: 10,
-    coaches: 1,
-    isStation: false,
-    description: 'Players hold bat horizontally at hip level and practice the hip rotation sequence: load, stride, fire hips, follow through. No ball needed.',
-    why: 'Power in hitting comes from the hips, not the arms. This drill trains the core rotation sequence.',
-    equipment: ['Bats'],
-    tip: 'Cue: "Turn your belt buckle toward the pitcher." Works every time.',
-    youtube: ''
-  },
-  {
-    id: 'relay-throw',
-    title: 'Relay Throw Challenge',
-    category: 'Throwing',
-    duration: 15,
-    coaches: 2,
-    isStation: false,
-    description: 'Two teams compete in relay throws from deep outfield to home plate. Ball must touch each relay player. Fastest team wins.',
-    why: 'Makes throwing practice competitive and teaches relay alignment — a crucial game skill.',
-    equipment: ['Baseballs', 'Gloves'],
-    tip: 'Teach relay man to hold arms up high as target. Call "Cut!" when needed.',
-    youtube: ''
-  },
-  {
-    id: 'target-throw',
-    title: 'Target Throw Accuracy',
-    category: 'Throwing',
-    duration: 12,
-    coaches: 1,
-    isStation: false,
-    description: 'Players throw at a target (hula hoop on fence or square on net) from increasing distances. Points for hitting the target.',
-    why: 'Accuracy matters more than arm strength at U8. This drill builds the habit of throwing to a spot.',
-    equipment: ['Baseballs', 'Gloves', 'Target'],
-    tip: 'Start close (30 ft). Move back only when they can hit the target 3/5 times.',
-    youtube: ''
-  },
-  {
-    id: 'crow-hop',
-    title: 'Crow Hop and Throw',
-    category: 'Throwing',
-    duration: 12,
-    coaches: 1,
-    isStation: false,
-    description: 'Players practice the outfield crow hop — gather step, hop, and throw in one fluid motion. Begin stationary, then with a moving approach.',
-    why: 'The crow hop generates momentum and power for outfield throws. Rarely taught at youth level but very effective.',
-    equipment: ['Baseballs', 'Gloves'],
-    tip: 'Hop with the same foot as throwing hand. Right-handed thrower hops on right foot.',
-    youtube: ''
-  },
-  {
-    id: 'hot-potato',
-    title: 'Hot Potato Baserunning',
-    category: 'Baserunning',
-    duration: 12,
-    coaches: 2,
-    isStation: false,
-    description: 'Players run the bases as coach calls "go" and "freeze." Coach yells "hot potato" and players must make a decision to advance or retreat based on a batted ball scenario.',
-    why: 'Trains baserunning decisions in a fun game format. Reading batted ball and coach signals are key youth skills.',
-    equipment: ['Bases'],
-    tip: 'Over-rotate through first base every time. Teach them to never slow up.',
-    youtube: ''
-  },
-  {
-    id: 'first-to-third',
-    title: 'First to Third Sprint',
-    category: 'Baserunning',
-    duration: 10,
-    coaches: 1,
-    isStation: false,
-    description: 'Players start at first base. Coach hits to outfield. Players must read the ball and decide to go to third or hold at second. Coach at third gives stop/go signal.',
-    why: 'First to third on a base hit is one of the most common baserunning plays. Young players need many reps.',
-    equipment: ['Baseballs', 'Bat', 'Bases'],
-    tip: 'Watch the ball off the bat, not where you\'re going. Trust the third base coach.',
-    youtube: ''
-  },
-  {
-    id: 'run-through-first',
-    title: 'Run Through First Base',
-    category: 'Baserunning',
+    id: 'alligator-catch',
+    title: 'Alligator Catch',
+    category: 'Fielding',
     duration: 8,
     coaches: 1,
     isStation: false,
-    description: 'Players practice hitting the bag at full speed and continuing through, circling back safely. Emphasis on hitting the front half of the bag and not slowing down before contact.',
-    why: 'The most common baserunning mistake in youth baseball is slowing down before the bag.',
-    equipment: ['Bases'],
-    tip: 'Race to the foul line, not the bag. The bag is on the way.',
-    youtube: ''
+    description: 'Coach rolls slow ground balls and players field using two hands — bottom hand scoops, top hand closes like an alligator mouth snapping shut. Start from just 10 feet away.',
+    why: 'Teaches the two-hand fielding habit that prevents bobbles. The alligator image sticks with 8U kids perfectly.',
+    equipment: ['Baseballs', 'Gloves'],
+    tip: 'Say "Alligator snaps shut!" every time they close the glove. The sillier the better at this age.',
+    youtube: 'https://www.youtube.com/results?search_query=alligator+catch+baseball+fielding+drill+8u+kids'
   },
   {
-    id: 'coach-pitch-live',
-    title: 'Coach Pitch Live At-Bats',
-    category: 'Game',
-    duration: 25,
-    coaches: 2,
-    isStation: false,
-    description: 'Full live at-bats from coach pitch. All positions in the field. Rotate through batting order. Focus on hitting pitches into play.',
-    why: 'Nothing prepares players for games like game-speed at-bats with full defense.',
-    equipment: ['Baseballs', 'Bats', 'Gloves', 'Catcher gear'],
-    tip: 'Keep the pace fast. No lecture between every pitch. Let them play.',
-    youtube: ''
-  },
-  {
-    id: 'home-run-derby',
-    title: 'Home Run Derby',
-    category: 'Game',
-    duration: 15,
+    id: 'roll-and-field',
+    title: 'Roll & Field',
+    category: 'Fielding',
+    duration: 10,
     coaches: 1,
     isStation: false,
-    description: 'Bracket-style home run competition. Each player gets 5 swings. Balls that clear the outfield cone line count as HRs. Top HR total advances.',
-    why: 'Pure fun. Kids love it and it builds confidence, enthusiasm, and free swinging.',
-    equipment: ['Tee or pitching machine', 'Bats', 'Baseballs', 'Cones'],
-    tip: 'Let them swing freely. No mechanics coaching during the derby — that\'s the whole point.',
-    youtube: ''
-  },
-  {
-    id: 'walk-up-music',
-    title: 'Walk-Up Music At-Bats',
-    category: 'Game',
-    duration: 20,
-    coaches: 1,
-    isStation: false,
-    description: 'Each player gets to pick a walk-up song. Coach plays it on speaker as they step into the box. Regular at-bat format follows.',
-    why: 'Creates genuine game atmosphere. Kids remember this forever. Builds confidence and emotional connection to the game.',
-    equipment: ['Speaker', 'Phone/playlist', 'Baseballs', 'Bats'],
-    tip: 'Do this at the end of practice before the team huddle. Maximum energy, maximum memories.',
-    youtube: ''
-  },
-  {
-    id: 'scrimmage',
-    title: '3-Inning Scrimmage',
-    category: 'Game',
-    duration: 30,
-    coaches: 2,
-    isStation: false,
-    description: 'Split team into two groups or use whole roster in a 3-inning game. Coach pitch. Track outs and runs. Rotate all players through offense and defense.',
-    why: 'In-game reps with scoring and accountability is the closest thing to a real game. Builds all skills simultaneously.',
-    equipment: ['Full baseball equipment', 'Bases'],
-    tip: 'Keep lineups balanced. The goal is development, not winning the scrimmage.',
-    youtube: ''
-  },
-  {
-    id: 'team-huddle',
-    title: 'Team Huddle & Cheer',
-    category: 'Team',
-    duration: 5,
-    coaches: 1,
-    isStation: false,
-    description: 'End of practice circle up. Coach gives 2-3 positives from practice, one focus for next time, then team does their cheer together.',
-    why: 'Closing ritual builds team identity, gives kids positive takeaways, and ends practice on a high note.',
-    equipment: [],
-    tip: 'Let a different player lead the cheer each practice. Leadership development starts here.',
-    youtube: ''
-  },
-  {
-    id: 'strike-zone',
-    title: 'Strike Zone Challenge',
-    category: 'Pitching',
-    duration: 15,
-    coaches: 1,
-    isStation: false,
-    description: 'Pitchers (or all players) throw at a strike zone target from the mound. Track strikes and balls. Compete for most strikes in 10 pitches.',
-    why: 'Throwing strikes is the most important skill in youth pitching. Gamifying it increases engagement.',
-    equipment: ['Baseballs', 'Strike zone target', 'Gloves'],
-    tip: 'Focus on repeating mechanics over velocity. Slow and accurate beats fast and wild every time.',
-    youtube: ''
-  },
-  {
-    id: 'windup-basics',
-    title: 'Wind-Up Basics',
-    category: 'Pitching',
-    duration: 12,
-    coaches: 1,
-    isStation: false,
-    description: 'Step-by-step pitching mechanics walkthrough: stance, pivot, leg lift, hip drive, arm path, release, follow-through. Dry reps then off the mound.',
-    why: 'Building proper mechanics early prevents injury and creates a repeatable delivery that improves with age.',
-    equipment: ['Baseballs', 'Mound (or flat ground)'],
-    tip: 'Lead with the hip, not the arm. Hip drive creates velocity, arm creates direction.',
-    youtube: ''
+    description: 'Coach kneels 15 feet away and rolls ball slowly. Player gets into ready position, fields the ball, and tosses back underhand. No throwing pressure — pure fielding focus.',
+    why: 'Perfect entry-level ground ball drill for 8U. Low stress, high reps, builds the field-and-return habit.',
+    equipment: ['Baseballs', 'Gloves'],
+    tip: 'Keep rolls slow enough that every kid succeeds. Confidence at 8U matters more than difficulty.',
+    youtube: 'https://www.youtube.com/results?search_query=youth+baseball+ground+ball+roll+field+drill+beginners'
   },
   {
     id: 'fielding-mini-game',
@@ -361,7 +166,293 @@ export const DRILLS = [
     why: 'Competitive fielding drills keep energy high and mirror the pressure of game situations.',
     equipment: ['Baseballs', 'Bat', 'Gloves', 'Scoreboard/whiteboard'],
     tip: 'Count clean fields even without the throw. Fielding comes before throwing.',
-    youtube: ''
+    youtube: 'https://www.youtube.com/results?search_query=youth+baseball+fielding+mini+game+competitive+kids'
+  },
+  {
+    id: 'tee-stations',
+    title: 'Tee Station Rotations',
+    category: 'Hitting',
+    duration: 25,
+    coaches: 3,
+    isStation: true,
+    description: '3 tee stations: (1) inside pitch tee, (2) outside pitch tee, (3) middle tee. Players hit 5-7 swings at each station and rotate. Coaches focus on one mechanic per station.',
+    why: 'Tee work is the foundation of hitting. Stations keep kids moving and allow focused mechanical coaching.',
+    equipment: ['Tees', 'Bats', 'Baseballs', 'Nets or screen'],
+    tip: 'Give one cue per station max. Overcoaching at the tee is the #1 mistake.',
+    youtube: 'https://www.youtube.com/results?search_query=8u+youth+baseball+tee+work+hitting+drill+kids'
+  },
+  {
+    id: 'wiffle-target',
+    title: 'Wiffle Ball Target Practice',
+    category: 'Hitting',
+    duration: 15,
+    coaches: 1,
+    isStation: false,
+    description: 'Coach flips wiffle balls underhand. Players try to hit them into designated zones (cones). Points for hitting specific targets.',
+    why: 'Wiffle balls reduce fear of getting hit and allow high-volume swings in a small space.',
+    equipment: ['Wiffle balls', 'Bats', 'Cones'],
+    tip: 'Use colored cones for zones. Double points for pulling the ball in the right direction.',
+    youtube: 'https://www.youtube.com/results?search_query=wiffle+ball+hitting+drill+youth+baseball+kids'
+  },
+  {
+    id: 'one-hand-bat',
+    title: 'One-Hand Bat Drill',
+    category: 'Hitting',
+    duration: 10,
+    coaches: 1,
+    isStation: false,
+    description: 'Batters hit off a tee using only their top hand, then only their bottom hand. Encourages proper extension and contact point.',
+    why: 'Isolates each hand\'s role in the swing and fixes common casting/rolling over problems.',
+    equipment: ['Tees', 'Bats', 'Baseballs'],
+    tip: 'Bottom hand drill: feel the pull. Top hand drill: feel the push through contact.',
+    youtube: 'https://www.youtube.com/results?search_query=one+hand+batting+drill+youth+baseball+tee+work'
+  },
+  {
+    id: 'hip-rotation',
+    title: 'Hip Rotation Drill',
+    category: 'Hitting',
+    duration: 10,
+    coaches: 1,
+    isStation: false,
+    description: 'Players hold bat horizontally at hip level and practice the hip rotation sequence: load, stride, fire hips, follow through. No ball needed.',
+    why: 'Power in hitting comes from the hips, not the arms. This drill trains the core rotation sequence.',
+    equipment: ['Bats'],
+    tip: 'Cue: "Turn your belt buckle toward the pitcher." Works every time.',
+    youtube: 'https://www.youtube.com/results?search_query=youth+baseball+hip+rotation+hitting+drill+kids'
+  },
+  {
+    id: 'tee-and-go',
+    title: 'Tee & Go',
+    category: 'Hitting',
+    duration: 12,
+    coaches: 1,
+    isStation: false,
+    description: 'Player hits off the tee and immediately sprints to first base. Emphasis on dropping the bat safely and running hard out of the box on every single swing.',
+    why: 'Connects hitting and baserunning into one habit. 8U kids learn early that contact means RUN.',
+    equipment: ['Tee', 'Bat', 'Baseballs', 'First base'],
+    tip: 'Cheer every run to first. Energy is contagious at this age.',
+    youtube: 'https://www.youtube.com/results?search_query=8u+baseball+hit+and+run+tee+drill+kids'
+  },
+  {
+    id: 'noodle-contact',
+    title: 'Pool Noodle Contact Drill',
+    category: 'Hitting',
+    duration: 8,
+    coaches: 1,
+    isStation: false,
+    description: 'Hang a pool noodle from a string at strike zone height. Kids swing and make contact with the noodle. No ball needed — pure swing path and contact point training.',
+    why: 'Zero intimidation, instant visual feedback. Every swing either hits the noodle or misses — kids self-correct fast.',
+    equipment: ['Pool noodle', 'String or rope', 'Bats'],
+    tip: 'Adjust noodle height for each kid. Inside vs outside position teaches pitch location awareness.',
+    youtube: 'https://www.youtube.com/results?search_query=pool+noodle+baseball+hitting+drill+youth+kids'
+  },
+  {
+    id: 'relay-throw',
+    title: 'Relay Throw Challenge',
+    category: 'Throwing',
+    duration: 15,
+    coaches: 2,
+    isStation: false,
+    description: 'Two teams compete in relay throws from deep outfield to home plate. Ball must touch each relay player. Fastest team wins.',
+    why: 'Makes throwing practice competitive and teaches relay alignment — a crucial game skill.',
+    equipment: ['Baseballs', 'Gloves'],
+    tip: 'Teach relay man to hold arms up high as target. Call "Cut!" when needed.',
+    youtube: 'https://www.youtube.com/results?search_query=youth+baseball+relay+throw+drill+outfield+kids'
+  },
+  {
+    id: 'target-throw',
+    title: 'Target Throw Accuracy',
+    category: 'Throwing',
+    duration: 12,
+    coaches: 1,
+    isStation: false,
+    description: 'Players throw at a target (hula hoop on fence or square on net) from increasing distances. Points for hitting the target.',
+    why: 'Accuracy matters more than arm strength at U8. This drill builds the habit of throwing to a spot.',
+    equipment: ['Baseballs', 'Gloves', 'Target'],
+    tip: 'Start close (30 ft). Move back only when they can hit the target 3/5 times.',
+    youtube: 'https://www.youtube.com/results?search_query=youth+baseball+throwing+accuracy+target+drill+8u'
+  },
+  {
+    id: 'crow-hop',
+    title: 'Crow Hop and Throw',
+    category: 'Throwing',
+    duration: 12,
+    coaches: 1,
+    isStation: false,
+    description: 'Players practice the outfield crow hop — gather step, hop, and throw in one fluid motion. Begin stationary, then with a moving approach.',
+    why: 'The crow hop generates momentum and power for outfield throws. Rarely taught at youth level but very effective.',
+    equipment: ['Baseballs', 'Gloves'],
+    tip: 'Hop with the same foot as throwing hand. Right-handed thrower hops on right foot.',
+    youtube: 'https://www.youtube.com/results?search_query=baseball+crow+hop+throwing+drill+youth+outfield'
+  },
+  {
+    id: 'four-corners',
+    title: 'Four Corners Catch',
+    category: 'Throwing',
+    duration: 10,
+    coaches: 1,
+    isStation: false,
+    description: 'One player at each base. Ball is thrown around all four bases as fast as possible without dropping. Time each round and try to beat the record.',
+    why: 'Builds quick, accurate throws under light pressure. Kids love competing against the clock.',
+    equipment: ['Baseballs', 'Gloves', 'Bases'],
+    tip: 'Footwork at the bag is key — step toward the next base before you throw.',
+    youtube: 'https://www.youtube.com/results?search_query=four+corners+baseball+throwing+drill+youth+kids'
+  },
+  {
+    id: 'hot-potato',
+    title: 'Hot Potato Baserunning',
+    category: 'Baserunning',
+    duration: 12,
+    coaches: 2,
+    isStation: false,
+    description: 'Players run the bases as coach calls "go" and "freeze." Coach yells "hot potato" and players must make a decision to advance or retreat based on a batted ball scenario.',
+    why: 'Trains baserunning decisions in a fun game format. Reading batted ball and coach signals are key youth skills.',
+    equipment: ['Bases'],
+    tip: 'Over-rotate through first base every time. Teach them to never slow up.',
+    youtube: 'https://www.youtube.com/results?search_query=youth+baseball+baserunning+drill+fun+kids+decision'
+  },
+  {
+    id: 'first-to-third',
+    title: 'First to Third Sprint',
+    category: 'Baserunning',
+    duration: 10,
+    coaches: 1,
+    isStation: false,
+    description: 'Players start at first base. Coach hits to outfield. Players must read the ball and decide to go to third or hold at second. Coach at third gives stop/go signal.',
+    why: 'First to third on a base hit is one of the most common baserunning plays. Young players need many reps.',
+    equipment: ['Baseballs', 'Bat', 'Bases'],
+    tip: 'Watch the ball off the bat, not where you\'re going. Trust the third base coach.',
+    youtube: 'https://www.youtube.com/results?search_query=youth+baseball+first+to+third+baserunning+drill'
+  },
+  {
+    id: 'run-through-first',
+    title: 'Run Through First Base',
+    category: 'Baserunning',
+    duration: 8,
+    coaches: 1,
+    isStation: false,
+    description: 'Players practice hitting the bag at full speed and continuing through, circling back safely. Emphasis on hitting the front half of the bag and not slowing down before contact.',
+    why: 'The most common baserunning mistake in youth baseball is slowing down before the bag.',
+    equipment: ['Bases'],
+    tip: 'Race to the foul line, not the bag. The bag is on the way.',
+    youtube: 'https://www.youtube.com/results?search_query=youth+baseball+run+through+first+base+drill+kids'
+  },
+  {
+    id: 'base-path-sprint',
+    title: 'Base Path Sprint Race',
+    category: 'Baserunning',
+    duration: 8,
+    coaches: 1,
+    isStation: false,
+    description: 'Players race around all four bases. Coach times each player and posts the result. Kids try to beat their own time each practice.',
+    why: 'Pure fun that builds speed and base-rounding habits. Kids love competing against their own clock.',
+    equipment: ['Bases', 'Stopwatch'],
+    tip: 'Teach them to lean into the turn at each base — touch the inside corner of the bag.',
+    youtube: 'https://www.youtube.com/results?search_query=youth+baseball+base+running+around+bases+sprint+drill'
+  },
+  {
+    id: 'coach-pitch-live',
+    title: 'Coach Pitch Live At-Bats',
+    category: 'Game',
+    duration: 25,
+    coaches: 2,
+    isStation: false,
+    description: 'Full live at-bats from coach pitch. All positions in the field. Rotate through batting order. Focus on hitting pitches into play.',
+    why: 'Nothing prepares players for games like game-speed at-bats with full defense.',
+    equipment: ['Baseballs', 'Bats', 'Gloves', 'Catcher gear'],
+    tip: 'Keep the pace fast. No lecture between every pitch. Let them play.',
+    youtube: 'https://www.youtube.com/results?search_query=8u+coach+pitch+baseball+live+practice+kids'
+  },
+  {
+    id: 'home-run-derby',
+    title: 'Home Run Derby',
+    category: 'Game',
+    duration: 15,
+    coaches: 1,
+    isStation: false,
+    description: 'Bracket-style home run competition. Each player gets 5 swings. Balls that clear the outfield cone line count as HRs. Top HR total advances.',
+    why: 'Pure fun. Kids love it and it builds confidence, enthusiasm, and free swinging.',
+    equipment: ['Tee or pitching machine', 'Bats', 'Baseballs', 'Cones'],
+    tip: 'Let them swing freely. No mechanics coaching during the derby — that\'s the whole point.',
+    youtube: 'https://www.youtube.com/results?search_query=youth+baseball+home+run+derby+practice+kids'
+  },
+  {
+    id: 'walk-up-music',
+    title: 'Walk-Up Music At-Bats',
+    category: 'Game',
+    duration: 20,
+    coaches: 1,
+    isStation: false,
+    description: 'Each player gets to pick a walk-up song. Coach plays it on speaker as they step into the box. Regular at-bat format follows.',
+    why: 'Creates genuine game atmosphere. Kids remember this forever. Builds confidence and emotional connection to the game.',
+    equipment: ['Speaker', 'Phone/playlist', 'Baseballs', 'Bats'],
+    tip: 'Do this at the end of practice before the team huddle. Maximum energy, maximum memories.',
+    youtube: 'https://www.youtube.com/results?search_query=youth+baseball+walk+up+music+practice+fun'
+  },
+  {
+    id: 'scrimmage',
+    title: '3-Inning Scrimmage',
+    category: 'Game',
+    duration: 30,
+    coaches: 2,
+    isStation: false,
+    description: 'Split team into two groups or use whole roster in a 3-inning game. Coach pitch. Track outs and runs. Rotate all players through offense and defense.',
+    why: 'In-game reps with scoring and accountability is the closest thing to a real game. Builds all skills simultaneously.',
+    equipment: ['Full baseball equipment', 'Bases'],
+    tip: 'Keep lineups balanced. The goal is development, not winning the scrimmage.',
+    youtube: 'https://www.youtube.com/results?search_query=8u+youth+baseball+scrimmage+coach+pitch+practice'
+  },
+  {
+    id: 'freeze-tag-fielding',
+    title: 'Freeze Tag Fielding',
+    category: 'Game',
+    duration: 10,
+    coaches: 1,
+    isStation: false,
+    description: 'Two kids are "it" and try to tag others. Tagged players freeze. A frozen player can only be unfrozen when a teammate tosses them a ball and they catch it. Coach controls the baseballs.',
+    why: 'Disguises catching practice as pure play. 8U kids are fully engaged without knowing they\'re drilling.',
+    equipment: ['Baseballs', 'Gloves (optional)'],
+    tip: 'Keep it chaotic and fast. The less it feels like a drill, the better.',
+    youtube: 'https://www.youtube.com/results?search_query=youth+baseball+fun+fielding+game+kids+8u'
+  },
+  {
+    id: 'team-huddle',
+    title: 'Team Huddle & Cheer',
+    category: 'Team',
+    duration: 5,
+    coaches: 1,
+    isStation: false,
+    description: 'End of practice circle up. Coach gives 2-3 positives from practice, one focus for next time, then team does their cheer together.',
+    why: 'Closing ritual builds team identity, gives kids positive takeaways, and ends practice on a high note.',
+    equipment: [],
+    tip: 'Let a different player lead the cheer each practice. Leadership development starts here.',
+    youtube: 'https://www.youtube.com/results?search_query=youth+baseball+team+cheer+huddle+kids'
+  },
+  {
+    id: 'strike-zone',
+    title: 'Strike Zone Challenge',
+    category: 'Pitching',
+    duration: 15,
+    coaches: 1,
+    isStation: false,
+    description: 'Pitchers (or all players) throw at a strike zone target from the mound. Track strikes and balls. Compete for most strikes in 10 pitches.',
+    why: 'Throwing strikes is the most important skill in youth pitching. Gamifying it increases engagement.',
+    equipment: ['Baseballs', 'Strike zone target', 'Gloves'],
+    tip: 'Focus on repeating mechanics over velocity. Slow and accurate beats fast and wild every time.',
+    youtube: 'https://www.youtube.com/results?search_query=youth+baseball+pitching+strike+zone+target+drill+kids'
+  },
+  {
+    id: 'windup-basics',
+    title: 'Wind-Up Basics',
+    category: 'Pitching',
+    duration: 12,
+    coaches: 1,
+    isStation: false,
+    description: 'Step-by-step pitching mechanics walkthrough: stance, pivot, leg lift, hip drive, arm path, release, follow-through. Dry reps then off the mound.',
+    why: 'Building proper mechanics early prevents injury and creates a repeatable delivery that improves with age.',
+    equipment: ['Baseballs', 'Mound (or flat ground)'],
+    tip: 'Lead with the hip, not the arm. Hip drive creates velocity, arm creates direction.',
+    youtube: 'https://www.youtube.com/results?search_query=8u+youth+baseball+pitching+mechanics+beginners+kids'
   }
 ];
 
