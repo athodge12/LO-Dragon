@@ -80,7 +80,7 @@ function RoleBadge({ role }) {
   );
 }
 
-function MessageList({ messages, currentUser, isAdmin, bottomRef, onDelete, onEdit, onVote }) {
+function MessageList({ messages, currentUser, isAdmin, isCoach, pinnedId, bottomRef, onDelete, onEdit, onVote, onPin }) {
   const [editingId, setEditingId] = useState(null);
   const [editText, setEditText] = useState('');
 
@@ -205,6 +205,12 @@ function MessageList({ messages, currentUser, isAdmin, bottomRef, onDelete, onEd
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '3px', justifyContent: isMe ? 'flex-end' : 'flex-start' }}>
                     <span style={{ fontSize: '10px', color: 'var(--gray-400)' }}>{formatTime(msg.createdAt)}</span>
+                    {isCoach && (
+                      <button onClick={() => onPin(msg)} style={{
+                        fontSize: '10px', color: pinnedId === msg.id ? 'var(--red)' : 'var(--gray-400)',
+                        background: 'none', border: 'none', cursor: 'pointer', padding: '0', fontWeight: '600'
+                      }}>{pinnedId === msg.id ? '📌 Pinned' : '📌 Pin'}</button>
+                    )}
                     {canAct && (
                       <>
                         <button onClick={() => startEdit(msg)} style={{
@@ -238,6 +244,7 @@ export default function Chat() {
   const [pinned, setPinned] = useState(null);
   const [pinnedText, setPinnedText] = useState('');
   const [showPinModal, setShowPinModal] = useState(false);
+  const [pinnedMsgId, setPinnedMsgId] = useState(null);
   const [showPollModal, setShowPollModal] = useState(false);
   const [pollQuestion, setPollQuestion] = useState('');
   const [pollOptions, setPollOptions] = useState(['', '']);
@@ -256,8 +263,13 @@ export default function Chat() {
       if (activeTab === 'fanzone') setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
     }));
     unsubs.push(onSnapshot(doc(db, 'settings', 'pinnedMessage'), snap => {
-      if (snap.exists() && snap.data().text) setPinned(snap.data());
-      else setPinned(null);
+      if (snap.exists() && snap.data().text) {
+        setPinned(snap.data());
+        setPinnedMsgId(snap.data().msgId || null);
+      } else {
+        setPinned(null);
+        setPinnedMsgId(null);
+      }
     }));
     return () => unsubs.forEach(u => u());
   }, []);
@@ -305,6 +317,20 @@ export default function Chat() {
     await setDoc(doc(db, 'settings', 'pinnedMessage'), { text: '' });
   };
 
+  const handlePin = async (msg) => {
+    // Tapping the pinned message's pin button unpins it
+    if (pinnedMsgId === msg.id) {
+      await setDoc(doc(db, 'settings', 'pinnedMessage'), { text: '' });
+      return;
+    }
+    await setDoc(doc(db, 'settings', 'pinnedMessage'), {
+      text: msg.text,
+      msgId: msg.id,
+      authorName: msg.authorName,
+      createdAt: new Date().toISOString()
+    });
+  };
+
   const createPoll = async () => {
     const opts = pollOptions.map(o => o.trim()).filter(Boolean);
     if (!pollQuestion.trim() || opts.length < 2) return;
@@ -340,13 +366,7 @@ export default function Chat() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
-      <Header title="Chat" back="/" actions={isCoach && activeTab === 'team' && (
-        <button onClick={() => setShowPinModal(true)} style={{
-          background: 'rgba(255,255,255,0.15)', border: 'none', borderRadius: '8px',
-          width: 36, height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center',
-          color: 'white', cursor: 'pointer', fontSize: '16px'
-        }}>📌</button>
-      )} />
+      <Header title="Chat" back="/" />
 
       {/* Tabs — fixed below header so they're always visible */}
       <div style={{
@@ -377,19 +397,25 @@ export default function Chat() {
       </div>
 
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', paddingTop: '45px' }}>
-        {/* Pinned announcement */}
+        {/* Pinned message */}
         {activeTab === 'team' && pinned?.text && (
           <div style={{
-            background: '#FFF5F5', borderBottom: '1px solid #FECACA',
-            padding: '10px 16px', display: 'flex', gap: '8px', alignItems: 'flex-start'
+            background: '#FFF5F5', borderBottom: '2px solid #FECACA',
+            padding: '10px 16px', display: 'flex', gap: '10px', alignItems: 'flex-start'
           }}>
-            <span style={{ fontSize: '14px' }}>📌</span>
-            <div style={{ flex: 1 }}>
-              <p style={{ fontSize: '13px', color: 'var(--black)', lineHeight: '1.4' }}>{pinned.text}</p>
-              <p style={{ fontSize: '11px', color: 'var(--gray-400)', marginTop: '2px' }}>{pinned.authorName}</p>
+            <span style={{ fontSize: '16px', flexShrink: 0, marginTop: '1px' }}>📌</span>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: '10px', fontWeight: '700', color: 'var(--red)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '2px' }}>
+                Pinned Message
+              </div>
+              <p style={{ fontSize: '13px', color: 'var(--black)', lineHeight: '1.4', wordBreak: 'break-word' }}>{pinned.text}</p>
+              <p style={{ fontSize: '11px', color: 'var(--gray-400)', marginTop: '2px' }}>— {pinned.authorName}</p>
             </div>
             {isCoach && (
-              <button onClick={clearPinned} style={{ background: 'none', border: 'none', color: 'var(--gray-400)', cursor: 'pointer', fontSize: '16px' }}>×</button>
+              <button onClick={clearPinned} style={{
+                background: 'none', border: 'none', color: 'var(--gray-400)',
+                cursor: 'pointer', fontSize: '18px', flexShrink: 0, lineHeight: 1
+              }}>×</button>
             )}
           </div>
         )}
@@ -410,10 +436,13 @@ export default function Chat() {
           messages={currentMessages}
           currentUser={currentUser}
           isAdmin={isActualAdmin}
+          isCoach={isCoach && activeTab === 'team'}
+          pinnedId={pinnedMsgId}
           bottomRef={bottomRef}
           onDelete={handleDelete}
           onEdit={handleEdit}
           onVote={handleVote}
+          onPin={handlePin}
         />
 
         {/* Input */}
