@@ -177,8 +177,8 @@ export default function LogPracticeModal({ players, practiceSchedule = [], onClo
     setIsSaving(false);
   };
 
-  const getPlayerName = p => p?.childName || `${p?.firstName||''} ${p?.lastName||''}`.trim() || 'Player';
-  const getFirstName  = p => p?.firstName || p?.childName?.split(' ')[0] || getPlayerName(p);
+  const getPlayerName = p => p?.name || p?.childName || `${p?.firstName||''} ${p?.lastName||''}`.trim() || 'Player';
+  const getFirstName  = p => (p?.name || p?.childName || p?.firstName || '').split(' ')[0] || 'Player';
 
   const upcomingPractices = practiceSchedule
     .map((slot, i) => ({ slot, i }))
