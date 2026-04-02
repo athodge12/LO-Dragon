@@ -12,7 +12,7 @@ const POS_SHORT = { 'Catcher':'C','1st Base':'1B','2nd Base':'2B','3rd Base':'3B
 
 const POSITION_OUT_PCT = {
   'Pitcher':      0.60,
-  'Catcher':      0.55,
+  'Catcher':      0.10,
   '1st Base':     0.80,
   '2nd Base':     0.50,
   '3rd Base':     0.20,

@@ -9,7 +9,7 @@ const POSITIONS = ['Pitcher','Catcher','1st Base','2nd Base','3rd Base','Shortst
 
 const POSITION_OUT_PCT = {
   'Pitcher':      0.60,
-  'Catcher':      0.55,
+  'Catcher':      0.10,
   '1st Base':     0.80,
   '2nd Base':     0.50,
   '3rd Base':     0.20,
