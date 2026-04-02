@@ -406,29 +406,35 @@ export default function Chat() {
         }}>Fan Zone</button>
       </div>
 
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', paddingTop: '45px' }}>
-        {/* Pinned message */}
-        {activeTab === 'team' && pinned?.text && (
-          <div style={{
-            background: '#FFF5F5', borderBottom: '2px solid #FECACA',
-            padding: '10px 16px', display: 'flex', gap: '10px', alignItems: 'flex-start'
-          }}>
-            <span style={{ fontSize: '16px', flexShrink: 0, marginTop: '1px' }}>📌</span>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: '10px', fontWeight: '700', color: 'var(--red)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '2px' }}>
-                Pinned Message
-              </div>
-              <p style={{ fontSize: '13px', color: 'var(--black)', lineHeight: '1.4', wordBreak: 'break-word' }}>{pinned.text}</p>
-              <p style={{ fontSize: '11px', color: 'var(--gray-400)', marginTop: '2px' }}>— {pinned.authorName}</p>
+      {/* Pinned message — fixed below the tabs so it never scrolls away */}
+      {activeTab === 'team' && pinned?.text && (
+        <div style={{
+          position: 'fixed',
+          top: 'calc(var(--header-height) + 45px)',
+          left: '50%', transform: 'translateX(-50%)',
+          width: '100%', maxWidth: 'var(--max-width)',
+          background: '#FFF5F5', borderBottom: '2px solid #FECACA',
+          padding: '10px 16px', display: 'flex', gap: '10px', alignItems: 'flex-start',
+          zIndex: 9, boxSizing: 'border-box'
+        }}>
+          <span style={{ fontSize: '16px', flexShrink: 0, marginTop: '1px' }}>📌</span>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: '10px', fontWeight: '700', color: 'var(--red)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '2px' }}>
+              Pinned Message
             </div>
-            {isCoach && (
-              <button onClick={clearPinned} style={{
-                background: 'none', border: 'none', color: 'var(--gray-400)',
-                cursor: 'pointer', fontSize: '18px', flexShrink: 0, lineHeight: 1
-              }}>×</button>
-            )}
+            <p style={{ fontSize: '13px', color: 'var(--black)', lineHeight: '1.4', wordBreak: 'break-word' }}>{pinned.text}</p>
+            <p style={{ fontSize: '11px', color: 'var(--gray-400)', marginTop: '2px' }}>— {pinned.authorName}</p>
           </div>
-        )}
+          {isCoach && (
+            <button onClick={clearPinned} style={{
+              background: 'none', border: 'none', color: 'var(--gray-400)',
+              cursor: 'pointer', fontSize: '18px', flexShrink: 0, lineHeight: 1
+            }}>×</button>
+          )}
+        </div>
+      )}
+
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', paddingTop: activeTab === 'team' && pinned?.text ? 'calc(45px + 72px)' : '45px' }}>
 
         {/* Fan Zone banner */}
         {activeTab === 'fanzone' && (
