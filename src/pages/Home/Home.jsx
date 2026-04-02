@@ -421,6 +421,7 @@ export default function Home() {
           <span className="section-title" style={{ display: 'block', marginBottom: '12px' }}>Quick Actions</span>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
             {[
+              { label: '📋 Practice', path: '/practice' },
               { label: '🏟️ Live Score', path: '/live-scoring' },
               { label: '🥤 Team Drinks Sign Up', path: '/snacks' },
               { label: '⭐ Awards', path: '/awards' },
