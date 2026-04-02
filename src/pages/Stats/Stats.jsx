@@ -11,16 +11,16 @@ const FIELDING_POSITIONS = ['Catcher','1st Base','2nd Base','3rd Base','Shortsto
 const POS_SHORT = { 'Catcher':'C','1st Base':'1B','2nd Base':'2B','3rd Base':'3B','Shortstop':'SS','Left Field':'LF','Left Center':'LC','Right Center':'RC','Right Field':'RF' };
 
 const POSITION_OUT_PCT = {
-  'Pitcher':      0.675,
-  'Catcher':      0.550,
-  '1st Base':     0.850,
-  '2nd Base':     0.575,
-  '3rd Base':     0.275,
-  'Shortstop':    0.475,
-  'Left Field':   0.100,
-  'Left Center':  0.100,
-  'Right Center': 0.100,
-  'Right Field':  0.100,
+  'Pitcher':      0.60,
+  'Catcher':      0.55,
+  '1st Base':     0.80,
+  '2nd Base':     0.50,
+  '3rd Base':     0.20,
+  'Shortstop':    0.40,
+  'Left Field':   0.05,
+  'Left Center':  0.05,
+  'Right Center': 0.05,
+  'Right Field':  0.05,
 };
 
 function fitScore(fieldingData, position) {
