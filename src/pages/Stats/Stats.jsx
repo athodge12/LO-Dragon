@@ -10,6 +10,35 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, LineCh
 const FIELDING_POSITIONS = ['Catcher','1st Base','2nd Base','3rd Base','Shortstop','Left Field','Left Center','Right Center','Right Field'];
 const POS_SHORT = { 'Catcher':'C','1st Base':'1B','2nd Base':'2B','3rd Base':'3B','Shortstop':'SS','Left Field':'LF','Left Center':'LC','Right Center':'RC','Right Field':'RF' };
 
+const POSITION_OUT_PCT = {
+  'Pitcher':      0.675,
+  'Catcher':      0.550,
+  '1st Base':     0.850,
+  '2nd Base':     0.575,
+  '3rd Base':     0.275,
+  'Shortstop':    0.475,
+  'Left Field':   0.100,
+  'Left Center':  0.100,
+  'Right Center': 0.100,
+  'Right Field':  0.100,
+};
+
+function fitScore(fieldingData, position) {
+  const base = POSITION_OUT_PCT[position] ?? 0.3;
+  const f = fieldingData?.[position];
+  if (f && f.innings > 0) {
+    const qualityMult = Math.max(0.25, 1 - f.errors / f.innings);
+    return { score: base * qualityMult, label: f.innings >= 3 ? 'solid data' : 'limited data', innings: f.innings, errors: f.errors };
+  }
+  return { score: base * 0.65, label: 'no data', innings: 0, errors: 0 };
+}
+
+function scoreColor(score) {
+  if (score >= 0.60) return { bg: '#DCFCE7', text: '#16A34A' };
+  if (score >= 0.35) return { bg: '#FEF9C3', text: '#92400E' };
+  return { bg: '#FEE2E2', text: '#B91C1C' };
+}
+
 const PRACTICE_HIT_ZONES = [
   { key: 'lf',         label: 'LF', row: 0 }, { key: 'lc',         label: 'LC', row: 0 },
   { key: 'cf',         label: 'CF', row: 0 }, { key: 'rc',         label: 'RC', row: 0 },
@@ -681,6 +710,86 @@ export default function Stats() {
     );
   };
 
+  const BestFitView = () => {
+    const [dataSource, setDataSource] = useState('practice');
+    const ALL_POSITIONS = ['Pitcher', ...FIELDING_POSITIONS];
+
+    const getFieldingFor = (playerId) =>
+      dataSource === 'practice'
+        ? allStats[playerId]?.practiceAgg?.fielding
+        : allStats[playerId]?.fielding;
+
+    return (
+      <div style={{ marginTop: '14px' }}>
+        {/* Toggle */}
+        <div style={{ display: 'flex', gap: '6px', marginBottom: '14px' }}>
+          {['practice', 'games'].map(src => (
+            <button key={src} onClick={() => setDataSource(src)} style={{
+              flex: 1, padding: '8px', borderRadius: '8px', border: 'none', cursor: 'pointer',
+              fontWeight: '700', fontSize: '13px', textTransform: 'capitalize',
+              background: dataSource === src ? 'var(--red)' : 'var(--gray-100)',
+              color: dataSource === src ? 'white' : 'var(--gray-600)',
+            }}>{src === 'practice' ? 'Practice Data' : 'Game Data'}</button>
+          ))}
+        </div>
+        <p style={{ fontSize: '12px', color: 'var(--gray-400)', marginBottom: '16px', textAlign: 'center' }}>
+          8U out probability × fielding quality per player
+        </p>
+
+        {ALL_POSITIONS.map(pos => {
+          const basePct = Math.round((POSITION_OUT_PCT[pos] ?? 0) * 100);
+          const ranked = players
+            .map(p => ({ p, ...fitScore(getFieldingFor(p.id), pos) }))
+            .sort((a, b) => b.score - a.score);
+          const withData = ranked.filter(r => r.label !== 'no data');
+          const noData   = ranked.filter(r => r.label === 'no data');
+
+          return (
+            <div key={pos} style={{ marginBottom: '18px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                <span style={{ fontFamily: 'Oswald, sans-serif', fontSize: '15px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.3px' }}>{pos}</span>
+                <span style={{ fontSize: '11px', background: 'var(--gray-100)', borderRadius: '6px', padding: '2px 8px', color: 'var(--gray-500)', fontWeight: '700' }}>Base: {basePct}% out</span>
+              </div>
+              <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                  <thead>
+                    <tr style={{ background: 'var(--gray-50)' }}>
+                      {['#','Player','Fit','Inn','E','Data'].map(h => (
+                        <th key={h} style={{ padding: '6px 8px', fontWeight: '700', color: 'var(--gray-500)', fontSize: '11px', textTransform: 'uppercase', textAlign: h === 'Player' ? 'left' : 'center', borderBottom: '1px solid var(--gray-200)' }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[...withData, ...noData].map(({ p, score, label, innings, errors }, i) => {
+                      const pct = Math.round(score * 100);
+                      const { bg, text } = scoreColor(score);
+                      const isTop = i === 0 && withData.length > 0;
+                      return (
+                        <tr key={p.id} style={{
+                          borderBottom: i < ranked.length - 1 ? '1px solid var(--gray-100)' : 'none',
+                          background: isTop ? '#F0FDF4' : 'transparent',
+                        }}>
+                          <td style={{ padding: '7px 8px', textAlign: 'center', color: 'var(--gray-400)', fontWeight: '700', fontSize: '12px' }}>{i + 1}</td>
+                          <td style={{ padding: '7px 8px', fontWeight: '700', color: isTop ? '#16A34A' : 'inherit' }}>{getPlayerName(p)}</td>
+                          <td style={{ padding: '7px 8px', textAlign: 'center' }}>
+                            <span style={{ background: bg, color: text, borderRadius: '6px', padding: '2px 8px', fontWeight: '700', fontSize: '12px' }}>{pct}%</span>
+                          </td>
+                          <td style={{ padding: '7px 8px', textAlign: 'center', color: label === 'no data' ? 'var(--gray-300)' : 'inherit' }}>{innings || '—'}</td>
+                          <td style={{ padding: '7px 8px', textAlign: 'center', color: label === 'no data' ? 'var(--gray-300)' : 'inherit' }}>{label === 'no data' ? '—' : errors}</td>
+                          <td style={{ padding: '7px 8px', textAlign: 'center', fontSize: '10px', color: label === 'no data' ? 'var(--gray-300)' : label === 'solid data' ? '#16A34A' : '#D97706', fontWeight: '600' }}>{label}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
+
   const PracticeReviewView = () => {
     const [selectedDate, setSelectedDate] = useState(null);
     const [hitZones, setHitZones] = useState(BLANK_ZONES);
@@ -940,6 +1049,7 @@ export default function Stats() {
           <button className={`tab ${tab === 'history' ? 'active' : ''}`} onClick={() => setTab('history')}>History</button>
           <button className={`tab ${tab === 'log' ? 'active' : ''}`} onClick={() => setTab('log')}>Game Log</button>
           {isCoach && <button className={`tab ${tab === 'practice' ? 'active' : ''}`} onClick={() => setTab('practice')}>Practice</button>}
+          {isCoach && <button className={`tab ${tab === 'bestfit' ? 'active' : ''}`} onClick={() => setTab('bestfit')}>Best Fit</button>}
         </div>
 
         {tab === 'current' && <BattingTable getStats={getCurrentSeason} showEdit={true} />}
@@ -949,6 +1059,7 @@ export default function Stats() {
         {tab === 'history' && <SeasonHistory />}
         {tab === 'log' && <GameLogView />}
         {tab === 'practice' && isCoach && <PracticeReviewView />}
+        {tab === 'bestfit' && isCoach && <BestFitView />}
 
         {/* Stat Glossary */}
         <div className="card" style={{ marginTop: '14px' }}>
