@@ -5,6 +5,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import Header from '../../components/Layout/Header';
 import Toast from '../../components/UI/Toast';
 import LogGameModal from '../../components/LogGameModal';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, LineChart, Line, CartesianGrid } from 'recharts';
 
 const FIELDING_POSITIONS = ['Catcher','1st Base','2nd Base','3rd Base','Shortstop','Left Field','Left Center','Right Center','Right Field'];
 const POS_SHORT = { 'Catcher':'C','1st Base':'1B','2nd Base':'2B','3rd Base':'3B','Shortstop':'SS','Left Field':'LF','Left Center':'LC','Right Center':'RC','Right Field':'RF' };
@@ -29,6 +30,8 @@ export default function Stats() {
   const [expandedLogGame, setExpandedLogGame] = useState(null);
   const [sortCol, setSortCol] = useState('avg');
   const [sortDir, setSortDir] = useState('desc');
+  const [chartStat, setChartStat] = useState('avg');
+  const [chartPlayer, setChartPlayer] = useState(null);
 
   useEffect(() => {
     const unsubs = [];
@@ -560,6 +563,115 @@ export default function Stats() {
     );
   };
 
+  const CHART_STATS = [
+    { key: 'avg',  label: 'AVG',  fmt: v => '.' + String(Math.round(v * 1000)).padStart(3, '0'), get: s => s.avg !== undefined ? s.avg : (s.hits||0)/(s.ab||1) },
+    { key: 'hits', label: 'H',    fmt: v => v, get: s => s.hits || 0 },
+    { key: 'hr',   label: 'HR',   fmt: v => v, get: s => s.hr || 0 },
+    { key: 'rbi',  label: 'RBI',  fmt: v => v, get: s => s.rbi || 0 },
+    { key: 'runs', label: 'R',    fmt: v => v, get: s => s.runs || 0 },
+    { key: 'bb',   label: 'BB',   fmt: v => v, get: s => s.bb || 0 },
+    { key: 'k',    label: 'K',    fmt: v => v, get: s => s.k || 0 },
+    { key: 'obp',  label: 'OBP',  fmt: v => '.' + String(Math.round(v * 1000)).padStart(3, '0'), get: s => s.obp !== undefined ? s.obp : calcOBP(s.hits||0, s.bb||0, s.ab||0) },
+  ];
+
+  const ChartsView = () => {
+    const statDef = CHART_STATS.find(s => s.key === chartStat) || CHART_STATS[0];
+    const getStatsForChart = tab === 'career' ? getCareer : getCurrentSeason;
+    const firstName = (p) => {
+      const name = getPlayerName(p);
+      return name.split(' ')[0] || name;
+    };
+
+    // Leaderboard bar chart data
+    const barData = [...players]
+      .map(p => ({ name: firstName(p), value: statDef.get(getStatsForChart(p.id)), id: p.id }))
+      .filter(d => d.value > 0)
+      .sort((a, b) => b.value - a.value);
+
+    const COLORS = ['#FFD700', '#C0C0C0', '#CD7F32'];
+    const barColor = (i) => i < 3 ? COLORS[i] : '#CC1B1B';
+
+    // Individual player trend (game-by-game cumulative AVG)
+    const trendPlayer = chartPlayer ? players.find(p => p.id === chartPlayer) : null;
+    let trendData = [];
+    if (trendPlayer) {
+      const logs = allStats[trendPlayer.id]?.gameLogs || {};
+      const sorted = Object.entries(logs)
+        .filter(([, e]) => e.ab > 0 || e.hits > 0)
+        .sort(([, a], [, b]) => (a.date || '').localeCompare(b.date || ''));
+      let cumAB = 0, cumH = 0;
+      trendData = sorted.map(([, e], i) => {
+        cumAB += e.ab || 0;
+        cumH += e.hits || 0;
+        const avg = cumAB > 0 ? cumH / cumAB : 0;
+        return { game: `G${i + 1}`, avg: parseFloat(avg.toFixed(3)), label: e.opponent || `Game ${i+1}` };
+      });
+    }
+
+    return (
+      <div>
+        {/* Stat selector */}
+        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '16px' }}>
+          {CHART_STATS.map(s => (
+            <button key={s.key} onClick={() => setChartStat(s.key)} style={{
+              padding: '6px 12px', borderRadius: '20px', cursor: 'pointer', fontWeight: '700', fontSize: '12px',
+              border: `1.5px solid ${chartStat === s.key ? 'var(--red)' : 'var(--gray-200)'}`,
+              background: chartStat === s.key ? '#FEF2F2' : 'white',
+              color: chartStat === s.key ? 'var(--red)' : 'var(--gray-500)'
+            }}>{s.label}</button>
+          ))}
+        </div>
+
+        {/* Leaderboard */}
+        <div className="card" style={{ marginBottom: '14px' }}>
+          <div style={{ fontFamily: 'Oswald, sans-serif', fontSize: '14px', fontWeight: '700', textTransform: 'uppercase', color: 'var(--gray-600)', marginBottom: '12px' }}>
+            {statDef.label} Leaderboard — {tab === 'career' ? 'All-Time' : `${currentYear}`}
+          </div>
+          {barData.length === 0 ? (
+            <p style={{ fontSize: '13px', color: 'var(--gray-400)', textAlign: 'center', padding: '16px 0' }}>No data yet</p>
+          ) : (
+            <ResponsiveContainer width="100%" height={Math.max(barData.length * 38, 120)}>
+              <BarChart data={barData} layout="vertical" margin={{ left: 8, right: 32, top: 4, bottom: 4 }}>
+                <XAxis type="number" tick={{ fontSize: 11 }} tickFormatter={v => statDef.key === 'avg' || statDef.key === 'obp' ? ('.' + String(Math.round(v * 1000)).padStart(3,'0')) : v} />
+                <YAxis type="category" dataKey="name" tick={{ fontSize: 12, fontWeight: 600 }} width={70} />
+                <Tooltip formatter={(v) => [statDef.fmt(v), statDef.label]} />
+                <Bar dataKey="value" radius={[0, 4, 4, 0]}>
+                  {barData.map((_, i) => <Cell key={i} fill={barColor(i)} />)}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          )}
+        </div>
+
+        {/* Individual AVG trend */}
+        <div className="card">
+          <div style={{ fontFamily: 'Oswald, sans-serif', fontSize: '14px', fontWeight: '700', textTransform: 'uppercase', color: 'var(--gray-600)', marginBottom: '10px' }}>
+            Season AVG Trend — Individual
+          </div>
+          <select className="form-select" value={chartPlayer || ''} onChange={e => setChartPlayer(e.target.value || null)} style={{ marginBottom: '12px' }}>
+            <option value="">Select a player…</option>
+            {players.map(p => <option key={p.id} value={p.id}>{getPlayerName(p)}</option>)}
+          </select>
+          {trendPlayer && trendData.length > 1 ? (
+            <ResponsiveContainer width="100%" height={180}>
+              <LineChart data={trendData} margin={{ left: 8, right: 16, top: 4, bottom: 4 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                <XAxis dataKey="game" tick={{ fontSize: 11 }} />
+                <YAxis domain={[0, 1]} tickFormatter={v => '.' + String(Math.round(v * 1000)).padStart(3,'0')} tick={{ fontSize: 11 }} />
+                <Tooltip formatter={(v) => ['.' + String(Math.round(v * 1000)).padStart(3,'0'), 'Cumulative AVG']} labelFormatter={(l, payload) => payload?.[0]?.payload?.label || l} />
+                <Line type="monotone" dataKey="avg" stroke="#CC1B1B" strokeWidth={2} dot={{ r: 4, fill: '#CC1B1B' }} />
+              </LineChart>
+            </ResponsiveContainer>
+          ) : trendPlayer && trendData.length <= 1 ? (
+            <p style={{ fontSize: '13px', color: 'var(--gray-400)', textAlign: 'center', padding: '16px 0' }}>Need at least 2 games logged to show a trend</p>
+          ) : (
+            <p style={{ fontSize: '13px', color: 'var(--gray-400)', textAlign: 'center', padding: '16px 0' }}>Select a player above to see their batting average trend game by game</p>
+          )}
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
       <Header title="Stats" actions={canEdit && (
@@ -606,6 +718,7 @@ export default function Stats() {
         <div className="tabs">
           <button className={`tab ${tab === 'current' ? 'active' : ''}`} onClick={() => setTab('current')}>{currentYear}</button>
           <button className={`tab ${tab === 'career' ? 'active' : ''}`} onClick={() => setTab('career')}>All-Time</button>
+          <button className={`tab ${tab === 'charts' ? 'active' : ''}`} onClick={() => setTab('charts')}>Charts</button>
           <button className={`tab ${tab === 'fielding' ? 'active' : ''}`} onClick={() => setTab('fielding')}>Fielding</button>
           <button className={`tab ${tab === 'history' ? 'active' : ''}`} onClick={() => setTab('history')}>History</button>
           <button className={`tab ${tab === 'log' ? 'active' : ''}`} onClick={() => setTab('log')}>Game Log</button>
@@ -613,6 +726,7 @@ export default function Stats() {
 
         {tab === 'current' && <BattingTable getStats={getCurrentSeason} showEdit={true} />}
         {tab === 'career' && <BattingTable getStats={getCareer} showEdit={false} />}
+        {tab === 'charts' && <ChartsView />}
         {tab === 'fielding' && <RotationView />}
         {tab === 'history' && <SeasonHistory />}
         {tab === 'log' && <GameLogView />}
