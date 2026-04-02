@@ -139,8 +139,8 @@ export default function PlayerProfile() {
       await setDoc(doc(db, 'playerStats', id), { scoutingReport: data.report }, { merge: true });
       setScoutingReport(data.report);
       setToast('Scouting report generated!');
-    } catch {
-      setToast('Could not generate report. Check API key is set in Vercel.');
+    } catch (err) {
+      setToast('Error: ' + (err?.message || 'Unknown error'));
     } finally {
       setReportLoading(false);
     }
