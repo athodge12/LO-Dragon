@@ -268,9 +268,23 @@ export default function Schedule() {
   };
 
   const toggleCancelGame = async (game) => {
-    await setDoc(doc(db, 'games', game.id), { cancelled: !game.cancelled }, { merge: true });
-    setToast(game.cancelled ? 'Game restored' : 'Game cancelled');
+    const cancelling = !game.cancelled;
+    await setDoc(doc(db, 'games', game.id), { cancelled: cancelling }, { merge: true });
+    setToast(cancelling ? 'Game cancelled' : 'Game restored');
     setEditModal(null);
+    if (cancelling) {
+      try {
+        await fetch('/api/notify', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({
+            title: '⚠️ Game Cancelled',
+            body: `Dragons vs ${game.opponent} on ${game.date} has been cancelled.`,
+            url: '/schedule',
+          }),
+        });
+      } catch { /* silently skip */ }
+    }
   };
 
   const openEditPractice = (event) => {

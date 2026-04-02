@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { useNotifications } from './hooks/useNotifications';
 import LoadingScreen from './components/UI/LoadingScreen';
 import BottomNav from './components/Layout/BottomNav';
 import './index.css';
@@ -36,8 +37,10 @@ function PublicRoute({ children }) {
 const HIDE_NAV_PATHS = ['/login', '/register'];
 
 function AppContent() {
+  const { currentUser } = useAuth();
   const location = useLocation();
   const showNav = !HIDE_NAV_PATHS.includes(location.pathname);
+  useNotifications(currentUser);
 
   return (
     <>

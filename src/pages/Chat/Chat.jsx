@@ -343,6 +343,17 @@ export default function Chat() {
       authorName: msg.authorName,
       createdAt: new Date().toISOString()
     });
+    try {
+      await fetch('/api/notify', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          title: '📌 Pinned Message',
+          body: displayText.length > 80 ? displayText.slice(0, 77) + '...' : displayText,
+          url: '/chat',
+        }),
+      });
+    } catch { /* silently skip */ }
   };
 
   const createPoll = async () => {

@@ -1,6 +1,7 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
+import { getMessaging, isSupported } from 'firebase/messaging';
 
 const firebaseConfig = {
   apiKey: "AIzaSyA-qE5_CAep-pyJWxG6S6cQpgEiOoXJ6WE",
@@ -16,4 +17,8 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const db = getFirestore(app);
+
+// Messaging is not supported in all browsers (e.g. Firefox private mode, iOS < 16.4)
+export const messaging = await isSupported().then(ok => ok ? getMessaging(app) : null).catch(() => null);
+
 export default app;
