@@ -763,7 +763,7 @@ export default function Stats() {
                     </tr>
                   </thead>
                   <tbody>
-                    {[...withData, ...noData].map(({ p, score, label, innings, errors }, i) => {
+                    {[...withData, ...noData].map(({ p, score, label, innings, putouts, errors }, i) => {
                       const pct = Math.round(score * 100);
                       const { bg, text } = scoreColor(score);
                       const isTop = i === 0 && withData.length > 0;
