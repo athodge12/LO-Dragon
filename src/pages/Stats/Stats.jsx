@@ -78,6 +78,16 @@ export default function Stats() {
   const [practiceDate, setPracticeDate] = useState(null); // shared across practice views
 
   useEffect(() => {
+    const d = sessionStorage.getItem('openPracticeDate');
+    if (d) {
+      setPracticeDate(d);
+      setSubTab('practice');
+      setMainTab('hitting');
+      sessionStorage.removeItem('openPracticeDate');
+    }
+  }, []);
+
+  useEffect(() => {
     const unsubs = [];
     unsubs.push(onSnapshot(query(collection(db, 'roster'), orderBy('createdAt')), snap => {
       setPlayers(snap.docs.map(d => ({ id: d.id, ...d.data() })));

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { collection, onSnapshot, addDoc, deleteDoc, doc, setDoc, query, orderBy } from 'firebase/firestore';
 import { db } from '../../firebase/config';
 import { useAuth } from '../../contexts/AuthContext';
@@ -65,6 +66,7 @@ function getUpcomingPracticeDates(slot, weeksAhead = 52) {
 export default function Schedule() {
   const { isCoach, isBookkeeper, currentUser, userProfile } = useAuth();
   const canScore = isCoach || isBookkeeper;
+  const navigate = useNavigate();
   const [tab, setTab] = useState('all');
   const [games, setGames] = useState([]);
   const [practiceSchedule, setPracticeSchedule] = useState([]);
@@ -220,7 +222,8 @@ export default function Schedule() {
     }));
   });
 
-  const today = new Date().toISOString().split('T')[0];
+  const _d = new Date();
+  const today = `${_d.getFullYear()}-${String(_d.getMonth()+1).padStart(2,'0')}-${String(_d.getDate()).padStart(2,'0')}`;
 
   const gameEvents = games.map(g => ({ ...g, type: 'game' }));
 
@@ -228,11 +231,38 @@ export default function Schedule() {
     .filter(e => e.date >= today)
     .sort((a, b) => a.date.localeCompare(b.date));
 
+  const pastPracticeEvents = practiceEvents
+    .filter(e => e.date < today)
+    .sort((a, b) => b.date.localeCompare(a.date))
+    .slice(0, 8);
+
   const completedGames = games.filter(g => g.result);
 
   const visibleUpcoming = tab === 'all' ? allEvents
     : tab === 'games' ? allEvents.filter(e => e.type === 'game')
     : allEvents.filter(e => e.type === 'practice');
+
+  const scheduleNextWeek = async (event) => {
+    const nextDate = new Date(event.date + 'T12:00:00');
+    nextDate.setDate(nextDate.getDate() + 7);
+    const dateStr = `${nextDate.getFullYear()}-${String(nextDate.getMonth()+1).padStart(2,'0')}-${String(nextDate.getDate()).padStart(2,'0')}`;
+    const slot = practiceSchedule[event.slotIndex] || {};
+    const newSlot = {
+      type: 'onetime',
+      date: dateStr,
+      time: event.time || '',
+      location: event.location || '',
+      focus: event.focus || '',
+      startHour: slot.startHour || '',
+      startMinute: slot.startMinute || '00',
+      startAmPm: slot.startAmPm || 'PM',
+      endHour: slot.endHour || '',
+      endMinute: slot.endMinute || '00',
+      endAmPm: slot.endAmPm || 'PM',
+    };
+    await setDoc(doc(db, 'settings', 'practiceSchedule'), { practices: [...practiceSchedule, newSlot] });
+    setToast(`Practice scheduled for ${formatDate(dateStr)} ✅`);
+  };
 
   const savePractices = async (data) => {
     await setDoc(doc(db, 'settings', 'practiceSchedule'), { practices: data });
@@ -543,14 +573,14 @@ export default function Schedule() {
     );
   };
 
-  const PracticeCard = ({ event }) => {
+  const PracticeCard = ({ event, isPast }) => {
     const myRsvp = rsvps[event.id];
     return (
       <div className="card" style={{
         marginBottom: '10px',
         opacity: event.cancelled ? 0.6 : 1,
-        border: event.cancelled ? '1px solid #FECACA' : undefined,
-        background: event.cancelled ? '#FFF5F5' : undefined
+        border: event.cancelled ? '1px solid #FECACA' : isPast ? '1px solid var(--gray-200)' : undefined,
+        background: event.cancelled ? '#FFF5F5' : isPast ? 'var(--gray-50)' : undefined
       }}>
         <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
           <div style={{
@@ -583,7 +613,7 @@ export default function Schedule() {
             {event.time && <div style={{ fontSize: '13px', color: 'var(--gray-500)', marginTop: '2px', textDecoration: event.cancelled ? 'line-through' : 'none' }}>{event.time}</div>}
             {event.location && !event.cancelled && <div style={{ fontSize: '12px', color: 'var(--gray-400)', marginTop: '1px' }}>📍 {event.location}</div>}
             {event.focus && !event.cancelled && <div style={{ fontSize: '12px', color: '#7C3AED', fontWeight: '600', marginTop: '2px' }}>{event.focus}</div>}
-            {!event.cancelled && (
+            {!event.cancelled && !isPast && (
               <div style={{ display: 'flex', gap: '6px', marginTop: '10px' }}>
                 {[
                   { key: 'yes', label: '✅ Going' },
@@ -595,8 +625,27 @@ export default function Schedule() {
                 ))}
               </div>
             )}
+            {isPast && (
+              <div style={{ display: 'flex', gap: '6px', marginTop: '10px' }}>
+                <button onClick={() => {
+                  sessionStorage.setItem('openPracticeDate', event.date);
+                  navigate('/stats');
+                }} style={{
+                  padding: '5px 10px', borderRadius: '8px', border: 'none',
+                  background: '#EDE9FE', color: '#7C3AED',
+                  fontSize: '12px', fontWeight: '600', cursor: 'pointer'
+                }}>📊 View Stats</button>
+                {isCoach && (
+                  <button onClick={() => scheduleNextWeek(event)} style={{
+                    padding: '5px 10px', borderRadius: '8px', border: 'none',
+                    background: '#DCFCE7', color: '#16A34A',
+                    fontSize: '12px', fontWeight: '600', cursor: 'pointer'
+                  }}>📅 Schedule Next Week</button>
+                )}
+              </div>
+            )}
           </div>
-          {isCoach && (
+          {isCoach && !isPast && (
             <button onClick={() => openEditPractice(event)} style={{
               background: 'var(--gray-100)', border: 'none', borderRadius: '6px',
               padding: '4px 8px', fontSize: '11px', cursor: 'pointer', fontWeight: '600', color: 'var(--gray-600)', flexShrink: 0
@@ -615,7 +664,14 @@ export default function Schedule() {
             background: 'rgba(255,255,255,0.15)', border: 'none', borderRadius: '8px',
             padding: '0 12px', height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center',
             color: 'white', cursor: 'pointer', fontSize: '13px', fontWeight: '700', letterSpacing: '0.3px'
-          }}>Export Schedule</button>
+          }}>Export</button>
+          {isCoach && (
+            <button onClick={() => setPracticeModal(true)} style={{
+              background: 'rgba(255,255,255,0.15)', border: 'none', borderRadius: '8px',
+              padding: '0 10px', height: 36, display: 'flex', alignItems: 'center', justifyContent: 'center',
+              color: 'white', cursor: 'pointer', fontSize: '13px', fontWeight: '700'
+            }}>✏️ Practice</button>
+          )}
           {isCoach && (
             <button onClick={() => setModal(true)} style={{
               background: 'rgba(255,255,255,0.15)', border: 'none', borderRadius: '8px',
@@ -679,6 +735,16 @@ export default function Schedule() {
               <span className="section-title">Results ({completedGames.length})</span>
             </div>
             {completedGames.map(g => <GameCard key={g.id} game={{ ...g, type: 'game' }} />)}
+          </>
+        )}
+
+        {/* Past practices */}
+        {tab !== 'games' && pastPracticeEvents.length > 0 && (
+          <>
+            <div className="section-header" style={{ marginTop: '16px', marginBottom: '10px' }}>
+              <span className="section-title">Past Practices ({pastPracticeEvents.length})</span>
+            </div>
+            {pastPracticeEvents.map(e => <PracticeCard key={e.id} event={e} isPast />)}
           </>
         )}
       </div>
