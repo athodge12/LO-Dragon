@@ -2,8 +2,8 @@ import { useState } from 'react';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '../firebase/config';
 
-const FIELDING_POSITIONS = ['Catcher','1st Base','2nd Base','3rd Base','Shortstop','Left Field','Left Center','Right Center','Right Field'];
-const POS_SHORT = { 'Catcher':'C','1st Base':'1B','2nd Base':'2B','3rd Base':'3B','Shortstop':'SS','Left Field':'LF','Left Center':'LC','Right Center':'RC','Right Field':'RF' };
+const FIELDING_POSITIONS = ['Pitcher','Catcher','1st Base','2nd Base','3rd Base','Shortstop','Left Field','Left Center','Right Center','Right Field'];
+const POS_SHORT = { 'Pitcher':'P','Catcher':'C','1st Base':'1B','2nd Base':'2B','3rd Base':'3B','Shortstop':'SS','Left Field':'LF','Left Center':'LC','Right Center':'RC','Right Field':'RF' };
 
 const BLANK_BATTING = { ab:0, singles:0, doubles:0, triples:0, hr:0, rbi:0, k:0, bb:0, runs:0 };
 const BLANK_ZONES = { lf:0, lc:0, cf:0, rc:0, rf:0, thirdBase:0, ss:0, pitcher:0, secondBase:0, firstBase:0 };
@@ -45,11 +45,20 @@ function recalcFieldingFromLogs(allLogs) {
   Object.values(allLogs).forEach(g => {
     if (!g.fielding) return;
     Object.entries(g.fielding).forEach(([pos, f]) => {
-      if (!totals[pos]) totals[pos] = { innings: 0, putouts: 0, assists: 0, errors: 0 };
-      totals[pos].innings  += parseInt(f.innings)  || 0;
-      totals[pos].putouts  += parseInt(f.putouts)  || 0;
-      totals[pos].assists  += parseInt(f.assists)  || 0;
-      totals[pos].errors   += parseInt(f.errors)   || 0;
+      if (!totals[pos]) totals[pos] = pos === 'Pitcher'
+        ? { innings: 0, k: 0, bb: 0, hitsAllowed: 0, er: 0, errors: 0 }
+        : { innings: 0, putouts: 0, assists: 0, errors: 0 };
+      totals[pos].innings += parseInt(f.innings) || 0;
+      totals[pos].errors  += parseInt(f.errors)  || 0;
+      if (pos === 'Pitcher') {
+        totals[pos].k           += parseInt(f.k)           || 0;
+        totals[pos].bb          += parseInt(f.bb)          || 0;
+        totals[pos].hitsAllowed += parseInt(f.hitsAllowed) || 0;
+        totals[pos].er          += parseInt(f.er)          || 0;
+      } else {
+        totals[pos].putouts += parseInt(f.putouts) || 0;
+        totals[pos].assists += parseInt(f.assists) || 0;
+      }
     });
   });
   return totals;
@@ -72,13 +81,11 @@ function FieldingEntries({ entries = [], onAdd, onUpdate, onRemove }) {
             <span style={{ fontWeight: '700', fontSize: '13px', fontFamily: 'Oswald, sans-serif' }}>{POS_SHORT[entry.pos]} — {entry.pos}</span>
             <button onClick={() => onRemove(entry.pos)} style={{ background: 'none', border: 'none', color: 'var(--gray-400)', cursor: 'pointer', fontSize: '16px', lineHeight: 1 }}>×</button>
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '6px' }}>
-            {[
-              { key: 'innings', label: 'Inn' },
-              { key: 'putouts', label: 'PO' },
-              { key: 'assists', label: 'A' },
-              { key: 'errors',  label: 'E' },
-            ].map(f => (
+          <div style={{ display: 'grid', gridTemplateColumns: entry.pos === 'Pitcher' ? 'repeat(5, 1fr)' : 'repeat(4, 1fr)', gap: '6px' }}>
+            {(entry.pos === 'Pitcher'
+              ? [{ key:'innings',label:'IP' },{ key:'k',label:'K' },{ key:'bb',label:'BB' },{ key:'hitsAllowed',label:'H' },{ key:'er',label:'ER' }]
+              : [{ key:'innings',label:'Inn' },{ key:'putouts',label:'PO' },{ key:'assists',label:'A' },{ key:'errors',label:'E' }]
+            ).map(f => (
               <div key={f.key} style={{ textAlign: 'center' }}>
                 <div style={{ fontSize: '10px', fontWeight: '700', color: 'var(--gray-500)', textTransform: 'uppercase', marginBottom: '3px' }}>{f.label}</div>
                 <input
@@ -145,9 +152,12 @@ export default function LogGameModal({ players, currentYear, games = [], initial
     if (!currentPlayer) return;
     const e = getEntry(currentPlayer.id);
     if ((e.fieldingThisGame || []).find(f => f.pos === pos)) return;
+    const blank = pos === 'Pitcher'
+      ? { pos, innings: 0, k: 0, bb: 0, hitsAllowed: 0, er: 0, errors: 0 }
+      : { pos, innings: 1, putouts: 0, assists: 0, errors: 0 };
     setLogEntries(prev => ({
       ...prev,
-      [currentPlayer.id]: { ...e, fieldingThisGame: [...(e.fieldingThisGame || []), { pos, innings: 1, putouts: 0, assists: 0, errors: 0 }] }
+      [currentPlayer.id]: { ...e, fieldingThisGame: [...(e.fieldingThisGame || []), blank] }
     }));
   };
 
@@ -214,12 +224,17 @@ export default function LogGameModal({ players, currentYear, games = [], initial
 
       const fieldingMap = {};
       (e.fieldingThisGame || []).forEach(f => {
-        fieldingMap[f.pos] = {
-          innings: parseInt(f.innings) || 0,
-          putouts: parseInt(f.putouts) || 0,
-          assists: parseInt(f.assists) || 0,
-          errors:  parseInt(f.errors)  || 0,
-        };
+        const entry = { innings: parseInt(f.innings)||0, errors: parseInt(f.errors)||0 };
+        if (f.pos === 'Pitcher') {
+          entry.k           = parseInt(f.k)           || 0;
+          entry.bb          = parseInt(f.bb)          || 0;
+          entry.hitsAllowed = parseInt(f.hitsAllowed) || 0;
+          entry.er          = parseInt(f.er)          || 0;
+        } else {
+          entry.putouts = parseInt(f.putouts) || 0;
+          entry.assists = parseInt(f.assists) || 0;
+        }
+        fieldingMap[f.pos] = entry;
       });
 
       const ref = doc(db, 'playerStats', player.id);

@@ -2,8 +2,8 @@ import { useState, useEffect } from 'react';
 import { doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
 import { db } from '../firebase/config';
 
-const FIELDING_POSITIONS = ['Catcher','1st Base','2nd Base','3rd Base','Shortstop','Left Field','Left Center','Right Center','Right Field'];
-const POS_SHORT = { 'Catcher':'C','1st Base':'1B','2nd Base':'2B','3rd Base':'3B','Shortstop':'SS','Left Field':'LF','Left Center':'LC','Right Center':'RC','Right Field':'RF' };
+const FIELDING_POSITIONS = ['Pitcher','Catcher','1st Base','2nd Base','3rd Base','Shortstop','Left Field','Left Center','Right Center','Right Field'];
+const POS_SHORT = { 'Pitcher':'P','Catcher':'C','1st Base':'1B','2nd Base':'2B','3rd Base':'3B','Shortstop':'SS','Left Field':'LF','Left Center':'LC','Right Center':'RC','Right Field':'RF' };
 
 const HIT_ZONES = [
   { key: 'lf',         label: 'LF',   row: 0, col: 0 },
@@ -92,7 +92,10 @@ export default function LogPracticeModal({ players, practiceSchedule = [], onClo
   const addPos = (id, pos) => {
     const e = getEntry(id);
     if (e.fieldingList.find(f => f.pos === pos)) return;
-    setEntries(prev => ({ ...prev, [id]: { ...e, fieldingList: [...e.fieldingList, { pos, innings: 1, putouts: 0, assists: 0, errors: 0 }], saved: false } }));
+    const blank = pos === 'Pitcher'
+      ? { pos, innings: 0, k: 0, bb: 0, hitsAllowed: 0, er: 0, errors: 0 }
+      : { pos, innings: 0, putouts: 0, assists: 0, errors: 0 };
+    setEntries(prev => ({ ...prev, [id]: { ...e, fieldingList: [...e.fieldingList, blank], saved: false } }));
   };
 
   const updatePos = (id, pos, key, delta) => {
@@ -370,8 +373,11 @@ export default function LogPracticeModal({ players, practiceSchedule = [], onClo
                       <span style={{ fontWeight: '700', fontSize: '13px' }}>{POS_SHORT[f.pos]} — {f.pos}</span>
                       <button onClick={() => removePos(activePlayer, f.pos)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '18px', color: 'var(--gray-300)' }}>×</button>
                     </div>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
-                      {[{key:'innings',label:'Inn'},{key:'putouts',label:'PO'},{key:'assists',label:'A'},{key:'errors',label:'E'}].map(({ key, label }) => (
+                    <div style={{ display: 'grid', gridTemplateColumns: f.pos === 'Pitcher' ? 'repeat(5, 1fr)' : 'repeat(4, 1fr)', gap: '6px' }}>
+                      {(f.pos === 'Pitcher'
+                        ? [{key:'innings',label:'IP'},{key:'k',label:'K'},{key:'bb',label:'BB'},{key:'hitsAllowed',label:'H'},{key:'er',label:'ER'}]
+                        : [{key:'innings',label:'Inn'},{key:'putouts',label:'PO'},{key:'assists',label:'A'},{key:'errors',label:'E'}]
+                      ).map(({ key, label }) => (
                         <PlusMinus key={key} label={label}
                           value={f[key] || 0}
                           onInc={() => updatePos(activePlayer, f.pos, key, 1)}
