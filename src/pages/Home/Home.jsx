@@ -173,7 +173,7 @@ export default function Home() {
         )
       } />
 
-      <div className="page-content" style={{ paddingBottom: 'calc(var(--bottom-nav-height) + 16px)' }}>
+      <div className="page-content" style={{ paddingBottom: 'calc(var(--bottom-nav-height) + env(safe-area-inset-bottom, 0px) + 16px)' }}>
 
         {/* Live Stream Banner */}
         {liveStream?.isLive && (

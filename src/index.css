@@ -211,7 +211,7 @@ input, textarea, select {
 
 .page-content {
   padding: 16px;
-  padding-bottom: calc(var(--bottom-nav-height) + 16px);
+  padding-bottom: calc(var(--bottom-nav-height) + env(safe-area-inset-bottom, 0px) + 16px);
   flex: 1;
   overflow-y: auto;
 }
@@ -353,7 +353,7 @@ input, textarea, select {
 
 .toast {
   position: fixed;
-  bottom: calc(var(--bottom-nav-height) + 16px);
+  bottom: calc(var(--bottom-nav-height) + env(safe-area-inset-bottom, 0px) + 16px);
   left: 50%;
   transform: translateX(-50%);
   background: var(--black);

@@ -489,7 +489,7 @@ export default function Chat() {
 
         {/* Input */}
         <div style={{
-          position: 'fixed', bottom: 'var(--bottom-nav-height)', left: '50%',
+          position: 'fixed', bottom: 'calc(var(--bottom-nav-height) + env(safe-area-inset-bottom, 0px))', left: '50%',
           transform: 'translateX(-50%)',
           width: '100%', maxWidth: 'var(--max-width)', background: 'white',
           borderTop: '1px solid var(--gray-200)', padding: '10px 16px',
