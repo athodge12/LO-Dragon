@@ -6,6 +6,14 @@ const FIELDING_POSITIONS = ['Catcher','1st Base','2nd Base','3rd Base','Shortsto
 const POS_SHORT = { 'Catcher':'C','1st Base':'1B','2nd Base':'2B','3rd Base':'3B','Shortstop':'SS','Left Field':'LF','Left Center':'LC','Right Center':'RC','Right Field':'RF' };
 
 const BLANK_BATTING = { ab:0, singles:0, doubles:0, triples:0, hr:0, rbi:0, k:0, bb:0, runs:0 };
+const BLANK_ZONES = { lf:0, lc:0, cf:0, rc:0, rf:0, thirdBase:0, ss:0, pitcher:0, secondBase:0, firstBase:0 };
+const HIT_ZONES = [
+  { key: 'lf', label: 'LF', row: 0 }, { key: 'lc', label: 'LC', row: 0 },
+  { key: 'cf', label: 'CF', row: 0 }, { key: 'rc', label: 'RC', row: 0 },
+  { key: 'rf', label: 'RF', row: 0 }, { key: 'thirdBase', label: '3B', row: 1 },
+  { key: 'ss', label: 'SS', row: 1 }, { key: 'pitcher', label: 'P', row: 1 },
+  { key: 'secondBase', label: '2B', row: 1 }, { key: 'firstBase', label: '1B', row: 1 },
+];
 
 function calcOBP(hits, bb, ab) {
   const d = ab + bb;
@@ -108,13 +116,17 @@ function FieldingEntries({ entries = [], onAdd, onUpdate, onRemove }) {
 // ----------------------------------------------------------------
 export default function LogGameModal({ players, currentYear, games = [], initialGame = null, onClose, onSaved }) {
   const liveMode = !!initialGame;
-  const [logStep, setLogStep] = useState(liveMode ? 0 : 0); // 0 = grid/picker, 1 = player entry
+  const [logStep, setLogStep] = useState(0);
   const [logGame, setLogGame] = useState(initialGame);
   const [manualGame, setManualGame] = useState({ opponent: '', date: new Date().toISOString().slice(0, 10) });
   const [logEntries, setLogEntries] = useState({});
   const [isSaving, setIsSaving] = useState(false);
   const [playerTab, setPlayerTab] = useState('batting');
   const [selectedPlayerId, setSelectedPlayerId] = useState(null); // liveMode only
+  const [gameZones, setGameZones] = useState(BLANK_ZONES);
+  const [lastZone, setLastZone] = useState(null);
+  const [zoneStepActive, setZoneStepActive] = useState(false); // step mode: zone capture before players
+  const [zonesOpen, setZonesOpen] = useState(false); // live mode collapsible
 
   // In liveMode: currentPlayer is whoever was tapped on the grid
   // In stepMode: currentPlayer is players[logStep - 1]
@@ -156,6 +168,9 @@ export default function LogGameModal({ players, currentYear, games = [], initial
       [currentPlayer.id]: { ...e, fieldingThisGame: (e.fieldingThisGame || []).filter(f => f.pos !== pos) }
     }));
   };
+
+  const tapZone = (key) => { setGameZones(z => ({ ...z, [key]: (z[key]||0)+1 })); setLastZone(key); };
+  const undoZone = () => { if (!lastZone) return; setGameZones(z => ({ ...z, [lastZone]: Math.max(0,(z[lastZone]||0)-1) })); setLastZone(null); };
 
   const hasStats = (id) => {
     const e = logEntries[id];
@@ -238,6 +253,10 @@ export default function LogGameModal({ players, currentYear, games = [], initial
       await setDoc(ref, { ...current, gameLogs: updatedLogs, seasons: updatedSeasons, career, fielding: mergedFielding }, { merge: true });
     }
 
+    const totalZoneHits = Object.values(gameZones).reduce((s, v) => s + v, 0);
+    if (totalZoneHits > 0) {
+      await setDoc(doc(db, 'settings', 'gameHitZones_' + gameKey), gameZones);
+    }
     setIsSaving(false);
     onSaved(`Game vs ${game.opponent} logged for ${players.length} players!`);
     onClose();
@@ -290,6 +309,34 @@ export default function LogGameModal({ players, currentYear, games = [], initial
                 );
               })}
             </div>
+            {/* Hit Zones collapsible */}
+            <div style={{ marginBottom: '12px', border: '1px solid var(--gray-200)', borderRadius: '12px', overflow: 'hidden' }}>
+              <button onClick={() => setZonesOpen(o => !o)} style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 14px', background: 'var(--gray-50)', border: 'none', cursor: 'pointer' }}>
+                <span style={{ fontFamily: 'Oswald, sans-serif', fontWeight: '700', fontSize: '14px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                  ⚾ Hit Zones ({Object.values(gameZones).reduce((s,v)=>s+v,0)} hits)
+                </span>
+                <span style={{ fontSize: '18px', color: 'var(--gray-400)' }}>{zonesOpen ? '▲' : '▼'}</span>
+              </button>
+              {zonesOpen && (
+                <div style={{ padding: '12px' }}>
+                  {[0,1].map(row => (
+                    <div key={row} style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '6px', marginBottom: row===0?'6px':0 }}>
+                      {HIT_ZONES.filter(z=>z.row===row).map(z => (
+                        <button key={z.key} onClick={() => tapZone(z.key)} style={{ padding: '10px 4px', borderRadius: '10px', textAlign: 'center', cursor: 'pointer', border: 'none', background: gameZones[z.key]>0 ? (row===0?'#FEF2F2':'#FFF7ED') : 'var(--gray-100)', borderBottom: `3px solid ${gameZones[z.key]>0?(row===0?'var(--red)':'#F59E0B'):'transparent'}` }}>
+                          <div style={{ fontSize: '10px', fontWeight: '700', color: 'var(--gray-500)', textTransform: 'uppercase' }}>{z.label}</div>
+                          <div style={{ fontFamily: 'Oswald, sans-serif', fontSize: '22px', fontWeight: '700', color: gameZones[z.key]>0?(row===0?'var(--red)':'#D97706'):'var(--gray-300)', lineHeight:1 }}>{gameZones[z.key]}</div>
+                        </button>
+                      ))}
+                    </div>
+                  ))}
+                  {lastZone && (
+                    <button onClick={undoZone} style={{ marginTop: '10px', width: '100%', padding: '8px', borderRadius: '8px', border: '1.5px solid var(--gray-300)', background: 'white', color: 'var(--gray-600)', fontWeight: '600', fontSize: '13px', cursor: 'pointer' }}>
+                      ↩ Undo last tap ({HIT_ZONES.find(z=>z.key===lastZone)?.label})
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
             <button disabled={isSaving} onClick={handleFinish} style={{
               width: '100%', padding: '14px', borderRadius: '10px', border: 'none',
               background: 'var(--red)', color: 'white', fontWeight: '700', fontSize: '15px', cursor: 'pointer'
@@ -299,14 +346,55 @@ export default function LogGameModal({ players, currentYear, games = [], initial
           </>
         )}
 
+        {/* ── Step mode: Zone capture (between game pick and player entries) ── */}
+        {!liveMode && logStep === 0 && zoneStepActive && (
+          <>
+            <div style={{ marginBottom: '14px' }}>
+              <div style={{ fontSize: '11px', color: 'var(--gray-500)', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Hit Zones</div>
+              <div style={{ fontFamily: 'Oswald, sans-serif', fontSize: '20px', fontWeight: '700', textTransform: 'uppercase' }}>
+                vs {logGame?.opponent} &middot; {logGame?.date}
+              </div>
+              <div style={{ fontSize: '12px', color: 'var(--gray-500)', marginTop: '2px' }}>
+                Tap a zone each time a ball is hit there
+              </div>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+              <span style={{ fontSize: '13px', fontWeight: '600', color: 'var(--gray-500)' }}>{Object.values(gameZones).reduce((s,v)=>s+v,0)} total hits</span>
+              {lastZone && (
+                <button onClick={undoZone} style={{ padding: '5px 12px', borderRadius: '8px', border: '1.5px solid var(--gray-300)', background: 'white', color: 'var(--gray-600)', fontWeight: '600', fontSize: '12px', cursor: 'pointer' }}>
+                  ↩ Undo ({HIT_ZONES.find(z=>z.key===lastZone)?.label})
+                </button>
+              )}
+            </div>
+            {[0,1].map(row => (
+              <div key={row} style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '8px', marginBottom: '8px' }}>
+                {HIT_ZONES.filter(z=>z.row===row).map(z => (
+                  <button key={z.key} onClick={() => tapZone(z.key)} style={{ padding: '12px 4px', borderRadius: '12px', textAlign: 'center', cursor: 'pointer', border: 'none', background: gameZones[z.key]>0?(row===0?'#FEF2F2':'#FFF7ED'):'var(--gray-100)', borderBottom: `3px solid ${gameZones[z.key]>0?(row===0?'var(--red)':'#F59E0B'):'transparent'}` }}>
+                    <div style={{ fontSize: '10px', fontWeight: '700', color: 'var(--gray-500)', textTransform: 'uppercase' }}>{z.label}</div>
+                    <div style={{ fontFamily: 'Oswald, sans-serif', fontSize: '26px', fontWeight: '700', color: gameZones[z.key]>0?(row===0?'var(--red)':'#D97706'):'var(--gray-300)', lineHeight:1 }}>{gameZones[z.key]}</div>
+                  </button>
+                ))}
+              </div>
+            ))}
+            <div style={{ display: 'flex', gap: '10px', marginTop: '16px' }}>
+              <button onClick={() => { setZoneStepActive(false); setLogStep(1); }} style={{ flex: 1, padding: '12px', borderRadius: '10px', border: 'none', background: 'var(--gray-200)', color: 'var(--gray-700)', fontWeight: '700', fontSize: '14px', cursor: 'pointer' }}>
+                Skip Zones
+              </button>
+              <button onClick={() => { setZoneStepActive(false); setLogStep(1); }} style={{ flex: 2, padding: '12px', borderRadius: '10px', border: 'none', background: 'var(--red)', color: 'white', fontWeight: '700', fontSize: '14px', cursor: 'pointer' }}>
+                Continue to Players →
+              </button>
+            </div>
+          </>
+        )}
+
         {/* ── Step 0: Pick game (step-through mode only) ── */}
-        {!liveMode && logStep === 0 && (
+        {!liveMode && logStep === 0 && !zoneStepActive && (
           <>
             <h3 style={{ fontFamily: 'Oswald, sans-serif', fontSize: '20px', marginBottom: '4px', textTransform: 'uppercase' }}>Log a Game</h3>
             <p style={{ color: 'var(--gray-500)', fontSize: '14px', marginBottom: '14px' }}>Pick a game or enter manually.</p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px' }}>
               {games.slice(0, 10).map(g => (
-                <button key={g.id} onClick={() => { setLogGame({ id: g.id, opponent: g.opponent || g.title || 'Game', date: g.date || '', year: currentYear }); setLogStep(1); }}
+                <button key={g.id} onClick={() => { setLogGame({ id: g.id, opponent: g.opponent || g.title || 'Game', date: g.date || '', year: currentYear }); setZoneStepActive(true); }}
                   style={{ textAlign: 'left', padding: '12px 14px', borderRadius: '10px', border: '1px solid var(--gray-200)', background: 'white', cursor: 'pointer' }}>
                   <div style={{ fontWeight: '700', fontSize: '14px' }}>vs {g.opponent || g.title || 'Game'}</div>
                   <div style={{ fontSize: '12px', color: 'var(--gray-500)', marginTop: '2px' }}>{g.date || ''}</div>
@@ -327,7 +415,7 @@ export default function LogGameModal({ players, currentYear, games = [], initial
                 </div>
               </div>
               <button className="btn-primary" disabled={!manualGame.opponent.trim() || !manualGame.date}
-                onClick={() => { setLogGame({ id: 'manual_' + manualGame.date, opponent: manualGame.opponent.trim(), date: manualGame.date, year: currentYear }); setLogStep(1); }}>
+                onClick={() => { setLogGame({ id: 'manual_' + manualGame.date, opponent: manualGame.opponent.trim(), date: manualGame.date, year: currentYear }); setZoneStepActive(true); }}>
                 Use Manual Entry
               </button>
             </div>

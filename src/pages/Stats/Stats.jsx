@@ -794,6 +794,75 @@ export default function Stats() {
     );
   };
 
+  const HitZonesView = () => {
+    const [practiceZones, setPracticeZones] = useState(BLANK_ZONES);
+    const [gameZones, setGameZones] = useState(BLANK_ZONES);
+    const [loading, setLoading] = useState(true);
+
+    const allPracticeDates = [...new Set(players.flatMap(p => Object.keys(allStats[p.id]?.practiceLogs || {})))];
+    const allGameKeys = [...new Set(players.flatMap(p => Object.keys(allStats[p.id]?.gameLogs || {})))];
+
+    useEffect(() => {
+      const load = async () => {
+        setLoading(true);
+        const [practiceSnaps, gameSnaps] = await Promise.all([
+          Promise.all(allPracticeDates.map(d => getDoc(doc(db, 'settings', 'practiceHitZones_' + d)))),
+          Promise.all(allGameKeys.map(k => getDoc(doc(db, 'settings', 'gameHitZones_' + k)))),
+        ]);
+        const pTotals = { ...BLANK_ZONES };
+        practiceSnaps.forEach(snap => { if (!snap.exists()) return; Object.keys(BLANK_ZONES).forEach(k => { pTotals[k] = (pTotals[k]||0)+(snap.data()[k]||0); }); });
+        const gTotals = { ...BLANK_ZONES };
+        gameSnaps.forEach(snap => { if (!snap.exists()) return; Object.keys(BLANK_ZONES).forEach(k => { gTotals[k] = (gTotals[k]||0)+(snap.data()[k]||0); }); });
+        setPracticeZones(pTotals);
+        setGameZones(gTotals);
+        setLoading(false);
+      };
+      load();
+    }, []); // eslint-disable-line
+
+    const ZoneGrid = ({ zones, title, emoji }) => {
+      const row0 = PRACTICE_HIT_ZONES.filter(z => z.row === 0);
+      const row1 = PRACTICE_HIT_ZONES.filter(z => z.row === 1);
+      const total = Object.values(zones).reduce((s, v) => s + v, 0);
+      return (
+        <div className="card" style={{ marginBottom: '20px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+            <div style={{ fontFamily: 'Oswald, sans-serif', fontSize: '15px', fontWeight: '700', textTransform: 'uppercase' }}>{emoji} {title}</div>
+            <span style={{ fontSize: '12px', color: 'var(--gray-400)', fontWeight: '600' }}>{total} total hits</span>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '6px', marginBottom: '6px' }}>
+            {row0.map(z => (
+              <div key={z.key} style={{ padding: '10px 4px', borderRadius: '10px', textAlign: 'center', background: zones[z.key]>0?'#FEF2F2':'var(--gray-100)', borderBottom: `3px solid ${zones[z.key]>0?'var(--red)':'transparent'}` }}>
+                <div style={{ fontSize: '10px', fontWeight: '700', color: 'var(--gray-500)', textTransform: 'uppercase' }}>{z.label}</div>
+                <div style={{ fontFamily: 'Oswald, sans-serif', fontSize: '24px', fontWeight: '700', color: zones[z.key]>0?'var(--red)':'var(--gray-300)', lineHeight: 1 }}>{zones[z.key]}</div>
+              </div>
+            ))}
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '6px' }}>
+            {row1.map(z => (
+              <div key={z.key} style={{ padding: '10px 4px', borderRadius: '10px', textAlign: 'center', background: zones[z.key]>0?'#FFF7ED':'var(--gray-100)', borderBottom: `3px solid ${zones[z.key]>0?'#F59E0B':'transparent'}` }}>
+                <div style={{ fontSize: '10px', fontWeight: '700', color: 'var(--gray-500)', textTransform: 'uppercase' }}>{z.label}</div>
+                <div style={{ fontFamily: 'Oswald, sans-serif', fontSize: '24px', fontWeight: '700', color: zones[z.key]>0?'#D97706':'var(--gray-300)', lineHeight: 1 }}>{zones[z.key]}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    };
+
+    if (loading) return <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--gray-400)', fontSize: '14px' }}>Loading zones…</div>;
+
+    return (
+      <div style={{ marginTop: '14px' }}>
+        <ZoneGrid zones={practiceZones} title="Practice Hit Zones — All Time" emoji="🏋️" />
+        <ZoneGrid zones={gameZones} title="Game Hit Zones — All Time" emoji="⚾" />
+        <p style={{ fontSize: '12px', color: 'var(--gray-400)', textAlign: 'center', lineHeight: '1.6' }}>
+          Game zones are logged during Live Scoring.<br />Practice zones are logged during Practice.
+        </p>
+      </div>
+    );
+  };
+
   const PracticeReviewView = () => {
     const [selectedDate, setSelectedDate] = useState(null);
     const [hitZones, setHitZones] = useState(BLANK_ZONES);
@@ -1053,6 +1122,7 @@ export default function Stats() {
           <button className={`tab ${tab === 'history' ? 'active' : ''}`} onClick={() => setTab('history')}>History</button>
           <button className={`tab ${tab === 'log' ? 'active' : ''}`} onClick={() => setTab('log')}>Game Log</button>
           {isCoach && <button className={`tab ${tab === 'practice' ? 'active' : ''}`} onClick={() => setTab('practice')}>Practice</button>}
+          {isCoach && <button className={`tab ${tab === 'zones' ? 'active' : ''}`} onClick={() => setTab('zones')}>Zones</button>}
           {isCoach && <button className={`tab ${tab === 'bestfit' ? 'active' : ''}`} onClick={() => setTab('bestfit')}>Best Fit</button>}
         </div>
 
@@ -1063,6 +1133,7 @@ export default function Stats() {
         {tab === 'history' && <SeasonHistory />}
         {tab === 'log' && <GameLogView />}
         {tab === 'practice' && isCoach && <PracticeReviewView />}
+        {tab === 'zones' && isCoach && <HitZonesView />}
         {tab === 'bestfit' && isCoach && <BestFitView />}
 
         {/* Stat Glossary */}
