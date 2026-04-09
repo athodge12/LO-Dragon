@@ -717,27 +717,15 @@ export default function Stats() {
   };
 
   const BestFitView = () => {
-    const [dataSource, setDataSource] = useState('practice');
     const ALL_POSITIONS = ['Pitcher', ...FIELDING_POSITIONS];
 
     const getFieldingFor = (playerId) =>
-      dataSource === 'practice'
+      subTab === 'practice'
         ? allStats[playerId]?.practiceAgg?.fielding
         : allStats[playerId]?.fielding;
 
     return (
       <div style={{ marginTop: '14px' }}>
-        {/* Toggle */}
-        <div style={{ display: 'flex', gap: '6px', marginBottom: '14px' }}>
-          {['practice', 'games'].map(src => (
-            <button key={src} onClick={() => setDataSource(src)} style={{
-              flex: 1, padding: '8px', borderRadius: '8px', border: 'none', cursor: 'pointer',
-              fontWeight: '700', fontSize: '13px', textTransform: 'capitalize',
-              background: dataSource === src ? 'var(--red)' : 'var(--gray-100)',
-              color: dataSource === src ? 'white' : 'var(--gray-600)',
-            }}>{src === 'practice' ? 'Practice Data' : 'Game Data'}</button>
-          ))}
-        </div>
         <p style={{ fontSize: '12px', color: 'var(--gray-400)', marginBottom: '16px', textAlign: 'center' }}>
           8U out probability × fielding quality per player
         </p>
@@ -1338,20 +1326,18 @@ export default function Stats() {
           {isCoach && <button className={`tab ${mainTab === 'bestfit' ? 'active' : ''}`} onClick={() => setMainTab('bestfit')}>Best Fit</button>}
         </div>
 
-        {/* ── Level 2: Game / Practice sub-tabs ── */}
-        {mainTab !== 'bestfit' && (
-          <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
-            {[{id:'game',label:'⚾ Game'},{id:'practice',label:'🏋️ Practice'}].map(s => (
-              <button key={s.id} onClick={() => setSubTab(s.id)} style={{
-                flex: 1, padding: '10px', borderRadius: '10px', cursor: 'pointer',
-                fontFamily: 'Oswald, sans-serif', fontWeight: '700', fontSize: '14px',
-                textTransform: 'uppercase', border: `2px solid ${subTab===s.id?'var(--red)':'var(--gray-200)'}`,
-                background: subTab===s.id ? '#FEF2F2' : 'white',
-                color: subTab===s.id ? 'var(--red)' : 'var(--gray-600)',
-              }}>{s.label}</button>
-            ))}
-          </div>
-        )}
+        {/* ── Level 2: Game / Practice sub-tabs (all main tabs) ── */}
+        <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
+          {[{id:'game',label:'⚾ Game'},{id:'practice',label:'🏋️ Practice'}].map(s => (
+            <button key={s.id} onClick={() => setSubTab(s.id)} style={{
+              flex: 1, padding: '10px', borderRadius: '10px', cursor: 'pointer',
+              fontFamily: 'Oswald, sans-serif', fontWeight: '700', fontSize: '14px',
+              textTransform: 'uppercase', border: `2px solid ${subTab===s.id?'var(--red)':'var(--gray-200)'}`,
+              background: subTab===s.id ? '#FEF2F2' : 'white',
+              color: subTab===s.id ? 'var(--red)' : 'var(--gray-600)',
+            }}>{s.label}</button>
+          ))}
+        </div>
 
         {/* ── Hitting › Game ── */}
         {mainTab === 'hitting' && subTab === 'game' && (
@@ -1414,8 +1400,9 @@ export default function Stats() {
           : <div className="empty-state" style={{ marginTop: '24px' }}><p>Practice zones are coach-only</p></div>
         )}
 
-        {/* ── Best Fit ── */}
+        {/* ── Best Fit › Game or Practice ── */}
         {mainTab === 'bestfit' && isCoach && <BestFitView />}
+        {mainTab === 'bestfit' && !isCoach && <div className="empty-state" style={{ marginTop: '24px' }}><p>Best Fit is coach-only</p></div>}
 
         {/* Stat Glossary */}
         <div className="card" style={{ marginTop: '14px' }}>
