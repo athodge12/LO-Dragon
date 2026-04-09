@@ -150,9 +150,10 @@ export function AuthProvider({ children }) {
     isActualAdmin: trueIsAdmin,
     isAdmin: effectiveRole ? effectiveRole === 'admin' : trueIsAdmin,
     isCoach: effectiveRole
-      ? effectiveRole === 'coach' || effectiveRole === 'admin'
+      ? effectiveRole === 'coach' || effectiveRole === 'admin' || effectiveRole === 'bookkeeper'
       : (userProfile?.roles?.includes('coach') || userProfile?.role === 'coach' ||
-         userProfile?.roles?.includes('admin') || userProfile?.role === 'admin'),
+         userProfile?.roles?.includes('admin') || userProfile?.role === 'admin' ||
+         userProfile?.roles?.includes('bookkeeper') || userProfile?.role === 'bookkeeper'),
     isBookkeeper: effectiveRole
       ? effectiveRole === 'bookkeeper' || effectiveRole === 'admin'
       : (userProfile?.roles?.includes('bookkeeper') || userProfile?.role === 'bookkeeper' ||
