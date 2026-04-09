@@ -73,6 +73,9 @@ export default function Stats() {
   const [sortDir, setSortDir] = useState('desc');
   const [chartStat, setChartStat] = useState('avg');
   const [chartPlayer, setChartPlayer] = useState(null);
+  const [mainTab, setMainTab] = useState('hitting');   // hitting | fielding | zones | bestfit
+  const [subTab, setSubTab] = useState('game');         // game | practice
+  const [practiceDate, setPracticeDate] = useState(null); // shared across practice views
 
   useEffect(() => {
     const unsubs = [];
@@ -863,6 +866,240 @@ export default function Stats() {
     );
   };
 
+  // ── Shared practice helpers (use practiceDate from outer scope) ────────────
+  const practiceDates = [...new Set(
+    players.flatMap(p => Object.keys(allStats[p.id]?.practiceLogs || {}))
+  )].sort((a, b) => b.localeCompare(a));
+
+  const practiceDateLabels = {};
+  practiceDates.forEach(date => {
+    const p = players.find(pl => allStats[pl.id]?.practiceLogs?.[date]?.label);
+    practiceDateLabels[date] = p ? allStats[p.id].practiceLogs[date].label : date;
+  });
+
+  const fmtAvg = entry => {
+    if (!entry?.ab) return '.---';
+    const hits = entry.hits ?? ((entry.singles||0)+(entry.doubles||0)+(entry.triples||0)+(entry.hr||0));
+    return '.' + String(Math.round((hits / entry.ab) * 1000)).padStart(3, '0');
+  };
+
+  const PracticeDatePicker = () => (
+    <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '16px' }}>
+      {[null, ...practiceDates].map(date => (
+        <button key={date ?? 'all'} onClick={() => setPracticeDate(date)} style={{
+          padding: '6px 14px', borderRadius: '20px', cursor: 'pointer', fontWeight: '700', fontSize: '12px', whiteSpace: 'nowrap',
+          border: `1.5px solid ${practiceDate === date ? 'var(--red)' : 'var(--gray-200)'}`,
+          background: practiceDate === date ? '#FEF2F2' : 'white',
+          color: practiceDate === date ? 'var(--red)' : 'var(--gray-500)',
+        }}>{date ? (practiceDateLabels[date] || date) : 'All'}</button>
+      ))}
+    </div>
+  );
+
+  const PracticeEmptyState = ({ icon, label }) => (
+    <div className="empty-state" style={{ marginTop: '24px' }}>
+      <p style={{ fontSize: '32px' }}>{icon}</p>
+      <p>{label}</p>
+      <p style={{ fontSize: '13px', color: 'var(--gray-400)', marginTop: '4px' }}>Tap Stats on the Practice page to start logging.</p>
+    </div>
+  );
+
+  const HittingPracticeView = () => {
+    if (!practiceDates.length) return <PracticeEmptyState icon="🏋️" label="No practice stats yet" />;
+    const rows = players
+      .map(p => ({ p, entry: practiceDate ? allStats[p.id]?.practiceLogs?.[practiceDate] : allStats[p.id]?.practiceAgg }))
+      .filter(({ entry }) => entry && (entry.ab > 0 || (entry.hits ?? 0) > 0));
+    return (
+      <div style={{ marginTop: '14px' }}>
+        <PracticeDatePicker />
+        <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+            <thead>
+              <tr style={{ background: 'var(--gray-50)' }}>
+                {['Player','AVG','AB','H','HR','RBI','K','BB'].map(h => (
+                  <th key={h} style={{ padding: '8px 6px', fontWeight: '700', color: 'var(--gray-500)', fontSize: '11px', textTransform: 'uppercase', textAlign: h==='Player'?'left':'center', borderBottom: '1px solid var(--gray-200)' }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {rows.length === 0 ? (
+                <tr><td colSpan={8} style={{ padding: '16px', textAlign: 'center', color: 'var(--gray-400)', fontSize: '13px' }}>No batting data{practiceDate ? ' for this practice' : ''}</td></tr>
+              ) : rows.map(({ p, entry }, i) => {
+                const hits = entry.hits ?? ((entry.singles||0)+(entry.doubles||0)+(entry.triples||0)+(entry.hr||0));
+                return (
+                  <tr key={p.id} style={{ borderBottom: i < rows.length-1 ? '1px solid var(--gray-100)' : 'none' }}>
+                    <td style={{ padding: '8px 6px', fontWeight: '700' }}>{getPlayerName(p)}</td>
+                    <td style={{ padding: '8px 6px', textAlign: 'center', fontFamily: 'Oswald, sans-serif', fontWeight: '700', color: 'var(--red)' }}>{fmtAvg(entry)}</td>
+                    <td style={{ padding: '8px 6px', textAlign: 'center' }}>{entry.ab||0}</td>
+                    <td style={{ padding: '8px 6px', textAlign: 'center' }}>{hits}</td>
+                    <td style={{ padding: '8px 6px', textAlign: 'center' }}>{entry.hr||0}</td>
+                    <td style={{ padding: '8px 6px', textAlign: 'center' }}>{entry.rbi||0}</td>
+                    <td style={{ padding: '8px 6px', textAlign: 'center' }}>{entry.k||0}</td>
+                    <td style={{ padding: '8px 6px', textAlign: 'center' }}>{entry.bb||0}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    );
+  };
+
+  const FieldingPracticeView = () => {
+    if (!practiceDates.length) return <PracticeEmptyState icon="🧤" label="No practice stats yet" />;
+    let hasAny = false;
+    return (
+      <div style={{ marginTop: '14px' }}>
+        <PracticeDatePicker />
+        {FIELDING_POSITIONS.map(pos => {
+          const rows = players
+            .map(p => {
+              const src = practiceDate ? allStats[p.id]?.practiceLogs?.[practiceDate]?.fielding : allStats[p.id]?.practiceAgg?.fielding;
+              return { p, f: src?.[pos] };
+            })
+            .filter(({ f }) => f && f.innings > 0)
+            .sort((a, b) => (a.f.errors||0) - (b.f.errors||0));
+          if (!rows.length) return null;
+          hasAny = true;
+          return (
+            <div key={pos} style={{ marginBottom: '14px' }}>
+              <div style={{ fontWeight: '700', fontSize: '13px', color: 'var(--gray-600)', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ background: 'var(--gray-100)', borderRadius: '6px', padding: '2px 8px', fontFamily: 'Oswald, sans-serif' }}>{POS_SHORT[pos]}</span>
+                {pos}
+              </div>
+              <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                  <thead>
+                    <tr style={{ background: 'var(--gray-50)' }}>
+                      {['Player','Inn','PO','A','E'].map(h => (
+                        <th key={h} style={{ padding: '6px 8px', fontWeight: '700', color: 'var(--gray-500)', fontSize: '11px', textTransform: 'uppercase', textAlign: h==='Player'?'left':'center', borderBottom: '1px solid var(--gray-200)' }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rows.map(({ p, f }, i) => (
+                      <tr key={p.id} style={{ borderBottom: i < rows.length-1 ? '1px solid var(--gray-100)' : 'none' }}>
+                        <td style={{ padding: '7px 8px', fontWeight: '700' }}>{getPlayerName(p)}</td>
+                        <td style={{ padding: '7px 8px', textAlign: 'center' }}>{f.innings||0}</td>
+                        <td style={{ padding: '7px 8px', textAlign: 'center' }}>{f.putouts||0}</td>
+                        <td style={{ padding: '7px 8px', textAlign: 'center' }}>{f.assists||0}</td>
+                        <td style={{ padding: '7px 8px', textAlign: 'center', fontWeight: '700', color: (f.errors||0)>2?'var(--red)':(f.errors||0)>0?'#D97706':'#16A34A' }}>{f.errors||0}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          );
+        })}
+        {!hasAny && <div style={{ textAlign: 'center', padding: '20px', color: 'var(--gray-400)', fontSize: '13px' }}>No fielding data{practiceDate ? ' for this practice' : ''}</div>}
+      </div>
+    );
+  };
+
+  const PracticeZonesView = () => {
+    const [hitZones, setHitZones] = useState(BLANK_ZONES);
+    const [loadingZones, setLoadingZones] = useState(false);
+    useEffect(() => {
+      if (!practiceDates.length) { setHitZones(BLANK_ZONES); return; }
+      setLoadingZones(true);
+      if (practiceDate) {
+        getDoc(doc(db, 'settings', 'practiceHitZones_' + practiceDate)).then(snap => {
+          setHitZones(snap.exists() ? { ...BLANK_ZONES, ...snap.data() } : BLANK_ZONES);
+          setLoadingZones(false);
+        });
+      } else {
+        Promise.all(practiceDates.map(d => getDoc(doc(db, 'settings', 'practiceHitZones_' + d)))).then(snaps => {
+          const t = { ...BLANK_ZONES };
+          snaps.forEach(s => { if (s.exists()) Object.keys(BLANK_ZONES).forEach(k => { t[k] = (t[k]||0)+(s.data()[k]||0); }); });
+          setHitZones(t); setLoadingZones(false);
+        });
+      }
+    }, [practiceDate, practiceDates.join(',')]); // eslint-disable-line
+    if (!practiceDates.length) return <PracticeEmptyState icon="⚾" label="No practice zones yet" />;
+    const row0 = PRACTICE_HIT_ZONES.filter(z => z.row === 0);
+    const row1 = PRACTICE_HIT_ZONES.filter(z => z.row === 1);
+    const total = Object.values(hitZones).reduce((s, v) => s+v, 0);
+    return (
+      <div style={{ marginTop: '14px' }}>
+        <PracticeDatePicker />
+        <div className="card">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+            <div style={{ fontFamily: 'Oswald, sans-serif', fontSize: '14px', fontWeight: '700', textTransform: 'uppercase' }}>
+              {practiceDate ? (practiceDateLabels[practiceDate] || practiceDate) : 'All Practices Combined'}
+            </div>
+            <span style={{ fontSize: '12px', color: 'var(--gray-400)' }}>{total} total hits</span>
+          </div>
+          {loadingZones ? <p style={{ textAlign: 'center', color: 'var(--gray-400)', fontSize: '13px', padding: '12px 0' }}>Loading…</p> : (
+            <>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '6px', marginBottom: '6px' }}>
+                {row0.map(z => (
+                  <div key={z.key} style={{ padding: '10px 4px', borderRadius: '10px', textAlign: 'center', background: hitZones[z.key]>0?'#FEF2F2':'var(--gray-100)', borderBottom: `3px solid ${hitZones[z.key]>0?'var(--red)':'transparent'}` }}>
+                    <div style={{ fontSize: '10px', fontWeight: '700', color: 'var(--gray-500)', textTransform: 'uppercase' }}>{z.label}</div>
+                    <div style={{ fontFamily: 'Oswald, sans-serif', fontSize: '24px', fontWeight: '700', color: hitZones[z.key]>0?'var(--red)':'var(--gray-300)', lineHeight:1 }}>{hitZones[z.key]}</div>
+                  </div>
+                ))}
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '6px' }}>
+                {row1.map(z => (
+                  <div key={z.key} style={{ padding: '10px 4px', borderRadius: '10px', textAlign: 'center', background: hitZones[z.key]>0?'#FFF7ED':'var(--gray-100)', borderBottom: `3px solid ${hitZones[z.key]>0?'#F59E0B':'transparent'}` }}>
+                    <div style={{ fontSize: '10px', fontWeight: '700', color: 'var(--gray-500)', textTransform: 'uppercase' }}>{z.label}</div>
+                    <div style={{ fontFamily: 'Oswald, sans-serif', fontSize: '24px', fontWeight: '700', color: hitZones[z.key]>0?'#D97706':'var(--gray-300)', lineHeight:1 }}>{hitZones[z.key]}</div>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  const GameZonesView = () => {
+    const [gameZones, setGameZones] = useState(BLANK_ZONES);
+    const [loading, setLoading] = useState(true);
+    const allGameKeys = [...new Set(players.flatMap(p => Object.keys(allStats[p.id]?.gameLogs || {})))];
+    useEffect(() => {
+      Promise.all(allGameKeys.map(k => getDoc(doc(db, 'settings', 'gameHitZones_' + k)))).then(snaps => {
+        const t = { ...BLANK_ZONES };
+        snaps.forEach(s => { if (s.exists()) Object.keys(BLANK_ZONES).forEach(k => { t[k] = (t[k]||0)+(s.data()[k]||0); }); });
+        setGameZones(t); setLoading(false);
+      });
+    }, []); // eslint-disable-line
+    const row0 = PRACTICE_HIT_ZONES.filter(z => z.row === 0);
+    const row1 = PRACTICE_HIT_ZONES.filter(z => z.row === 1);
+    const total = Object.values(gameZones).reduce((s, v) => s+v, 0);
+    if (loading) return <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--gray-400)' }}>Loading…</div>;
+    return (
+      <div style={{ marginTop: '14px' }}>
+        <div className="card">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+            <div style={{ fontFamily: 'Oswald, sans-serif', fontSize: '14px', fontWeight: '700', textTransform: 'uppercase' }}>All Games Combined</div>
+            <span style={{ fontSize: '12px', color: 'var(--gray-400)' }}>{total} total hits</span>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '6px', marginBottom: '6px' }}>
+            {row0.map(z => (
+              <div key={z.key} style={{ padding: '10px 4px', borderRadius: '10px', textAlign: 'center', background: gameZones[z.key]>0?'#FEF2F2':'var(--gray-100)', borderBottom: `3px solid ${gameZones[z.key]>0?'var(--red)':'transparent'}` }}>
+                <div style={{ fontSize: '10px', fontWeight: '700', color: 'var(--gray-500)', textTransform: 'uppercase' }}>{z.label}</div>
+                <div style={{ fontFamily: 'Oswald, sans-serif', fontSize: '24px', fontWeight: '700', color: gameZones[z.key]>0?'var(--red)':'var(--gray-300)', lineHeight:1 }}>{gameZones[z.key]}</div>
+              </div>
+            ))}
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '6px' }}>
+            {row1.map(z => (
+              <div key={z.key} style={{ padding: '10px 4px', borderRadius: '10px', textAlign: 'center', background: gameZones[z.key]>0?'#FFF7ED':'var(--gray-100)', borderBottom: `3px solid ${gameZones[z.key]>0?'#F59E0B':'transparent'}` }}>
+                <div style={{ fontSize: '10px', fontWeight: '700', color: 'var(--gray-500)', textTransform: 'uppercase' }}>{z.label}</div>
+                <div style={{ fontFamily: 'Oswald, sans-serif', fontSize: '24px', fontWeight: '700', color: gameZones[z.key]>0?'#D97706':'var(--gray-300)', lineHeight:1 }}>{gameZones[z.key]}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+        {total === 0 && <p style={{ fontSize: '12px', color: 'var(--gray-400)', textAlign: 'center', marginTop: '10px' }}>Log hit zones during Live Scoring to populate this chart.</p>}
+      </div>
+    );
+  };
+
   const PracticeReviewView = () => {
     const [selectedDate, setSelectedDate] = useState(null);
     const [hitZones, setHitZones] = useState(BLANK_ZONES);
@@ -1093,55 +1330,99 @@ export default function Stats() {
       <div className="page-content">
         {!canEdit && <div className="view-only-banner">👁 Stats are updated by coaches</div>}
 
-        {/* Team Banner */}
-        <div style={{ background: 'linear-gradient(135deg, #CC1B1B, #8B0000)', borderRadius: '12px', padding: '16px', marginBottom: '14px', color: 'white' }}>
-          <p style={{ fontSize: '11px', fontWeight: '600', letterSpacing: '1px', opacity: 0.75, textTransform: 'uppercase', marginBottom: '8px' }}>
-            Team Batting — {tab === 'career' ? 'All-Time' : `${currentYear} Season`}
-          </p>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '8px' }}>
-            {[
-              { label: 'AVG', value: '.' + String(Math.round(teamAvg * 1000)).padStart(3, '0') },
-              { label: 'OBP', value: '.' + String(Math.round(calcOBP(activeTeam.hits||0, activeTeam.bb||0, activeTeam.ab||0) * 1000)).padStart(3,'0') },
-              { label: 'H',   value: activeTeam.hits || 0 },
-              { label: 'HR',  value: activeTeam.hr   || 0 },
-              { label: 'RBI', value: activeTeam.rbi  || 0 },
-            ].map(s => (
-              <div key={s.label} style={{ textAlign: 'center' }}>
-                <div style={{ fontFamily: 'Oswald, sans-serif', fontSize: '22px', fontWeight: '700' }}>{s.value}</div>
-                <div style={{ fontSize: '10px', opacity: 0.7, textTransform: 'uppercase' }}>{s.label}</div>
-              </div>
+        {/* ── Level 1: Main tabs ── */}
+        <div className="tabs" style={{ marginBottom: '8px' }}>
+          <button className={`tab ${mainTab === 'hitting' ? 'active' : ''}`} onClick={() => setMainTab('hitting')}>Hitting</button>
+          <button className={`tab ${mainTab === 'fielding' ? 'active' : ''}`} onClick={() => setMainTab('fielding')}>Fielding</button>
+          <button className={`tab ${mainTab === 'zones' ? 'active' : ''}`} onClick={() => setMainTab('zones')}>Zones</button>
+          {isCoach && <button className={`tab ${mainTab === 'bestfit' ? 'active' : ''}`} onClick={() => setMainTab('bestfit')}>Best Fit</button>}
+        </div>
+
+        {/* ── Level 2: Game / Practice sub-tabs ── */}
+        {mainTab !== 'bestfit' && (
+          <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
+            {[{id:'game',label:'⚾ Game'},{id:'practice',label:'🏋️ Practice'}].map(s => (
+              <button key={s.id} onClick={() => setSubTab(s.id)} style={{
+                flex: 1, padding: '10px', borderRadius: '10px', cursor: 'pointer',
+                fontFamily: 'Oswald, sans-serif', fontWeight: '700', fontSize: '14px',
+                textTransform: 'uppercase', border: `2px solid ${subTab===s.id?'var(--red)':'var(--gray-200)'}`,
+                background: subTab===s.id ? '#FEF2F2' : 'white',
+                color: subTab===s.id ? 'var(--red)' : 'var(--gray-600)',
+              }}>{s.label}</button>
             ))}
           </div>
-        </div>
+        )}
 
-        <div className="tabs">
-          <button className={`tab ${tab === 'current' ? 'active' : ''}`} onClick={() => setTab('current')}>{currentYear}</button>
-          <button className={`tab ${tab === 'career' ? 'active' : ''}`} onClick={() => setTab('career')}>All-Time</button>
-          <button className={`tab ${tab === 'charts' ? 'active' : ''}`} onClick={() => setTab('charts')}>Charts</button>
-          <button className={`tab ${tab === 'fielding' ? 'active' : ''}`} onClick={() => setTab('fielding')}>Fielding</button>
-          <button className={`tab ${tab === 'history' ? 'active' : ''}`} onClick={() => setTab('history')}>History</button>
-          <button className={`tab ${tab === 'log' ? 'active' : ''}`} onClick={() => setTab('log')}>Game Log</button>
-          {isCoach && <button className={`tab ${tab === 'practice' ? 'active' : ''}`} onClick={() => setTab('practice')}>Practice</button>}
-          {isCoach && <button className={`tab ${tab === 'zones' ? 'active' : ''}`} onClick={() => setTab('zones')}>Zones</button>}
-          {isCoach && <button className={`tab ${tab === 'bestfit' ? 'active' : ''}`} onClick={() => setTab('bestfit')}>Best Fit</button>}
-        </div>
+        {/* ── Hitting › Game ── */}
+        {mainTab === 'hitting' && subTab === 'game' && (
+          <>
+            <div style={{ background: 'linear-gradient(135deg, #CC1B1B, #8B0000)', borderRadius: '12px', padding: '16px', marginBottom: '14px', color: 'white' }}>
+              <p style={{ fontSize: '11px', fontWeight: '600', letterSpacing: '1px', opacity: 0.75, textTransform: 'uppercase', marginBottom: '8px' }}>
+                Team Batting — {tab === 'career' ? 'All-Time' : `${currentYear} Season`}
+              </p>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '8px' }}>
+                {[
+                  { label: 'AVG', value: '.' + String(Math.round(teamAvg * 1000)).padStart(3, '0') },
+                  { label: 'OBP', value: '.' + String(Math.round(calcOBP(activeTeam.hits||0, activeTeam.bb||0, activeTeam.ab||0) * 1000)).padStart(3,'0') },
+                  { label: 'H',   value: activeTeam.hits || 0 },
+                  { label: 'HR',  value: activeTeam.hr   || 0 },
+                  { label: 'RBI', value: activeTeam.rbi  || 0 },
+                ].map(s => (
+                  <div key={s.label} style={{ textAlign: 'center' }}>
+                    <div style={{ fontFamily: 'Oswald, sans-serif', fontSize: '22px', fontWeight: '700' }}>{s.value}</div>
+                    <div style={{ fontSize: '10px', opacity: 0.7, textTransform: 'uppercase' }}>{s.label}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="tabs">
+              <button className={`tab ${tab === 'current' ? 'active' : ''}`} onClick={() => setTab('current')}>{currentYear}</button>
+              <button className={`tab ${tab === 'career' ? 'active' : ''}`} onClick={() => setTab('career')}>All-Time</button>
+              <button className={`tab ${tab === 'charts' ? 'active' : ''}`} onClick={() => setTab('charts')}>Charts</button>
+              <button className={`tab ${tab === 'history' ? 'active' : ''}`} onClick={() => setTab('history')}>History</button>
+              <button className={`tab ${tab === 'log' ? 'active' : ''}`} onClick={() => setTab('log')}>Log</button>
+            </div>
+            {tab === 'current' && <BattingTable getStats={getCurrentSeason} showEdit={true} />}
+            {tab === 'career'  && <BattingTable getStats={getCareer} showEdit={false} />}
+            {tab === 'charts'  && <ChartsView />}
+            {tab === 'history' && <SeasonHistory />}
+            {tab === 'log'     && <GameLogView />}
+          </>
+        )}
 
-        {tab === 'current' && <BattingTable getStats={getCurrentSeason} showEdit={true} />}
-        {tab === 'career' && <BattingTable getStats={getCareer} showEdit={false} />}
-        {tab === 'charts' && <ChartsView />}
-        {tab === 'fielding' && <RotationView />}
-        {tab === 'history' && <SeasonHistory />}
-        {tab === 'log' && <GameLogView />}
-        {tab === 'practice' && isCoach && <PracticeReviewView />}
-        {tab === 'zones' && isCoach && <HitZonesView />}
-        {tab === 'bestfit' && isCoach && <BestFitView />}
+        {/* ── Hitting › Practice ── */}
+        {mainTab === 'hitting' && subTab === 'practice' && (isCoach
+          ? <HittingPracticeView />
+          : <div className="empty-state" style={{ marginTop: '24px' }}><p>Practice stats are coach-only</p></div>
+        )}
+
+        {/* ── Fielding › Game ── */}
+        {mainTab === 'fielding' && subTab === 'game' && <RotationView />}
+
+        {/* ── Fielding › Practice ── */}
+        {mainTab === 'fielding' && subTab === 'practice' && (isCoach
+          ? <FieldingPracticeView />
+          : <div className="empty-state" style={{ marginTop: '24px' }}><p>Practice stats are coach-only</p></div>
+        )}
+
+        {/* ── Zones › Game ── */}
+        {mainTab === 'zones' && subTab === 'game' && <GameZonesView />}
+
+        {/* ── Zones › Practice ── */}
+        {mainTab === 'zones' && subTab === 'practice' && (isCoach
+          ? <PracticeZonesView />
+          : <div className="empty-state" style={{ marginTop: '24px' }}><p>Practice zones are coach-only</p></div>
+        )}
+
+        {/* ── Best Fit ── */}
+        {mainTab === 'bestfit' && isCoach && <BestFitView />}
 
         {/* Stat Glossary */}
         <div className="card" style={{ marginTop: '14px' }}>
           <div style={{ fontFamily: 'Oswald, sans-serif', fontSize: '14px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '10px', color: 'var(--gray-700)' }}>
             📖 Stat Guide
           </div>
-          {tab !== 'fielding' ? (
+          {mainTab !== 'fielding' ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
               {[
                 { abbr: 'AVG', name: 'Batting Average', desc: 'Hits divided by At Bats. .300 is excellent.' },
