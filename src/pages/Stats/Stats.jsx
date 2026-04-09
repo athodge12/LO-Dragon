@@ -726,7 +726,7 @@ export default function Stats() {
   };
 
   const BestFitView = () => {
-    const ALL_POSITIONS = ['Pitcher', ...FIELDING_POSITIONS];
+    const ALL_POSITIONS = FIELDING_POSITIONS;
 
     const getFieldingFor = (playerId) =>
       subTab === 'practice'
