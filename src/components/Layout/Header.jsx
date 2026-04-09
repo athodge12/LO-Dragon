@@ -78,10 +78,10 @@ export default function Header({ title, back, actions }) {
     <>
       <header style={{
         background: 'linear-gradient(135deg, #CC1B1B 0%, #8B0000 100%)',
-        height: 'var(--header-height)',
+        height: 'calc(var(--header-height) + env(safe-area-inset-top, 0px))',
         display: 'flex',
         alignItems: 'center',
-        padding: '0 16px',
+        padding: 'env(safe-area-inset-top, 0px) 16px 0',
         gap: '12px',
         position: 'sticky',
         top: 0,

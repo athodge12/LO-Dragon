@@ -395,7 +395,7 @@ export default function Chat() {
 
       {/* Tabs — fixed below header so they're always visible */}
       <div style={{
-        position: 'fixed', top: 'var(--header-height)', left: '50%',
+        position: 'fixed', top: 'calc(var(--header-height) + env(safe-area-inset-top, 0px))', left: '50%',
         transform: 'translateX(-50%)',
         width: '100%', maxWidth: 'var(--max-width)', zIndex: 10,
         display: 'flex', borderBottom: '1px solid var(--gray-200)',
@@ -435,7 +435,7 @@ export default function Chat() {
           }}
           style={{
             position: 'fixed',
-            top: 'calc(var(--header-height) + 45px)',
+            top: 'calc(var(--header-height) + env(safe-area-inset-top, 0px) + 45px)',
             left: '50%', transform: 'translateX(-50%)',
             width: '100%', maxWidth: 'var(--max-width)',
             background: '#FFF5F5', borderBottom: '2px solid #FECACA',
