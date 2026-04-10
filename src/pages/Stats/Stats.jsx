@@ -31,9 +31,9 @@ function fitScore(fieldingData, position) {
     const expectedPO  = f.innings * base;
     const putoutBoost = Math.min(1.0, (f.putouts || 0) / Math.max(1, expectedPO));
     const qualityMult = errorMult * (0.6 + 0.4 * putoutBoost);
-    return { score: base * qualityMult, label: f.innings >= 3 ? 'solid data' : 'limited data', innings: f.innings, putouts: f.putouts || 0, errors: f.errors };
+    return { score: base * qualityMult, label: f.innings >= 3 ? 'solid data' : 'limited data', innings: f.innings, putouts: f.putouts || 0, assists: f.assists || 0, errors: f.errors };
   }
-  return { score: base * 0.65, label: 'no data', innings: 0, putouts: 0, errors: 0 };
+  return { score: base * 0.65, label: 'no data', innings: 0, putouts: 0, assists: 0, errors: 0 };
 }
 
 function scoreColor(score) {
@@ -772,13 +772,13 @@ export default function Stats() {
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
                   <thead>
                     <tr style={{ background: 'var(--gray-50)' }}>
-                      {['#','Player','Fit','Inn','PO','E','Data'].map(h => (
+                      {['#','Player','Fit','Inn','PO','A','E','Data'].map(h => (
                         <th key={h} style={{ padding: '6px 8px', fontWeight: '700', color: 'var(--gray-500)', fontSize: '11px', textTransform: 'uppercase', textAlign: h === 'Player' ? 'left' : 'center', borderBottom: '1px solid var(--gray-200)' }}>{h}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
-                    {[...withData, ...noData].map(({ p, score, label, innings, putouts, errors }, i) => {
+                    {[...withData, ...noData].map(({ p, score, label, innings, putouts, assists, errors }, i) => {
                       const pct = Math.round(score * 100);
                       const { bg, text } = scoreColor(score);
                       const isTop = i === 0 && withData.length > 0;
@@ -794,6 +794,7 @@ export default function Stats() {
                           </td>
                           <td style={{ padding: '7px 8px', textAlign: 'center', color: label === 'no data' ? 'var(--gray-300)' : 'inherit' }}>{innings || '—'}</td>
                           <td style={{ padding: '7px 8px', textAlign: 'center', color: label === 'no data' ? 'var(--gray-300)' : putouts > 0 ? '#16A34A' : 'inherit', fontWeight: putouts > 0 ? '700' : 'normal' }}>{label === 'no data' ? '—' : putouts}</td>
+                          <td style={{ padding: '7px 8px', textAlign: 'center', color: label === 'no data' ? 'var(--gray-300)' : assists > 0 ? '#2563EB' : 'inherit', fontWeight: assists > 0 ? '700' : 'normal' }}>{label === 'no data' ? '—' : assists}</td>
                           <td style={{ padding: '7px 8px', textAlign: 'center', color: label === 'no data' ? 'var(--gray-300)' : 'inherit' }}>{label === 'no data' ? '—' : errors}</td>
                           <td style={{ padding: '7px 8px', textAlign: 'center', fontSize: '10px', color: label === 'no data' ? 'var(--gray-300)' : label === 'solid data' ? '#16A34A' : '#D97706', fontWeight: '600' }}>{label}</td>
                         </tr>
