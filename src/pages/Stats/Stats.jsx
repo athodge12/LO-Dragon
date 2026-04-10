@@ -906,7 +906,30 @@ export default function Stats() {
   const HittingPracticeView = () => {
     if (!practiceDates.length) return <PracticeEmptyState icon="🏋️" label="No practice stats yet" />;
     const rows = players
-      .map(p => ({ p, entry: practiceDate ? allStats[p.id]?.practiceLogs?.[practiceDate] : allStats[p.id]?.practiceAgg }))
+      .map(p => {
+        let entry;
+        if (practiceDate) {
+          entry = allStats[p.id]?.practiceLogs?.[practiceDate];
+        } else {
+          const logs = Object.values(allStats[p.id]?.practiceLogs || {});
+          if (!logs.length) { entry = null; }
+          else {
+            entry = logs.reduce((acc, l) => ({
+              ab:      (acc.ab||0)      + (l.ab||0),
+              singles: (acc.singles||0) + (l.singles||0),
+              doubles: (acc.doubles||0) + (l.doubles||0),
+              triples: (acc.triples||0) + (l.triples||0),
+              hr:      (acc.hr||0)      + (l.hr||0),
+              hits:    (acc.hits||0)    + (l.hits||0),
+              rbi:     (acc.rbi||0)     + (l.rbi||0),
+              k:       (acc.k||0)       + (l.k||0),
+              bb:      (acc.bb||0)      + (l.bb||0),
+              runs:    (acc.runs||0)    + (l.runs||0),
+            }), {});
+          }
+        }
+        return { p, entry };
+      })
       .filter(({ entry }) => entry && (entry.ab > 0 || (entry.hits ?? 0) > 0));
     return (
       <div style={{ marginTop: '14px' }}>
@@ -954,8 +977,24 @@ export default function Stats() {
         {FIELDING_POSITIONS.map(pos => {
           const rows = players
             .map(p => {
-              const src = practiceDate ? allStats[p.id]?.practiceLogs?.[practiceDate]?.fielding : allStats[p.id]?.practiceAgg?.fielding;
-              return { p, f: src?.[pos] };
+              let f;
+              if (practiceDate) {
+                f = allStats[p.id]?.practiceLogs?.[practiceDate]?.fielding?.[pos];
+              } else {
+                const logs = Object.values(allStats[p.id]?.practiceLogs || {});
+                const combined = logs.reduce((acc, l) => {
+                  const lf = l.fielding?.[pos];
+                  if (!lf) return acc;
+                  return {
+                    innings:  (acc.innings||0)  + (lf.innings||0),
+                    putouts:  (acc.putouts||0)  + (lf.putouts||0),
+                    assists:  (acc.assists||0)  + (lf.assists||0),
+                    errors:   (acc.errors||0)   + (lf.errors||0),
+                  };
+                }, {});
+                f = combined.innings > 0 ? combined : undefined;
+              }
+              return { p, f };
             })
             .filter(({ f }) => f && f.innings > 0)
             .sort((a, b) => (a.f.errors||0) - (b.f.errors||0));
