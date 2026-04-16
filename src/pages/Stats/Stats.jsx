@@ -30,7 +30,8 @@ function fitScore(fieldingData, position) {
     const errorMult   = Math.max(0.25, 1 - f.errors / f.innings);
     const expectedPO  = f.innings * base;
     const putoutBoost = Math.min(1.0, (f.putouts || 0) / Math.max(1, expectedPO));
-    const qualityMult = errorMult * (0.6 + 0.4 * putoutBoost);
+    const assistBoost = Math.min(1.0, (f.assists || 0) / Math.max(1, f.innings * 0.5));
+    const qualityMult = errorMult * (0.5 + 0.3 * putoutBoost + 0.2 * assistBoost);
     return { score: base * qualityMult, label: f.innings >= 3 ? 'solid data' : 'limited data', innings: f.innings, putouts: f.putouts || 0, assists: f.assists || 0, errors: f.errors };
   }
   return { score: base * 0.65, label: 'no data', innings: 0, putouts: 0, assists: 0, errors: 0 };
