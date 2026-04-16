@@ -463,6 +463,47 @@ export default function Schedule() {
     a.click(); URL.revokeObjectURL(url);
   }
 
+  function generateTextSchedule() {
+    const upcoming = allEvents.filter(e => !e.cancelled);
+    const lines = ['🐉 Dragons Baseball Schedule', ''];
+    upcoming.forEach(e => {
+      const dateObj = new Date(e.date + 'T12:00:00');
+      const dateStr = dateObj.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+      if (e.type === 'game') {
+        lines.push(`⚾ ${dateStr} — vs ${e.opponent}${e.homeAway ? ` (${e.homeAway})` : ''}`);
+      } else {
+        lines.push(`🏋️ ${dateStr} — Practice${e.focus ? ` (${e.focus})` : ''}`);
+      }
+      if (e.time) lines.push(`   🕐 ${e.time}`);
+      if (e.location) lines.push(`   📍 ${e.location}`);
+      lines.push('');
+    });
+    return lines.join('\n').trim();
+  }
+
+  async function copySchedule() {
+    const text = generateTextSchedule();
+    try {
+      await navigator.clipboard.writeText(text);
+      setToast('Schedule copied! Paste anywhere to share.');
+      setShowCalSync(false);
+    } catch {
+      setToast('Could not copy — try the Download option instead.');
+    }
+  }
+
+  async function shareSchedule() {
+    const text = generateTextSchedule();
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: 'Dragons Baseball Schedule', text });
+        setShowCalSync(false);
+      } catch { /* user cancelled */ }
+    } else {
+      copySchedule();
+    }
+  }
+
   function googleCalUrl(ev) {
     const times = parseTimeStr(ev.time);
     const ds = ev.date.replace(/-/g, '');
@@ -964,6 +1005,31 @@ export default function Schedule() {
               <p style={{ fontSize: '12px', color: '#854D0E', lineHeight: '1.5', margin: 0 }}>
                 <strong>Heads up:</strong> This is a one-time export (snapshot). If game times or locations change, you'll need to re-export and re-import to get the updates.
               </p>
+            </div>
+
+            {/* Share / Copy as text */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '10px' }}>
+              <button onClick={shareSchedule} style={{
+                padding: '14px', borderRadius: '12px', cursor: 'pointer',
+                fontWeight: '700', fontSize: '15px', border: 'none',
+                background: '#7C3AED', color: 'white'
+              }}>
+                📤 Share
+              </button>
+              <button onClick={copySchedule} style={{
+                padding: '14px', borderRadius: '12px', cursor: 'pointer',
+                fontWeight: '700', fontSize: '15px', border: '2px solid #7C3AED',
+                background: 'white', color: '#7C3AED'
+              }}>
+                📋 Copy Text
+              </button>
+            </div>
+            <p style={{ fontSize: '12px', color: 'var(--gray-400)', textAlign: 'center', marginBottom: '18px' }}>
+              Share or copy to paste in a text / email to parents
+            </p>
+
+            <div style={{ borderTop: '1px solid var(--gray-100)', paddingTop: '16px', marginBottom: '16px' }}>
+              <p style={{ fontWeight: '700', fontSize: '13px', color: 'var(--gray-700)', marginBottom: '10px' }}>ADD TO CALENDAR APP:</p>
             </div>
 
             {/* ICS download */}
