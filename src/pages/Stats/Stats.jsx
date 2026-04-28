@@ -77,6 +77,7 @@ export default function Stats() {
   const [mainTab, setMainTab] = useState('hitting');   // hitting | fielding | zones | bestfit
   const [subTab, setSubTab] = useState('game');         // game | practice
   const [practiceDate, setPracticeDate] = useState(null); // shared across practice views
+  const [selectedGame, setSelectedGame] = useState(null); // null = All, or a gameKey
 
   useEffect(() => {
     const d = sessionStorage.getItem('openPracticeDate');
@@ -531,6 +532,180 @@ export default function Stats() {
     const dateB = Object.values(allStats).find(s => s.gameLogs?.[b])?.gameLogs?.[b]?.date || '';
     return dateB.localeCompare(dateA);
   });
+
+  const gameKeyMeta = {};
+  allGameKeys.forEach(key => {
+    const e = Object.values(allStats).find(s => s.gameLogs?.[key])?.gameLogs?.[key];
+    if (e) gameKeyMeta[key] = { date: e.date || '', opponent: e.opponent || 'Game' };
+  });
+
+  const GamePicker = () => (
+    <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '16px' }}>
+      {[null, ...allGameKeys].map(key => {
+        const meta = key ? gameKeyMeta[key] : null;
+        const label = meta ? `vs ${meta.opponent}` : 'All';
+        const sub = meta && meta.date ? new Date(meta.date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : null;
+        return (
+          <button key={key ?? 'all'} onClick={() => setSelectedGame(key)} style={{
+            padding: '6px 14px', borderRadius: '20px', cursor: 'pointer', fontWeight: '700', fontSize: '12px', whiteSpace: 'nowrap',
+            border: `1.5px solid ${selectedGame === key ? 'var(--red)' : 'var(--gray-200)'}`,
+            background: selectedGame === key ? '#FEF2F2' : 'white',
+            color: selectedGame === key ? 'var(--red)' : 'var(--gray-500)',
+          }}>
+            {label}{sub ? <span style={{ fontWeight: '400', marginLeft: '4px' }}>{sub}</span> : null}
+          </button>
+        );
+      })}
+    </div>
+  );
+
+  const HittingGameView = () => {
+    if (!allGameKeys.length) return (
+      <div className="empty-state" style={{ marginTop: '24px' }}>
+        <p style={{ fontSize: '32px' }}>⚾</p>
+        <p>No games logged yet</p>
+        {canEdit && <p style={{ fontSize: '13px', color: 'var(--gray-400)', marginTop: '4px' }}>Tap Log Game in the header to start.</p>}
+      </div>
+    );
+    const rows = players
+      .map(p => {
+        let entry;
+        if (selectedGame) {
+          entry = allStats[p.id]?.gameLogs?.[selectedGame];
+        } else {
+          const logs = Object.values(allStats[p.id]?.gameLogs || {});
+          if (!logs.length) { entry = null; }
+          else {
+            entry = logs.reduce((acc, l) => ({
+              ab:      (acc.ab||0)      + (l.ab||0),
+              singles: (acc.singles||0) + (l.singles||0),
+              doubles: (acc.doubles||0) + (l.doubles||0),
+              triples: (acc.triples||0) + (l.triples||0),
+              hr:      (acc.hr||0)      + (l.hr||0),
+              hits:    (acc.hits||0)    + (l.hits||0),
+              rbi:     (acc.rbi||0)     + (l.rbi||0),
+              k:       (acc.k||0)       + (l.k||0),
+              bb:      (acc.bb||0)      + (l.bb||0),
+              runs:    (acc.runs||0)    + (l.runs||0),
+            }), {});
+          }
+        }
+        return { p, entry };
+      })
+      .filter(({ entry }) => entry && (entry.ab > 0 || (entry.hits ?? 0) > 0));
+    return (
+      <div style={{ marginTop: '14px' }}>
+        <GamePicker />
+        <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+            <thead>
+              <tr style={{ background: 'var(--gray-50)' }}>
+                {['Player','AVG','AB','H','HR','RBI','K','BB'].map(h => (
+                  <th key={h} style={{ padding: '8px 6px', fontWeight: '700', color: 'var(--gray-500)', fontSize: '11px', textTransform: 'uppercase', textAlign: h==='Player'?'left':'center', borderBottom: '1px solid var(--gray-200)' }}>{h}</th>
+                ))}
+                {canEdit && !selectedGame && <th style={{ borderBottom: '1px solid var(--gray-200)' }} />}
+              </tr>
+            </thead>
+            <tbody>
+              {rows.length === 0 ? (
+                <tr><td colSpan={9} style={{ padding: '16px', textAlign: 'center', color: 'var(--gray-400)', fontSize: '13px' }}>No batting data{selectedGame ? ' for this game' : ''}</td></tr>
+              ) : rows.map(({ p, entry }, i) => {
+                const hits = entry.hits ?? ((entry.singles||0)+(entry.doubles||0)+(entry.triples||0)+(entry.hr||0));
+                const avg = entry.ab > 0 ? '.' + String(Math.round((hits / entry.ab) * 1000)).padStart(3, '0') : '.---';
+                return (
+                  <tr key={p.id} style={{ borderBottom: i < rows.length-1 ? '1px solid var(--gray-100)' : 'none' }}>
+                    <td style={{ padding: '8px 6px', fontWeight: '700' }}>{getPlayerName(p)}</td>
+                    <td style={{ padding: '8px 6px', textAlign: 'center', fontFamily: 'Oswald, sans-serif', fontWeight: '700', color: 'var(--red)' }}>{avg}</td>
+                    <td style={{ padding: '8px 6px', textAlign: 'center' }}>{entry.ab||0}</td>
+                    <td style={{ padding: '8px 6px', textAlign: 'center' }}>{hits}</td>
+                    <td style={{ padding: '8px 6px', textAlign: 'center' }}>{entry.hr||0}</td>
+                    <td style={{ padding: '8px 6px', textAlign: 'center' }}>{entry.rbi||0}</td>
+                    <td style={{ padding: '8px 6px', textAlign: 'center' }}>{entry.k||0}</td>
+                    <td style={{ padding: '8px 6px', textAlign: 'center' }}>{entry.bb||0}</td>
+                    {canEdit && !selectedGame && (
+                      <td style={{ padding: '8px 6px', textAlign: 'center' }}>
+                        <button onClick={() => startEdit(p)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '16px' }}>✏️</button>
+                      </td>
+                    )}
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    );
+  };
+
+  const FieldingGameView = () => {
+    if (!allGameKeys.length) return (
+      <div className="empty-state" style={{ marginTop: '24px' }}>
+        <p style={{ fontSize: '32px' }}>🧤</p>
+        <p>No games logged yet</p>
+      </div>
+    );
+    return (
+      <div style={{ marginTop: '14px' }}>
+        <GamePicker />
+        {FIELDING_POSITIONS.map(pos => {
+          const rows = players
+            .map(p => {
+              let f;
+              if (selectedGame) {
+                f = allStats[p.id]?.gameLogs?.[selectedGame]?.fielding?.[pos];
+              } else {
+                const logs = Object.values(allStats[p.id]?.gameLogs || {});
+                const combined = logs.reduce((acc, l) => {
+                  const lf = l.fielding?.[pos];
+                  if (!lf) return acc;
+                  return {
+                    innings:  (acc.innings||0)  + (lf.innings||0),
+                    putouts:  (acc.putouts||0)  + (lf.putouts||0),
+                    assists:  (acc.assists||0)  + (lf.assists||0),
+                    errors:   (acc.errors||0)   + (lf.errors||0),
+                  };
+                }, {});
+                f = combined.innings > 0 ? combined : undefined;
+              }
+              return { p, f };
+            })
+            .filter(({ f }) => f && f.innings > 0)
+            .sort((a, b) => (a.f.errors||0) - (b.f.errors||0));
+          if (!rows.length) return null;
+          return (
+            <div key={pos} style={{ marginBottom: '14px' }}>
+              <div style={{ fontWeight: '700', fontSize: '13px', color: 'var(--gray-600)', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ background: 'var(--gray-100)', borderRadius: '6px', padding: '2px 8px', fontFamily: 'Oswald, sans-serif' }}>{POS_SHORT[pos]}</span>
+                {pos}
+              </div>
+              <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                  <thead>
+                    <tr style={{ background: 'var(--gray-50)' }}>
+                      {['Player','Inn','PO','A','E'].map(h => (
+                        <th key={h} style={{ padding: '6px 8px', fontWeight: '700', color: 'var(--gray-500)', fontSize: '11px', textTransform: 'uppercase', textAlign: h==='Player'?'left':'center', borderBottom: '1px solid var(--gray-200)' }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rows.map(({ p, f }, i) => (
+                      <tr key={p.id} style={{ borderBottom: i < rows.length-1 ? '1px solid var(--gray-100)' : 'none' }}>
+                        <td style={{ padding: '7px 8px', fontWeight: '700' }}>{getPlayerName(p)}</td>
+                        <td style={{ padding: '7px 8px', textAlign: 'center' }}>{f.innings||0}</td>
+                        <td style={{ padding: '7px 8px', textAlign: 'center' }}>{f.putouts||0}</td>
+                        <td style={{ padding: '7px 8px', textAlign: 'center' }}>{f.assists||0}</td>
+                        <td style={{ padding: '7px 8px', textAlign: 'center', fontWeight: '700', color: (f.errors||0)>2?'var(--red)':(f.errors||0)>0?'#D97706':'#16A34A' }}>{f.errors||0}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
 
   const GameLogView = () => {
     const [deleteConfirmKey, setDeleteConfirmKey] = useState(null);
@@ -1444,41 +1619,7 @@ export default function Stats() {
         </div>
 
         {/* ── Hitting › Game ── */}
-        {mainTab === 'hitting' && subTab === 'game' && (
-          <>
-            <div style={{ background: 'linear-gradient(135deg, #CC1B1B, #8B0000)', borderRadius: '12px', padding: '16px', marginBottom: '14px', color: 'white' }}>
-              <p style={{ fontSize: '11px', fontWeight: '600', letterSpacing: '1px', opacity: 0.75, textTransform: 'uppercase', marginBottom: '8px' }}>
-                Team Batting — {tab === 'career' ? 'All-Time' : `${currentYear} Season`}
-              </p>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '8px' }}>
-                {[
-                  { label: 'AVG', value: '.' + String(Math.round(teamAvg * 1000)).padStart(3, '0') },
-                  { label: 'OBP', value: '.' + String(Math.round(calcOBP(activeTeam.hits||0, activeTeam.bb||0, activeTeam.ab||0) * 1000)).padStart(3,'0') },
-                  { label: 'H',   value: activeTeam.hits || 0 },
-                  { label: 'HR',  value: activeTeam.hr   || 0 },
-                  { label: 'RBI', value: activeTeam.rbi  || 0 },
-                ].map(s => (
-                  <div key={s.label} style={{ textAlign: 'center' }}>
-                    <div style={{ fontFamily: 'Oswald, sans-serif', fontSize: '22px', fontWeight: '700' }}>{s.value}</div>
-                    <div style={{ fontSize: '10px', opacity: 0.7, textTransform: 'uppercase' }}>{s.label}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-            <div className="tabs">
-              <button className={`tab ${tab === 'current' ? 'active' : ''}`} onClick={() => setTab('current')}>{currentYear}</button>
-              <button className={`tab ${tab === 'career' ? 'active' : ''}`} onClick={() => setTab('career')}>All-Time</button>
-              <button className={`tab ${tab === 'charts' ? 'active' : ''}`} onClick={() => setTab('charts')}>Charts</button>
-              <button className={`tab ${tab === 'history' ? 'active' : ''}`} onClick={() => setTab('history')}>History</button>
-              <button className={`tab ${tab === 'log' ? 'active' : ''}`} onClick={() => setTab('log')}>Log</button>
-            </div>
-            {tab === 'current' && <BattingTable getStats={getCurrentSeason} showEdit={true} />}
-            {tab === 'career'  && <BattingTable getStats={getCareer} showEdit={false} />}
-            {tab === 'charts'  && <ChartsView />}
-            {tab === 'history' && <SeasonHistory />}
-            {tab === 'log'     && <GameLogView />}
-          </>
-        )}
+        {mainTab === 'hitting' && subTab === 'game' && <HittingGameView />}
 
         {/* ── Hitting › Practice ── */}
         {mainTab === 'hitting' && subTab === 'practice' && (isCoach
@@ -1487,7 +1628,7 @@ export default function Stats() {
         )}
 
         {/* ── Fielding › Game ── */}
-        {mainTab === 'fielding' && subTab === 'game' && <RotationView />}
+        {mainTab === 'fielding' && subTab === 'game' && <FieldingGameView />}
 
         {/* ── Fielding › Practice ── */}
         {mainTab === 'fielding' && subTab === 'practice' && (isCoach
