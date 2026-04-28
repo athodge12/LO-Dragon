@@ -371,7 +371,7 @@ export default function LiveScoring() {
 
           {/* Inning selector */}
           {canEdit && (
-            <div style={{ marginTop: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+            <div style={{ marginTop: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}>
               <span style={{ color: 'var(--gray-500)', fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.5px', marginRight: '4px' }}>Inning</span>
               {INNINGS.map(i => (
                 <button key={i} onClick={() => setScoringInning(i)} style={{
@@ -380,6 +380,16 @@ export default function LiveScoring() {
                   color: scoringInning === i ? 'white' : 'var(--gray-400)',
                 }}>{i}</button>
               ))}
+              {scoringInning > 7 && (
+                <button onClick={() => setScoringInning(scoringInning)} style={{
+                  height: 28, padding: '0 6px', borderRadius: '6px', border: 'none', cursor: 'pointer', fontFamily: 'Oswald, sans-serif', fontWeight: '700', fontSize: '13px',
+                  background: 'var(--red)', color: 'white',
+                }}>{scoringInning}</button>
+              )}
+              <button onClick={() => setScoringInning(s => s > 7 ? s + 1 : 8)} style={{
+                height: 28, padding: '0 5px', borderRadius: '6px', border: '1px dashed var(--gray-600)', cursor: 'pointer', fontFamily: 'Oswald, sans-serif', fontWeight: '700', fontSize: '10px',
+                background: 'transparent', color: 'var(--gray-600)',
+              }}>+EI</button>
             </div>
           )}
 

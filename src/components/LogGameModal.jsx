@@ -122,6 +122,18 @@ function LiveScoreBanner({ liveScore, onScoreAdjust, onOutsChange, onInningChang
                 color: liveScore.inning === i ? 'white' : 'var(--gray-400)',
               }}>{i}</button>
             ))}
+            {liveScore.inning > 7 && (
+              <button onClick={() => onInningChange(liveScore.inning)} style={{
+                padding: '5px 6px', borderRadius: '6px', border: 'none', cursor: 'pointer',
+                fontFamily: 'Oswald, sans-serif', fontWeight: '700', fontSize: '13px',
+                background: 'var(--red)', color: 'white',
+              }}>{liveScore.inning}</button>
+            )}
+            <button onClick={() => onInningChange(liveScore.inning > 7 ? liveScore.inning + 1 : 8)} style={{
+              padding: '5px 6px', borderRadius: '6px', border: '1px dashed var(--gray-600)', cursor: 'pointer',
+              fontFamily: 'Oswald, sans-serif', fontWeight: '700', fontSize: '10px',
+              background: 'transparent', color: 'var(--gray-600)',
+            }}>+EI</button>
           </div>
         </div>
       )}
