@@ -1711,6 +1711,9 @@ export default function Stats() {
         <div className="modal-overlay" onClick={() => setEditingPlayer(null)}>
           <div className="modal-sheet" onClick={e => e.stopPropagation()} style={{ maxHeight: '90vh', overflowY: 'auto' }}>
             <div className="modal-handle" />
+            <div style={{ position: 'sticky', top: 0, zIndex: 10, background: 'white', display: 'flex', justifyContent: 'flex-end', marginBottom: '-8px' }}>
+              <button onClick={() => setEditingPlayer(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '22px', color: 'var(--gray-400)', padding: '0 4px', lineHeight: 1 }}>✕</button>
+            </div>
             <h3 style={{ fontFamily: 'Oswald, sans-serif', fontSize: '20px', marginBottom: '4px', textTransform: 'uppercase' }}>Edit Stats</h3>
             <p style={{ color: 'var(--gray-500)', fontSize: '14px', marginBottom: '12px' }}>
               {getPlayerName(players.find(p => p.id === editingPlayer))} — {currentYear}
@@ -1841,6 +1844,9 @@ export default function Stats() {
         <div className="modal-overlay" onClick={() => setShowNewSeasonModal(false)}>
           <div className="modal-sheet" onClick={e => e.stopPropagation()}>
             <div className="modal-handle" />
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '-8px' }}>
+              <button onClick={() => setShowNewSeasonModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '22px', color: 'var(--gray-400)', padding: '0 4px', lineHeight: 1 }}>✕</button>
+            </div>
             <h3 style={{ fontFamily: 'Oswald, sans-serif', fontSize: '20px', marginBottom: '8px', textTransform: 'uppercase' }}>Start New Season</h3>
             <p style={{ fontSize: '14px', color: 'var(--gray-500)', marginBottom: '16px', lineHeight: '1.5' }}>
               Archives <strong>{currentYear}</strong> stats and starts fresh. Career totals are preserved.

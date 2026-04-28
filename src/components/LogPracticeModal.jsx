@@ -206,6 +206,9 @@ export default function LogPracticeModal({ players, practiceSchedule = [], onClo
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-sheet" onClick={e => e.stopPropagation()} style={{ maxHeight: '85vh', overflowY: 'auto' }}>
         <div className="modal-handle" />
+        <div style={{ position: 'sticky', top: 0, zIndex: 10, background: 'white', display: 'flex', justifyContent: 'flex-end', marginBottom: '-8px' }}>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '22px', color: 'var(--gray-400)', padding: '0 4px', lineHeight: 1 }}>✕</button>
+        </div>
         <h3 style={{ fontFamily: 'Oswald, sans-serif', fontSize: '20px', marginBottom: '4px', textTransform: 'uppercase' }}>Log Practice Stats</h3>
         <p style={{ fontSize: '13px', color: 'var(--gray-500)', marginBottom: '14px' }}>Pick today's practice to start logging.</p>
 
@@ -245,6 +248,11 @@ export default function LogPracticeModal({ players, practiceSchedule = [], onClo
     <div className="modal-overlay" onClick={!activePlayer ? onClose : undefined}>
       <div className="modal-sheet" onClick={e => e.stopPropagation()} style={{ maxHeight: '95vh', overflowY: 'auto', paddingBottom: '24px' }}>
         <div className="modal-handle" />
+        <div style={{ position: 'sticky', top: 0, zIndex: 10, background: 'white', display: 'flex', justifyContent: 'flex-end', marginBottom: '-8px' }}>
+          <button onClick={activePlayer ? () => setActivePlayer(null) : onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '22px', color: 'var(--gray-400)', padding: '0 4px', lineHeight: 1 }}>
+            {activePlayer ? '←' : '✕'}
+          </button>
+        </div>
 
         {/* Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '14px' }}>

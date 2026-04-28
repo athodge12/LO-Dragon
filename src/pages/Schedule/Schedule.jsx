@@ -795,6 +795,9 @@ export default function Schedule() {
         <div className="modal-overlay" onClick={() => setModal(null)}>
           <div className="modal-sheet" onClick={e => e.stopPropagation()}>
             <div className="modal-handle" />
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '-8px' }}>
+              <button onClick={() => setModal(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '22px', color: 'var(--gray-400)', padding: '0 4px', lineHeight: 1 }}>✕</button>
+            </div>
             <h3 style={{ fontFamily: 'Oswald, sans-serif', fontSize: '20px', marginBottom: '16px', textTransform: 'uppercase' }}>Add Game</h3>
             <div className="form-group">
               <label className="form-label">Opponent</label>
@@ -831,6 +834,9 @@ export default function Schedule() {
         <div className="modal-overlay" onClick={() => setScoreModal(null)}>
           <div className="modal-sheet" onClick={e => e.stopPropagation()}>
             <div className="modal-handle" />
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '-8px' }}>
+              <button onClick={() => setScoreModal(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '22px', color: 'var(--gray-400)', padding: '0 4px', lineHeight: 1 }}>✕</button>
+            </div>
             <h3 style={{ fontFamily: 'Oswald, sans-serif', fontSize: '20px', marginBottom: '4px', textTransform: 'uppercase' }}>
               Record Score
             </h3>
@@ -869,6 +875,9 @@ export default function Schedule() {
         <div className="modal-overlay" onClick={() => setEditModal(null)}>
           <div className="modal-sheet" onClick={e => e.stopPropagation()} style={{ maxHeight: '85vh', overflowY: 'auto' }}>
             <div className="modal-handle" />
+            <div style={{ position: 'sticky', top: 0, zIndex: 10, background: 'white', display: 'flex', justifyContent: 'flex-end', marginBottom: '-8px' }}>
+              <button onClick={() => setEditModal(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '22px', color: 'var(--gray-400)', padding: '0 4px', lineHeight: 1 }}>✕</button>
+            </div>
             <h3 style={{ fontFamily: 'Oswald, sans-serif', fontSize: '20px', marginBottom: '4px', textTransform: 'uppercase' }}>Edit Game</h3>
             <p style={{ fontSize: '13px', color: 'var(--gray-500)', marginBottom: '16px' }}>vs {editModal.opponent}</p>
             <div className="form-group">
@@ -915,6 +924,9 @@ export default function Schedule() {
         <div className="modal-overlay" onClick={() => setEditPracticeModal(null)}>
           <div className="modal-sheet" onClick={e => e.stopPropagation()} style={{ maxHeight: '85vh', overflowY: 'auto' }}>
             <div className="modal-handle" />
+            <div style={{ position: 'sticky', top: 0, zIndex: 10, background: 'white', display: 'flex', justifyContent: 'flex-end', marginBottom: '-8px' }}>
+              <button onClick={() => setEditPracticeModal(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '22px', color: 'var(--gray-400)', padding: '0 4px', lineHeight: 1 }}>✕</button>
+            </div>
             <h3 style={{ fontFamily: 'Oswald, sans-serif', fontSize: '20px', marginBottom: '4px', textTransform: 'uppercase' }}>Edit Practice</h3>
             <p style={{ fontSize: '13px', color: 'var(--gray-500)', marginBottom: '16px' }}>
               {editPracticeModal.day} · {new Date(editPracticeModal.date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
@@ -995,6 +1007,9 @@ export default function Schedule() {
         <div className="modal-overlay" onClick={() => setShowCalSync(false)}>
           <div className="modal-sheet" onClick={e => e.stopPropagation()} style={{ maxHeight: '85vh', overflowY: 'auto' }}>
             <div className="modal-handle" />
+            <div style={{ position: 'sticky', top: 0, zIndex: 10, background: 'white', display: 'flex', justifyContent: 'flex-end', marginBottom: '-8px' }}>
+              <button onClick={() => setShowCalSync(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '22px', color: 'var(--gray-400)', padding: '0 4px', lineHeight: 1 }}>✕</button>
+            </div>
             <h3 style={{ fontFamily: 'Oswald, sans-serif', fontSize: '20px', marginBottom: '4px', textTransform: 'uppercase' }}>
               📅 Sync Schedule
             </h3>
