@@ -388,7 +388,7 @@ export default function LogGameModal({ players, currentYear, games = [], initial
             <h3 style={{ fontFamily: 'Oswald, sans-serif', fontSize: '20px', marginBottom: '4px', textTransform: 'uppercase' }}>Log a Game</h3>
             <p style={{ color: 'var(--gray-500)', fontSize: '14px', marginBottom: '14px' }}>Pick a game or enter manually.</p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px' }}>
-              {games.slice(0, 10).map(g => (
+              {[...games].sort((a, b) => (b.date || '').localeCompare(a.date || '')).map(g => (
                 <button key={g.id} onClick={() => { setLogGame({ id: g.id, opponent: g.opponent || g.title || 'Game', date: g.date || '', year: currentYear }); setZoneStepActive(true); }}
                   style={{ textAlign: 'left', padding: '12px 14px', borderRadius: '10px', border: '1px solid var(--gray-200)', background: 'white', cursor: 'pointer' }}>
                   <div style={{ fontWeight: '700', fontSize: '14px' }}>vs {g.opponent || g.title || 'Game'}</div>
