@@ -84,6 +84,12 @@ export default function LiveScoring() {
     await setDoc(doc(db, 'settings', 'liveScore'), updated);
   };
 
+  const updateOuts = async () => {
+    if (!canEdit) return;
+    const newOuts = ((scoreData.outs || 0) + 1) % 4;
+    await setDoc(doc(db, 'settings', 'liveScore'), { ...scoreData, outs: newOuts });
+  };
+
   // Load a game from the schedule onto the scoreboard
   const loadGame = async (game) => {
     const newScore = {
@@ -361,6 +367,37 @@ export default function LiveScoring() {
               </tbody>
             </table>
           </div>
+
+          {/* Outs tracker */}
+          <div style={{ marginTop: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px' }}>
+            <span style={{ color: 'var(--gray-500)', fontSize: '12px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Outs</span>
+            {canEdit ? (
+              <button onClick={updateOuts} style={{ display: 'flex', gap: '8px', alignItems: 'center', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 8px', borderRadius: '8px' }}>
+                {[0, 1, 2].map(i => (
+                  <div key={i} style={{
+                    width: 18, height: 18, borderRadius: '50%',
+                    background: i < (scoreData.outs || 0) ? 'var(--red)' : 'var(--gray-700)',
+                    border: `2px solid ${i < (scoreData.outs || 0) ? 'var(--red)' : 'var(--gray-600)'}`,
+                    transition: 'background 0.15s'
+                  }} />
+                ))}
+              </button>
+            ) : (
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                {[0, 1, 2].map(i => (
+                  <div key={i} style={{
+                    width: 18, height: 18, borderRadius: '50%',
+                    background: i < (scoreData.outs || 0) ? 'var(--red)' : 'var(--gray-700)',
+                    border: `2px solid ${i < (scoreData.outs || 0) ? 'var(--red)' : 'var(--gray-600)'}`
+                  }} />
+                ))}
+              </div>
+            )}
+            <span style={{ color: 'var(--gray-400)', fontSize: '13px', fontWeight: '700' }}>
+              {scoreData.outs || 0} {(scoreData.outs || 0) === 1 ? 'out' : 'outs'}
+              {(scoreData.outs || 0) === 3 && <span style={{ color: 'var(--red)', marginLeft: '6px' }}>— Inning Over</span>}
+            </span>
+          </div>
         </div>
 
         {/* Game status */}
@@ -514,6 +551,7 @@ export default function LiveScoring() {
           currentYear={currentYear}
           games={[]}
           initialGame={activeGame}
+          liveScore={{ dragons: dragonsTotal, them: themTotal, opponent: scoreData.opponent, outs: scoreData.outs || 0 }}
           onClose={() => setShowLogStats(false)}
           onSaved={msg => { setToast(msg); setShowLogStats(false); }}
         />

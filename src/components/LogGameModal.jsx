@@ -68,7 +68,7 @@ function PlusMinus({ label, value, onInc, onDec }) {
   );
 }
 
-export default function LogGameModal({ players, currentYear, games = [], initialGame = null, onClose, onSaved }) {
+export default function LogGameModal({ players, currentYear, games = [], initialGame = null, liveScore = null, onClose, onSaved }) {
   const [logGame, setLogGame] = useState(initialGame);
   const [manualGame, setManualGame] = useState({ opponent: '', date: new Date().toISOString().slice(0, 10) });
   const [logEntries, setLogEntries] = useState({});
@@ -383,6 +383,31 @@ export default function LogGameModal({ players, currentYear, games = [], initial
             Tap a player to enter their stats
           </div>
         </div>
+
+        {/* Live score banner */}
+        {liveScore && (
+          <div style={{ background: '#111', borderRadius: '12px', padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px', fontFamily: 'Oswald, sans-serif' }}>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: '10px', color: 'var(--red)', fontWeight: '700', textTransform: 'uppercase', marginBottom: '2px' }}>Dragons</div>
+              <div style={{ fontSize: '36px', fontWeight: '700', color: liveScore.dragons >= liveScore.them ? '#FFD700' : 'white', lineHeight: 1 }}>{liveScore.dragons}</div>
+            </div>
+            <div>
+              <div style={{ color: 'var(--gray-500)', fontSize: '20px', textAlign: 'center' }}>–</div>
+              <div style={{ display: 'flex', gap: '6px', marginTop: '6px', justifyContent: 'center' }}>
+                {[0, 1, 2].map(i => (
+                  <div key={i} style={{ width: 10, height: 10, borderRadius: '50%', background: i < liveScore.outs ? 'var(--red)' : 'var(--gray-700)' }} />
+                ))}
+              </div>
+              <div style={{ fontSize: '9px', color: 'var(--gray-500)', textAlign: 'center', marginTop: '3px', textTransform: 'uppercase', letterSpacing: '0.3px' }}>
+                {liveScore.outs} {liveScore.outs === 1 ? 'out' : 'outs'}
+              </div>
+            </div>
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ fontSize: '10px', color: 'var(--gray-400)', fontWeight: '700', textTransform: 'uppercase', marginBottom: '2px' }}>{liveScore.opponent?.substring(0, 6)?.toUpperCase() || 'OPP'}</div>
+              <div style={{ fontSize: '36px', fontWeight: '700', color: liveScore.them > liveScore.dragons ? '#FFD700' : 'white', lineHeight: 1 }}>{liveScore.them}</div>
+            </div>
+          </div>
+        )}
 
         {/* Player grid */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', marginBottom: '16px' }}>
