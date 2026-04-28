@@ -180,8 +180,8 @@ export default function LiveScoring() {
     : { id: 'live_' + new Date().toISOString().slice(0, 10), opponent: scoreData.opponent || 'Opponent', date: new Date().toISOString().slice(0, 10), year: currentYear };
 
   const today = new Date().toISOString().slice(0, 10);
-  const upcomingGames = games.filter(g => !g.result && g.date >= today).slice(0, 10);
-  const recentGames = games.filter(g => g.result || g.date < today).slice(0, 5);
+  const upcomingGames = games.filter(g => !g.result && g.date >= today);
+  const recentGames = games.filter(g => g.result || g.date < today);
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
@@ -394,6 +394,9 @@ export default function LiveScoring() {
         <div className="modal-overlay" onClick={() => setShowGamePicker(false)}>
           <div className="modal-sheet" onClick={e => e.stopPropagation()} style={{ maxHeight: '90vh', overflowY: 'auto' }}>
             <div className="modal-handle" />
+            <div style={{ position: 'sticky', top: 0, zIndex: 10, background: 'white', display: 'flex', justifyContent: 'flex-end', marginBottom: '-8px' }}>
+              <button onClick={() => setShowGamePicker(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '22px', color: 'var(--gray-400)', padding: '0 4px', lineHeight: 1 }}>✕</button>
+            </div>
             <h3 style={{ fontFamily: 'Oswald, sans-serif', fontSize: '20px', marginBottom: '4px', textTransform: 'uppercase' }}>Select Game</h3>
             <p style={{ fontSize: '13px', color: 'var(--gray-500)', marginBottom: '14px' }}>
               Linking a game keeps the scoreboard, stats, and schedule in sync.
