@@ -34,6 +34,7 @@ export default function LiveScoring() {
   const [showLogStats, setShowLogStats] = useState(false);
   const [showGamePicker, setShowGamePicker] = useState(false);
   const [showEndGame, setShowEndGame] = useState(false);
+  const [scoringInning, setScoringInning] = useState(1);
 
   const DEFAULT_CHECKLIST = [
     { label: 'Lineup set', done: false },
@@ -368,6 +369,20 @@ export default function LiveScoring() {
             </table>
           </div>
 
+          {/* Inning selector */}
+          {canEdit && (
+            <div style={{ marginTop: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}>
+              <span style={{ color: 'var(--gray-500)', fontSize: '11px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.5px', marginRight: '4px' }}>Inning</span>
+              {INNINGS.map(i => (
+                <button key={i} onClick={() => setScoringInning(i)} style={{
+                  width: 28, height: 28, borderRadius: '6px', border: 'none', cursor: 'pointer', fontFamily: 'Oswald, sans-serif', fontWeight: '700', fontSize: '13px',
+                  background: scoringInning === i ? 'var(--red)' : 'var(--gray-700)',
+                  color: scoringInning === i ? 'white' : 'var(--gray-400)',
+                }}>{i}</button>
+              ))}
+            </div>
+          )}
+
           {/* Outs tracker */}
           <div style={{ marginTop: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px' }}>
             <span style={{ color: 'var(--gray-500)', fontSize: '12px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Outs</span>
@@ -551,7 +566,9 @@ export default function LiveScoring() {
           currentYear={currentYear}
           games={[]}
           initialGame={activeGame}
-          liveScore={{ dragons: dragonsTotal, them: themTotal, opponent: scoreData.opponent, outs: scoreData.outs || 0 }}
+          liveScore={{ dragons: dragonsTotal, them: themTotal, opponent: scoreData.opponent, outs: scoreData.outs || 0, inning: scoringInning }}
+          onScoreAdjust={(team, delta) => updateScore(team, scoringInning, delta)}
+          onOutsChange={updateOuts}
           onClose={() => setShowLogStats(false)}
           onSaved={msg => { setToast(msg); setShowLogStats(false); }}
         />

@@ -68,7 +68,51 @@ function PlusMinus({ label, value, onInc, onDec }) {
   );
 }
 
-export default function LogGameModal({ players, currentYear, games = [], initialGame = null, liveScore = null, onClose, onSaved }) {
+function LiveScoreBanner({ liveScore, onScoreAdjust, onOutsChange }) {
+  const canEdit = !!onScoreAdjust;
+  const ScoreCol = ({ team, label, color }) => (
+    <div style={{ textAlign: 'center' }}>
+      <div style={{ fontSize: '10px', color, fontWeight: '700', textTransform: 'uppercase', marginBottom: '4px' }}>{label}</div>
+      {canEdit && (
+        <button onClick={() => onScoreAdjust(team, 1)} style={{ display: 'block', width: '100%', background: 'var(--gray-700)', border: 'none', borderRadius: '4px', color: 'white', fontSize: '14px', lineHeight: '18px', cursor: 'pointer', marginBottom: '4px' }}>+</button>
+      )}
+      <div style={{ fontFamily: 'Oswald, sans-serif', fontSize: '36px', fontWeight: '700', lineHeight: 1, color: (team === 'dragons' ? liveScore.dragons >= liveScore.them : liveScore.them > liveScore.dragons) ? '#FFD700' : 'white' }}>
+        {liveScore[team]}
+      </div>
+      {canEdit && (
+        <button onClick={() => onScoreAdjust(team, -1)} style={{ display: 'block', width: '100%', background: 'var(--gray-700)', border: 'none', borderRadius: '4px', color: 'white', fontSize: '14px', lineHeight: '18px', cursor: 'pointer', marginTop: '4px' }}>−</button>
+      )}
+    </div>
+  );
+  return (
+    <div style={{ background: '#111', borderRadius: '12px', padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px', fontFamily: 'Oswald, sans-serif' }}>
+      <ScoreCol team="dragons" label="Dragons" color="var(--red)" />
+      <div style={{ textAlign: 'center' }}>
+        <div style={{ color: 'var(--gray-500)', fontSize: '16px', marginBottom: '6px' }}>Inn {liveScore.inning || '—'}</div>
+        {canEdit ? (
+          <button onClick={onOutsChange} style={{ display: 'flex', gap: '5px', alignItems: 'center', background: 'none', border: 'none', cursor: 'pointer', padding: '4px' }}>
+            {[0, 1, 2].map(i => (
+              <div key={i} style={{ width: 12, height: 12, borderRadius: '50%', background: i < liveScore.outs ? 'var(--red)' : 'var(--gray-700)', border: `2px solid ${i < liveScore.outs ? 'var(--red)' : 'var(--gray-600)'}` }} />
+            ))}
+          </button>
+        ) : (
+          <div style={{ display: 'flex', gap: '5px', alignItems: 'center', justifyContent: 'center' }}>
+            {[0, 1, 2].map(i => (
+              <div key={i} style={{ width: 12, height: 12, borderRadius: '50%', background: i < liveScore.outs ? 'var(--red)' : 'var(--gray-700)' }} />
+            ))}
+          </div>
+        )}
+        <div style={{ fontSize: '9px', color: 'var(--gray-500)', marginTop: '4px', textTransform: 'uppercase' }}>
+          {liveScore.outs} {liveScore.outs === 1 ? 'out' : 'outs'}
+          {liveScore.outs === 3 && <span style={{ color: 'var(--red)' }}> ✓</span>}
+        </div>
+      </div>
+      <ScoreCol team="them" label={liveScore.opponent?.substring(0, 6)?.toUpperCase() || 'OPP'} color="var(--gray-400)" />
+    </div>
+  );
+}
+
+export default function LogGameModal({ players, currentYear, games = [], initialGame = null, liveScore = null, onScoreAdjust = null, onOutsChange = null, onClose, onSaved }) {
   const [logGame, setLogGame] = useState(initialGame);
   const [manualGame, setManualGame] = useState({ opponent: '', date: new Date().toISOString().slice(0, 10) });
   const [logEntries, setLogEntries] = useState({});
@@ -270,6 +314,9 @@ export default function LogGameModal({ players, currentYear, games = [], initial
             </div>
           </div>
 
+          {/* Live score banner */}
+          {liveScore && <LiveScoreBanner liveScore={liveScore} onScoreAdjust={onScoreAdjust} onOutsChange={onOutsChange} />}
+
           {/* Batting / Fielding tabs */}
           <div style={{ display: 'flex', gap: '6px', marginBottom: '14px' }}>
             {['batting', 'fielding'].map(t => (
@@ -385,29 +432,7 @@ export default function LogGameModal({ players, currentYear, games = [], initial
         </div>
 
         {/* Live score banner */}
-        {liveScore && (
-          <div style={{ background: '#111', borderRadius: '12px', padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px', fontFamily: 'Oswald, sans-serif' }}>
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: '10px', color: 'var(--red)', fontWeight: '700', textTransform: 'uppercase', marginBottom: '2px' }}>Dragons</div>
-              <div style={{ fontSize: '36px', fontWeight: '700', color: liveScore.dragons >= liveScore.them ? '#FFD700' : 'white', lineHeight: 1 }}>{liveScore.dragons}</div>
-            </div>
-            <div>
-              <div style={{ color: 'var(--gray-500)', fontSize: '20px', textAlign: 'center' }}>–</div>
-              <div style={{ display: 'flex', gap: '6px', marginTop: '6px', justifyContent: 'center' }}>
-                {[0, 1, 2].map(i => (
-                  <div key={i} style={{ width: 10, height: 10, borderRadius: '50%', background: i < liveScore.outs ? 'var(--red)' : 'var(--gray-700)' }} />
-                ))}
-              </div>
-              <div style={{ fontSize: '9px', color: 'var(--gray-500)', textAlign: 'center', marginTop: '3px', textTransform: 'uppercase', letterSpacing: '0.3px' }}>
-                {liveScore.outs} {liveScore.outs === 1 ? 'out' : 'outs'}
-              </div>
-            </div>
-            <div style={{ textAlign: 'center' }}>
-              <div style={{ fontSize: '10px', color: 'var(--gray-400)', fontWeight: '700', textTransform: 'uppercase', marginBottom: '2px' }}>{liveScore.opponent?.substring(0, 6)?.toUpperCase() || 'OPP'}</div>
-              <div style={{ fontSize: '36px', fontWeight: '700', color: liveScore.them > liveScore.dragons ? '#FFD700' : 'white', lineHeight: 1 }}>{liveScore.them}</div>
-            </div>
-          </div>
-        )}
+        {liveScore && <LiveScoreBanner liveScore={liveScore} onScoreAdjust={onScoreAdjust} onOutsChange={onOutsChange} />}
 
         {/* Player grid */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', marginBottom: '16px' }}>
