@@ -68,7 +68,7 @@ function PlusMinus({ label, value, onInc, onDec }) {
   );
 }
 
-function LiveScoreBanner({ liveScore, onScoreAdjust, onOutsChange }) {
+function LiveScoreBanner({ liveScore, onScoreAdjust, onOutsChange, onInningChange }) {
   const canEdit = !!onScoreAdjust;
   const ScoreCol = ({ team, label, color }) => (
     <div style={{ textAlign: 'center' }}>
@@ -85,34 +85,51 @@ function LiveScoreBanner({ liveScore, onScoreAdjust, onOutsChange }) {
     </div>
   );
   return (
-    <div style={{ background: '#111', borderRadius: '12px', padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px', fontFamily: 'Oswald, sans-serif' }}>
-      <ScoreCol team="dragons" label="Dragons" color="var(--red)" />
-      <div style={{ textAlign: 'center' }}>
-        <div style={{ color: 'var(--gray-500)', fontSize: '16px', marginBottom: '6px' }}>Inn {liveScore.inning || '—'}</div>
-        {canEdit ? (
-          <button onClick={onOutsChange} style={{ display: 'flex', gap: '5px', alignItems: 'center', background: 'none', border: 'none', cursor: 'pointer', padding: '4px' }}>
-            {[0, 1, 2].map(i => (
-              <div key={i} style={{ width: 12, height: 12, borderRadius: '50%', background: i < liveScore.outs ? 'var(--red)' : 'var(--gray-700)', border: `2px solid ${i < liveScore.outs ? 'var(--red)' : 'var(--gray-600)'}` }} />
-            ))}
-          </button>
-        ) : (
-          <div style={{ display: 'flex', gap: '5px', alignItems: 'center', justifyContent: 'center' }}>
-            {[0, 1, 2].map(i => (
-              <div key={i} style={{ width: 12, height: 12, borderRadius: '50%', background: i < liveScore.outs ? 'var(--red)' : 'var(--gray-700)' }} />
+    <div style={{ background: '#111', borderRadius: '12px', padding: '12px 16px', marginBottom: '14px', fontFamily: 'Oswald, sans-serif' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: canEdit ? '12px' : '0' }}>
+        <ScoreCol team="dragons" label="Dragons" color="var(--red)" />
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ color: 'var(--gray-500)', fontSize: '13px', marginBottom: '6px', fontWeight: '700' }}>Inn {liveScore.inning || '—'}</div>
+          {canEdit ? (
+            <button onClick={onOutsChange} style={{ display: 'flex', gap: '5px', alignItems: 'center', background: 'none', border: 'none', cursor: 'pointer', padding: '4px', margin: '0 auto' }}>
+              {[0, 1, 2].map(i => (
+                <div key={i} style={{ width: 12, height: 12, borderRadius: '50%', background: i < liveScore.outs ? 'var(--red)' : 'var(--gray-700)', border: `2px solid ${i < liveScore.outs ? 'var(--red)' : 'var(--gray-600)'}` }} />
+              ))}
+            </button>
+          ) : (
+            <div style={{ display: 'flex', gap: '5px', alignItems: 'center', justifyContent: 'center' }}>
+              {[0, 1, 2].map(i => (
+                <div key={i} style={{ width: 12, height: 12, borderRadius: '50%', background: i < liveScore.outs ? 'var(--red)' : 'var(--gray-700)' }} />
+              ))}
+            </div>
+          )}
+          <div style={{ fontSize: '9px', color: 'var(--gray-500)', marginTop: '4px', textTransform: 'uppercase' }}>
+            {liveScore.outs} {liveScore.outs === 1 ? 'out' : 'outs'}
+            {liveScore.outs === 3 && <span style={{ color: 'var(--red)' }}> ✓</span>}
+          </div>
+        </div>
+        <ScoreCol team="them" label={liveScore.opponent?.substring(0, 6)?.toUpperCase() || 'OPP'} color="var(--gray-400)" />
+      </div>
+      {canEdit && onInningChange && (
+        <div style={{ borderTop: '1px solid var(--gray-800)', paddingTop: '10px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <span style={{ color: 'var(--gray-500)', fontSize: '10px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.5px', whiteSpace: 'nowrap' }}>Inning</span>
+          <div style={{ display: 'flex', gap: '4px', flex: 1 }}>
+            {[1,2,3,4,5,6,7].map(i => (
+              <button key={i} onClick={() => onInningChange(i)} style={{
+                flex: 1, padding: '5px 0', borderRadius: '6px', border: 'none', cursor: 'pointer',
+                fontFamily: 'Oswald, sans-serif', fontWeight: '700', fontSize: '13px',
+                background: liveScore.inning === i ? 'var(--red)' : 'var(--gray-700)',
+                color: liveScore.inning === i ? 'white' : 'var(--gray-400)',
+              }}>{i}</button>
             ))}
           </div>
-        )}
-        <div style={{ fontSize: '9px', color: 'var(--gray-500)', marginTop: '4px', textTransform: 'uppercase' }}>
-          {liveScore.outs} {liveScore.outs === 1 ? 'out' : 'outs'}
-          {liveScore.outs === 3 && <span style={{ color: 'var(--red)' }}> ✓</span>}
         </div>
-      </div>
-      <ScoreCol team="them" label={liveScore.opponent?.substring(0, 6)?.toUpperCase() || 'OPP'} color="var(--gray-400)" />
+      )}
     </div>
   );
 }
 
-export default function LogGameModal({ players, currentYear, games = [], initialGame = null, liveScore = null, onScoreAdjust = null, onOutsChange = null, onClose, onSaved }) {
+export default function LogGameModal({ players, currentYear, games = [], initialGame = null, liveScore = null, onScoreAdjust = null, onOutsChange = null, onInningChange = null, onClose, onSaved }) {
   const [logGame, setLogGame] = useState(initialGame);
   const [manualGame, setManualGame] = useState({ opponent: '', date: new Date().toISOString().slice(0, 10) });
   const [logEntries, setLogEntries] = useState({});
@@ -315,7 +332,7 @@ export default function LogGameModal({ players, currentYear, games = [], initial
           </div>
 
           {/* Live score banner */}
-          {liveScore && <LiveScoreBanner liveScore={liveScore} onScoreAdjust={onScoreAdjust} onOutsChange={onOutsChange} />}
+          {liveScore && <LiveScoreBanner liveScore={liveScore} onScoreAdjust={onScoreAdjust} onOutsChange={onOutsChange} onInningChange={onInningChange} />}
 
           {/* Batting / Fielding tabs */}
           <div style={{ display: 'flex', gap: '6px', marginBottom: '14px' }}>
@@ -432,7 +449,7 @@ export default function LogGameModal({ players, currentYear, games = [], initial
         </div>
 
         {/* Live score banner */}
-        {liveScore && <LiveScoreBanner liveScore={liveScore} onScoreAdjust={onScoreAdjust} onOutsChange={onOutsChange} />}
+        {liveScore && <LiveScoreBanner liveScore={liveScore} onScoreAdjust={onScoreAdjust} onOutsChange={onOutsChange} onInningChange={onInningChange} />}
 
         {/* Player grid */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', marginBottom: '16px' }}>

@@ -569,6 +569,7 @@ export default function LiveScoring() {
           liveScore={{ dragons: dragonsTotal, them: themTotal, opponent: scoreData.opponent, outs: scoreData.outs || 0, inning: scoringInning }}
           onScoreAdjust={(team, delta) => updateScore(team, scoringInning, delta)}
           onOutsChange={updateOuts}
+          onInningChange={setScoringInning}
           onClose={() => setShowLogStats(false)}
           onSaved={msg => { setToast(msg); setShowLogStats(false); }}
         />
