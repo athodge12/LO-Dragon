@@ -463,13 +463,33 @@ export default function Schedule() {
     return lines.join('\r\n');
   }
 
-  function downloadICS() {
+  async function downloadICS() {
     const content = generateICS();
     const blob = new Blob([content], { type: 'text/calendar;charset=utf-8' });
+
+    // iOS 15+: share the actual file so the user gets the native share sheet
+    if (navigator.canShare) {
+      const file = new File([blob], 'dragons-baseball.ics', { type: 'text/calendar' });
+      if (navigator.canShare({ files: [file] })) {
+        try {
+          await navigator.share({ files: [file], title: 'Dragons Baseball Schedule' });
+          return;
+        } catch (err) {
+          if (err?.name === 'AbortError') return;
+          // fall through to anchor download
+        }
+      }
+    }
+
+    // Desktop / Android fallback
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = url; a.download = 'dragons-baseball.ics';
-    a.click(); URL.revokeObjectURL(url);
+    a.href = url;
+    a.download = 'dragons-baseball.ics';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
 
   function generateTextSchedule() {
