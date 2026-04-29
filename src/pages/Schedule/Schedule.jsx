@@ -228,7 +228,7 @@ export default function Schedule() {
   const gameEvents = games.map(g => ({ ...g, type: 'game' }));
 
   const allEvents = [...gameEvents, ...practiceEvents]
-    .filter(e => e.date >= today)
+    .filter(e => e.date >= today || !!e.postponed)
     .sort((a, b) => a.date.localeCompare(b.date));
 
   const pastPracticeEvents = practiceEvents
@@ -299,7 +299,9 @@ export default function Schedule() {
 
   const updateGame = async () => {
     if (!editModal) return;
-    await setDoc(doc(db, 'games', editModal.id), { ...editForm, postponed: false }, { merge: true });
+    const updates = { ...editForm, postponed: false };
+    if (editModal.postponed) updates.cancelled = false;
+    await setDoc(doc(db, 'games', editModal.id), updates, { merge: true });
     setEditModal(null);
     setToast(editModal.postponed ? 'Game rescheduled! ✅' : 'Game updated!');
   };
