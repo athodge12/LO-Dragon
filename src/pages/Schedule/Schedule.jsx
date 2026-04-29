@@ -505,9 +505,13 @@ export default function Schedule() {
     const text = generateTextSchedule();
     if (navigator.share) {
       try {
-        await navigator.share({ title: 'Dragons Baseball Schedule', text });
+        await navigator.share({ title: 'Dragons Baseball Schedule', text, url: window.location.href });
         setShowCalSync(false);
-      } catch { /* user cancelled */ }
+      } catch (err) {
+        if (err?.name !== 'AbortError') {
+          copySchedule();
+        }
+      }
     } else {
       copySchedule();
     }
