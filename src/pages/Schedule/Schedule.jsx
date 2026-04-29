@@ -436,7 +436,7 @@ export default function Schedule() {
       'X-WR-CALNAME:Dragons Baseball',
       'X-WR-CALDESC:Dragons Baseball games and practices',
     ];
-    const upcoming = allEvents.filter(e => !e.cancelled);
+    const upcoming = allEvents.filter(e => !e.cancelled && !e.postponed);
     for (const ev of upcoming) {
       const times = parseTimeStr(ev.time);
       const ds = ev.date.replace(/-/g, '');
@@ -473,7 +473,7 @@ export default function Schedule() {
   }
 
   function generateTextSchedule() {
-    const upcoming = allEvents.filter(e => !e.cancelled);
+    const upcoming = allEvents.filter(e => !e.cancelled && !e.postponed);
     const lines = ['🐉 Dragons Baseball Schedule', ''];
     upcoming.forEach(e => {
       const dateObj = new Date(e.date + 'T12:00:00');
