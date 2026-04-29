@@ -237,6 +237,7 @@ export default function Schedule() {
     .slice(0, 8);
 
   const completedGames = games.filter(g => g.result);
+  const postponedGames = games.filter(g => g.postponed && !g.result && !g.cancelled);
 
   const visibleUpcoming = tab === 'all' ? allEvents
     : tab === 'games' ? allEvents.filter(e => e.type === 'game')
@@ -270,6 +271,12 @@ export default function Schedule() {
     setPracticeModal(false);
   };
 
+  const postponeGame = async (game) => {
+    await setDoc(doc(db, 'games', game.id), { postponed: true }, { merge: true });
+    setEditModal(null);
+    setToast('Game marked as postponed — tap Reschedule to set a new date');
+  };
+
   const addGame = async () => {
     if (!form.opponent || !form.date) return;
     await addDoc(collection(db, 'games'), { ...form, createdAt: new Date().toISOString() });
@@ -292,9 +299,9 @@ export default function Schedule() {
 
   const updateGame = async () => {
     if (!editModal) return;
-    await setDoc(doc(db, 'games', editModal.id), editForm, { merge: true });
+    await setDoc(doc(db, 'games', editModal.id), { ...editForm, postponed: false }, { merge: true });
     setEditModal(null);
-    setToast('Game updated!');
+    setToast(editModal.postponed ? 'Game rescheduled! ✅' : 'Game updated!');
   };
 
   const toggleCancelGame = async (game) => {
@@ -521,12 +528,13 @@ export default function Schedule() {
   }
   // ──────────────────────────────────────────────────────────────
 
-  const DateBadge = ({ date, result }) => {
+  const DateBadge = ({ date, result, postponed }) => {
     const dateObj = new Date(date + 'T12:00:00');
+    const bg = result ? (result === 'W' ? '#DCFCE7' : '#FEE2E2') : postponed ? '#FEF3C7' : 'var(--red)';
+    const fg = result ? (result === 'W' ? '#16A34A' : '#B91C1C') : postponed ? '#92400E' : 'white';
     return (
       <div style={{
-        background: result ? (result === 'W' ? '#DCFCE7' : '#FEE2E2') : 'var(--red)',
-        color: result ? (result === 'W' ? '#16A34A' : '#B91C1C') : 'white',
+        background: bg, color: fg,
         borderRadius: '10px', padding: '6px 10px', textAlign: 'center', minWidth: '52px', flexShrink: 0
       }}>
         <div style={{ fontSize: '10px', fontWeight: '600', textTransform: 'uppercase' }}>
@@ -546,16 +554,18 @@ export default function Schedule() {
       <div className="card" style={{
         marginBottom: '10px',
         opacity: game.cancelled ? 0.6 : 1,
-        border: game.cancelled ? '1px solid #FECACA' : undefined,
-        background: game.cancelled ? '#FFF5F5' : undefined
+        border: game.postponed && !game.cancelled ? '1px solid #FDE68A' : game.cancelled ? '1px solid #FECACA' : undefined,
+        background: game.postponed && !game.cancelled ? '#FFFBEB' : game.cancelled ? '#FFF5F5' : undefined
       }}>
         <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
-          <DateBadge date={game.date} result={game.result} />
+          <DateBadge date={game.date} result={game.result} postponed={game.postponed && !game.cancelled} />
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
               <span style={{ fontWeight: '700', fontSize: '16px', textDecoration: game.cancelled ? 'line-through' : 'none' }}>vs {game.opponent}</span>
               {game.cancelled ? (
                 <span style={{ fontSize: '11px', fontWeight: '700', padding: '2px 7px', borderRadius: '10px', background: '#FEE2E2', color: '#B91C1C' }}>Cancelled</span>
+              ) : game.postponed ? (
+                <span style={{ fontSize: '11px', fontWeight: '700', padding: '2px 7px', borderRadius: '10px', background: '#FEF3C7', color: '#92400E' }}>🔄 Postponed</span>
               ) : (
                 <span style={{
                   fontSize: '11px', fontWeight: '700', padding: '2px 7px', borderRadius: '10px',
@@ -590,17 +600,23 @@ export default function Schedule() {
             )}
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flexShrink: 0 }}>
-            {!game.cancelled && (
+            {!game.cancelled && !game.postponed && (
               <a href={googleCalUrl(game)} target="_blank" rel="noopener noreferrer" title="Add to Google Calendar" style={{
                 background: 'var(--gray-100)', border: 'none', borderRadius: '6px',
                 padding: '4px 8px', fontSize: '13px', cursor: 'pointer', textAlign: 'center', textDecoration: 'none', display: 'block'
               }}>📅</a>
             )}
-            {canScore && !game.result && !game.cancelled && (
+            {canScore && !game.result && !game.cancelled && !game.postponed && (
               <button onClick={() => { setScoreModal(game); setScore({ us: '', them: '', result: 'W' }); }} style={{
                 background: 'var(--gray-100)', border: 'none', borderRadius: '6px',
                 padding: '4px 8px', fontSize: '11px', cursor: 'pointer', fontWeight: '600', color: 'var(--gray-600)'
               }}>Score</button>
+            )}
+            {isCoach && game.postponed && !game.cancelled && (
+              <button onClick={() => openEditGame(game)} style={{
+                background: '#FEF3C7', border: 'none', borderRadius: '6px',
+                padding: '4px 8px', fontSize: '11px', cursor: 'pointer', fontWeight: '700', color: '#92400E'
+              }}>📅 Reschedule</button>
             )}
             {isCoach && (
               <button onClick={() => openEditGame(game)} style={{
@@ -733,6 +749,20 @@ export default function Schedule() {
           <button className={`tab ${tab === 'games' ? 'active' : ''}`} onClick={() => setTab('games')}>Games</button>
           <button className={`tab ${tab === 'practices' ? 'active' : ''}`} onClick={() => setTab('practices')}>Practices</button>
         </div>
+
+        {isCoach && postponedGames.length > 0 && (
+          <div style={{ background: '#FEF3C7', border: '1px solid #FDE68A', borderRadius: '12px', padding: '12px 14px', marginBottom: '14px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <span style={{ fontSize: '20px', flexShrink: 0 }}>🔄</span>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontWeight: '700', fontSize: '13px', color: '#92400E' }}>
+                {postponedGames.length} game{postponedGames.length > 1 ? 's' : ''} need{postponedGames.length === 1 ? 's' : ''} rescheduling
+              </div>
+              <div style={{ fontSize: '11px', color: '#B45309', marginTop: '2px' }}>
+                {postponedGames.map(g => `vs ${g.opponent}`).join(' · ')} — tap Reschedule to set a new date
+              </div>
+            </div>
+          </div>
+        )}
 
         {!isCoach && tab !== 'practices' && (
           <div className="view-only-banner">Tap Yes / No / Maybe to RSVP to each game</div>
@@ -905,7 +935,21 @@ export default function Schedule() {
                 <option value="Away">Away</option>
               </select>
             </div>
-            <button className="btn-primary" onClick={updateGame}>Save Changes</button>
+            {editModal.postponed && (
+              <div style={{ background: '#FEF3C7', border: '1px solid #FDE68A', borderRadius: '10px', padding: '10px 12px', marginBottom: '12px', fontSize: '13px', color: '#92400E', fontWeight: '600' }}>
+                🔄 This game is postponed — update the date above and tap Save to reschedule it.
+              </div>
+            )}
+            <button className="btn-primary" onClick={updateGame}>
+              {editModal.postponed ? '📅 Save & Reschedule' : 'Save Changes'}
+            </button>
+            {!editModal.result && !editModal.postponed && (
+              <button onClick={() => postponeGame(editModal)} style={{
+                width: '100%', marginTop: '8px', padding: '12px', borderRadius: '10px', cursor: 'pointer',
+                fontWeight: '700', fontSize: '15px', border: 'none',
+                background: '#FEF3C7', color: '#92400E'
+              }}>🔄 Postpone (Reschedule Later)</button>
+            )}
             <button onClick={() => toggleCancelGame(editModal)} style={{
               width: '100%', marginTop: '8px', padding: '12px', borderRadius: '10px', cursor: 'pointer',
               fontWeight: '700', fontSize: '15px', border: 'none',
