@@ -560,6 +560,8 @@ export default function Stats() {
   );
 
   const HittingGameView = () => {
+    const [hgSortCol, setHgSortCol] = useState('avg');
+    const [hgSortDir, setHgSortDir] = useState('desc');
     if (!allGameKeys.length) return (
       <div className="empty-state" style={{ marginTop: '24px' }}>
         <p style={{ fontSize: '32px' }}>⚾</p>
@@ -567,6 +569,20 @@ export default function Stats() {
         {canEdit && <p style={{ fontSize: '13px', color: 'var(--gray-400)', marginTop: '4px' }}>Tap Log Game in the header to start.</p>}
       </div>
     );
+    const HG_COLS = [
+      { key: 'avg', label: 'AVG' }, { key: 'ab', label: 'AB' }, { key: 'h', label: 'H' },
+      { key: 'hr', label: 'HR' }, { key: 'rbi', label: 'RBI' }, { key: 'k', label: 'K' }, { key: 'bb', label: 'BB' },
+    ];
+    const hgVal = (entry, key) => {
+      const hits = entry.hits ?? ((entry.singles||0)+(entry.doubles||0)+(entry.triples||0)+(entry.hr||0));
+      if (key === 'avg') return entry.ab > 0 ? hits / entry.ab : 0;
+      if (key === 'h') return hits;
+      return entry[key] || 0;
+    };
+    const handleHgSort = (key) => {
+      if (hgSortCol === key) setHgSortDir(d => d === 'desc' ? 'asc' : 'desc');
+      else { setHgSortCol(key); setHgSortDir('desc'); }
+    };
     const rows = players
       .map(p => {
         let entry;
@@ -592,7 +608,11 @@ export default function Stats() {
         }
         return { p, entry };
       })
-      .filter(({ entry }) => entry && (entry.ab > 0 || (entry.hits ?? 0) > 0));
+      .filter(({ entry }) => entry && (entry.ab > 0 || (entry.hits ?? 0) > 0))
+      .sort((a, b) => {
+        const av = hgVal(a.entry, hgSortCol), bv = hgVal(b.entry, hgSortCol);
+        return hgSortDir === 'desc' ? bv - av : av - bv;
+      });
     return (
       <div style={{ marginTop: '14px' }}>
         <GamePicker />
@@ -600,8 +620,11 @@ export default function Stats() {
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
             <thead>
               <tr style={{ background: 'var(--gray-50)' }}>
-                {['Player','AVG','AB','H','HR','RBI','K','BB'].map(h => (
-                  <th key={h} style={{ padding: '8px 6px', fontWeight: '700', color: 'var(--gray-500)', fontSize: '11px', textTransform: 'uppercase', textAlign: h==='Player'?'left':'center', borderBottom: '1px solid var(--gray-200)' }}>{h}</th>
+                <th style={{ padding: '8px 6px', fontWeight: '700', color: 'var(--gray-500)', fontSize: '11px', textTransform: 'uppercase', textAlign: 'left', borderBottom: '1px solid var(--gray-200)' }}>Player</th>
+                {HG_COLS.map(h => (
+                  <th key={h.key} onClick={() => handleHgSort(h.key)} style={{ padding: '8px 6px', fontWeight: '700', fontSize: '11px', textTransform: 'uppercase', textAlign: 'center', borderBottom: '1px solid var(--gray-200)', cursor: 'pointer', userSelect: 'none', color: hgSortCol === h.key ? 'var(--red)' : 'var(--gray-500)', whiteSpace: 'nowrap' }}>
+                    {h.label}{hgSortCol === h.key ? (hgSortDir === 'desc' ? ' ▼' : ' ▲') : ''}
+                  </th>
                 ))}
                 {canEdit && !selectedGame && <th style={{ borderBottom: '1px solid var(--gray-200)' }} />}
               </tr>
@@ -638,12 +661,22 @@ export default function Stats() {
   };
 
   const FieldingGameView = () => {
+    const [fgSortCol, setFgSortCol] = useState('errors');
+    const [fgSortDir, setFgSortDir] = useState('asc');
     if (!allGameKeys.length) return (
       <div className="empty-state" style={{ marginTop: '24px' }}>
         <p style={{ fontSize: '32px' }}>🧤</p>
         <p>No games logged yet</p>
       </div>
     );
+    const FG_COLS = [
+      { key: 'innings', label: 'Inn' }, { key: 'putouts', label: 'PO' },
+      { key: 'assists', label: 'A' }, { key: 'errors', label: 'E' },
+    ];
+    const handleFgSort = (key) => {
+      if (fgSortCol === key) setFgSortDir(d => d === 'desc' ? 'asc' : 'desc');
+      else { setFgSortCol(key); setFgSortDir(key === 'errors' ? 'asc' : 'desc'); }
+    };
     return (
       <div style={{ marginTop: '14px' }}>
         <GamePicker />
@@ -670,7 +703,10 @@ export default function Stats() {
               return { p, f };
             })
             .filter(({ f }) => f && f.innings > 0)
-            .sort((a, b) => (a.f.errors||0) - (b.f.errors||0));
+            .sort((a, b) => {
+              const av = a.f[fgSortCol] || 0, bv = b.f[fgSortCol] || 0;
+              return fgSortDir === 'desc' ? bv - av : av - bv;
+            });
           if (!rows.length) return null;
           return (
             <div key={pos} style={{ marginBottom: '14px' }}>
@@ -682,8 +718,11 @@ export default function Stats() {
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
                   <thead>
                     <tr style={{ background: 'var(--gray-50)' }}>
-                      {['Player','Inn','PO','A','E'].map(h => (
-                        <th key={h} style={{ padding: '6px 8px', fontWeight: '700', color: 'var(--gray-500)', fontSize: '11px', textTransform: 'uppercase', textAlign: h==='Player'?'left':'center', borderBottom: '1px solid var(--gray-200)' }}>{h}</th>
+                      <th style={{ padding: '6px 8px', fontWeight: '700', color: 'var(--gray-500)', fontSize: '11px', textTransform: 'uppercase', textAlign: 'left', borderBottom: '1px solid var(--gray-200)' }}>Player</th>
+                      {FG_COLS.map(h => (
+                        <th key={h.key} onClick={() => handleFgSort(h.key)} style={{ padding: '6px 8px', fontWeight: '700', fontSize: '11px', textTransform: 'uppercase', textAlign: 'center', borderBottom: '1px solid var(--gray-200)', cursor: 'pointer', userSelect: 'none', color: fgSortCol === h.key ? 'var(--red)' : 'var(--gray-500)', whiteSpace: 'nowrap' }}>
+                          {h.label}{fgSortCol === h.key ? (fgSortDir === 'desc' ? ' ▼' : ' ▲') : ''}
+                        </th>
                       ))}
                     </tr>
                   </thead>
@@ -1094,7 +1133,23 @@ export default function Stats() {
   );
 
   const HittingPracticeView = () => {
+    const [hpSortCol, setHpSortCol] = useState('avg');
+    const [hpSortDir, setHpSortDir] = useState('desc');
     if (!practiceDates.length) return <PracticeEmptyState icon="🏋️" label="No practice stats yet" />;
+    const HP_COLS = [
+      { key: 'avg', label: 'AVG' }, { key: 'ab', label: 'AB' }, { key: 'h', label: 'H' },
+      { key: 'hr', label: 'HR' }, { key: 'rbi', label: 'RBI' }, { key: 'k', label: 'K' }, { key: 'bb', label: 'BB' },
+    ];
+    const hpVal = (entry, key) => {
+      const hits = entry.hits ?? ((entry.singles||0)+(entry.doubles||0)+(entry.triples||0)+(entry.hr||0));
+      if (key === 'avg') return entry.ab > 0 ? hits / entry.ab : 0;
+      if (key === 'h') return hits;
+      return entry[key] || 0;
+    };
+    const handleHpSort = (key) => {
+      if (hpSortCol === key) setHpSortDir(d => d === 'desc' ? 'asc' : 'desc');
+      else { setHpSortCol(key); setHpSortDir('desc'); }
+    };
     const rows = players
       .map(p => {
         let entry;
@@ -1120,7 +1175,11 @@ export default function Stats() {
         }
         return { p, entry };
       })
-      .filter(({ entry }) => entry && (entry.ab > 0 || (entry.hits ?? 0) > 0));
+      .filter(({ entry }) => entry && (entry.ab > 0 || (entry.hits ?? 0) > 0))
+      .sort((a, b) => {
+        const av = hpVal(a.entry, hpSortCol), bv = hpVal(b.entry, hpSortCol);
+        return hpSortDir === 'desc' ? bv - av : av - bv;
+      });
     return (
       <div style={{ marginTop: '14px' }}>
         <PracticeDatePicker />
@@ -1128,8 +1187,11 @@ export default function Stats() {
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
             <thead>
               <tr style={{ background: 'var(--gray-50)' }}>
-                {['Player','AVG','AB','H','HR','RBI','K','BB'].map(h => (
-                  <th key={h} style={{ padding: '8px 6px', fontWeight: '700', color: 'var(--gray-500)', fontSize: '11px', textTransform: 'uppercase', textAlign: h==='Player'?'left':'center', borderBottom: '1px solid var(--gray-200)' }}>{h}</th>
+                <th style={{ padding: '8px 6px', fontWeight: '700', color: 'var(--gray-500)', fontSize: '11px', textTransform: 'uppercase', textAlign: 'left', borderBottom: '1px solid var(--gray-200)' }}>Player</th>
+                {HP_COLS.map(h => (
+                  <th key={h.key} onClick={() => handleHpSort(h.key)} style={{ padding: '8px 6px', fontWeight: '700', fontSize: '11px', textTransform: 'uppercase', textAlign: 'center', borderBottom: '1px solid var(--gray-200)', cursor: 'pointer', userSelect: 'none', color: hpSortCol === h.key ? 'var(--red)' : 'var(--gray-500)', whiteSpace: 'nowrap' }}>
+                    {h.label}{hpSortCol === h.key ? (hpSortDir === 'desc' ? ' ▼' : ' ▲') : ''}
+                  </th>
                 ))}
               </tr>
             </thead>
@@ -1159,7 +1221,17 @@ export default function Stats() {
   };
 
   const FieldingPracticeView = () => {
+    const [fpSortCol, setFpSortCol] = useState('errors');
+    const [fpSortDir, setFpSortDir] = useState('asc');
     if (!practiceDates.length) return <PracticeEmptyState icon="🧤" label="No practice stats yet" />;
+    const FP_COLS = [
+      { key: 'innings', label: 'Inn' }, { key: 'putouts', label: 'PO' },
+      { key: 'assists', label: 'A' }, { key: 'errors', label: 'E' },
+    ];
+    const handleFpSort = (key) => {
+      if (fpSortCol === key) setFpSortDir(d => d === 'desc' ? 'asc' : 'desc');
+      else { setFpSortCol(key); setFpSortDir(key === 'errors' ? 'asc' : 'desc'); }
+    };
     let hasAny = false;
     return (
       <div style={{ marginTop: '14px' }}>
@@ -1187,7 +1259,10 @@ export default function Stats() {
               return { p, f };
             })
             .filter(({ f }) => f && f.innings > 0)
-            .sort((a, b) => (a.f.errors||0) - (b.f.errors||0));
+            .sort((a, b) => {
+              const av = a.f[fpSortCol] || 0, bv = b.f[fpSortCol] || 0;
+              return fpSortDir === 'desc' ? bv - av : av - bv;
+            });
           if (!rows.length) return null;
           hasAny = true;
           return (
@@ -1200,8 +1275,11 @@ export default function Stats() {
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
                   <thead>
                     <tr style={{ background: 'var(--gray-50)' }}>
-                      {['Player','Inn','PO','A','E'].map(h => (
-                        <th key={h} style={{ padding: '6px 8px', fontWeight: '700', color: 'var(--gray-500)', fontSize: '11px', textTransform: 'uppercase', textAlign: h==='Player'?'left':'center', borderBottom: '1px solid var(--gray-200)' }}>{h}</th>
+                      <th style={{ padding: '6px 8px', fontWeight: '700', color: 'var(--gray-500)', fontSize: '11px', textTransform: 'uppercase', textAlign: 'left', borderBottom: '1px solid var(--gray-200)' }}>Player</th>
+                      {FP_COLS.map(h => (
+                        <th key={h.key} onClick={() => handleFpSort(h.key)} style={{ padding: '6px 8px', fontWeight: '700', fontSize: '11px', textTransform: 'uppercase', textAlign: 'center', borderBottom: '1px solid var(--gray-200)', cursor: 'pointer', userSelect: 'none', color: fpSortCol === h.key ? 'var(--red)' : 'var(--gray-500)', whiteSpace: 'nowrap' }}>
+                          {h.label}{fpSortCol === h.key ? (fpSortDir === 'desc' ? ' ▼' : ' ▲') : ''}
+                        </th>
                       ))}
                     </tr>
                   </thead>
