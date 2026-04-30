@@ -1911,7 +1911,7 @@ export default function Stats() {
         <LogGameModal
           players={players}
           currentYear={currentYear}
-          games={games}
+          games={games.filter(g => !g.postponed && !g.cancelled)}
           onClose={() => setShowLogGame(false)}
           onSaved={msg => setToast(msg)}
         />
