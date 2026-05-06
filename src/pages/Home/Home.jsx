@@ -422,7 +422,7 @@ export default function Home() {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
             {[
               { label: '📋 Practice', path: '/practice' },
-              { label: '🏟️ Live Score', path: '/live-scoring' },
+              { label: '🏟️ Games', path: '/live-scoring' },
               { label: '🥤 Team Drinks Sign Up', path: '/snacks' },
               { label: '⭐ Awards', path: '/awards' },
               { label: '📋 Attendance', path: '/attendance' }

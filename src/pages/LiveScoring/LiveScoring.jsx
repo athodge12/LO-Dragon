@@ -192,7 +192,7 @@ export default function LiveScoring() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
-      <Header title="Live Scoring" back="/" actions={canEdit && (
+      <Header title="Games" back="/" actions={canEdit && (
         <div style={{ display: 'flex', gap: '6px' }}>
           <button onClick={() => setShowLogStats(true)} style={{
             background: 'rgba(255,255,255,0.2)', border: 'none', borderRadius: '8px',
