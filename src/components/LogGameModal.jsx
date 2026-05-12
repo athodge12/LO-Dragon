@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '../firebase/config';
 
@@ -151,6 +151,34 @@ export default function LogGameModal({ players, currentYear, games = [], initial
   const [gameZones, setGameZones] = useState(BLANK_ZONES);
   const [lastZone, setLastZone] = useState(null);
   const [zonesOpen, setZonesOpen] = useState(false);
+
+  // Load existing saved stats whenever a game is selected (so re-opening mid-game works)
+  useEffect(() => {
+    if (!logGame) return;
+    const safeId = (logGame.id || 'manual_' + (logGame.date || Date.now())).replace(/[^a-zA-Z0-9_-]/g, '_');
+    const gameKey = `${currentYear}_${safeId}`;
+    const load = async () => {
+      const entries = {};
+      await Promise.all(players.map(async (player) => {
+        const snap = await getDoc(doc(db, 'playerStats', player.id));
+        if (!snap.exists()) return;
+        const gl = snap.data().gameLogs?.[gameKey];
+        if (!gl) return;
+        entries[player.id] = {
+          ab: gl.ab || 0, singles: gl.singles || 0, doubles: gl.doubles || 0,
+          triples: gl.triples || 0, hr: gl.hr || 0, rbi: gl.rbi || 0,
+          k: gl.k || 0, bb: gl.bb || 0, runs: gl.runs || 0,
+          fieldingThisGame: Object.entries(gl.fielding || {}).map(([pos, f]) => ({
+            pos, innings: f.innings || 0, putouts: f.putouts || 0, assists: f.assists || 0, errors: f.errors || 0,
+          })),
+        };
+      }));
+      setLogEntries(entries);
+      const zonesSnap = await getDoc(doc(db, 'settings', 'gameHitZones_' + gameKey));
+      if (zonesSnap.exists()) setGameZones({ ...BLANK_ZONES, ...zonesSnap.data() });
+    };
+    load();
+  }, [logGame?.id, logGame?.date]); // eslint-disable-line
 
   const getEntry = (playerId) => logEntries[playerId] || { ...BLANK_BATTING, fieldingThisGame: [] };
 
