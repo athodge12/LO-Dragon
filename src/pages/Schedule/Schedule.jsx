@@ -574,14 +574,14 @@ export default function Schedule() {
     );
   };
 
-  const GameCard = ({ game }) => {
+  const GameCard = ({ game, isPast }) => {
     const myRsvp = rsvps[game.id];
     return (
       <div className="card" style={{
         marginBottom: '10px',
         opacity: game.cancelled ? 0.6 : 1,
-        border: game.postponed && !game.cancelled ? '1px solid #FDE68A' : game.cancelled ? '1px solid #FECACA' : undefined,
-        background: game.postponed && !game.cancelled ? '#FFFBEB' : game.cancelled ? '#FFF5F5' : undefined
+        border: game.postponed && !game.cancelled ? '1px solid #FDE68A' : game.cancelled ? '1px solid #FECACA' : isPast ? '1px solid var(--gray-200)' : undefined,
+        background: game.postponed && !game.cancelled ? '#FFFBEB' : game.cancelled ? '#FFF5F5' : isPast ? 'var(--gray-50)' : undefined
       }}>
         <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
           <DateBadge date={game.date} result={game.result} postponed={game.postponed && !game.cancelled} />
@@ -622,6 +622,15 @@ export default function Schedule() {
                   <button key={opt.key} className={`rsvp-btn ${opt.key} ${myRsvp === opt.key ? 'active' : ''}`}
                     onClick={() => handleRsvp(game.id, opt.key)}>{opt.label}</button>
                 ))}
+              </div>
+            )}
+            {isPast && (
+              <div style={{ display: 'flex', gap: '6px', marginTop: '10px' }}>
+                <button onClick={() => navigate('/stats')} style={{
+                  padding: '5px 10px', borderRadius: '8px', border: 'none',
+                  background: '#FEF2F2', color: 'var(--red)',
+                  fontSize: '12px', fontWeight: '600', cursor: 'pointer'
+                }}>📊 View Stats</button>
               </div>
             )}
           </div>
@@ -829,9 +838,9 @@ export default function Schedule() {
         {tab !== 'practices' && completedGames.length > 0 && (
           <>
             <div className="section-header" style={{ marginTop: '16px', marginBottom: '10px' }}>
-              <span className="section-title">Results ({completedGames.length})</span>
+              <span className="section-title">Past Games ({completedGames.length})</span>
             </div>
-            {completedGames.map(g => <GameCard key={g.id} game={{ ...g, type: 'game' }} />)}
+            {completedGames.map(g => <GameCard key={g.id} game={{ ...g, type: 'game' }} isPast />)}
           </>
         )}
 
