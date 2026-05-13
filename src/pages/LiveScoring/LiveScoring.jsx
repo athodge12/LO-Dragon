@@ -449,6 +449,38 @@ export default function LiveScoring() {
             </button>
           </div>
         )}
+
+        {/* Past Games */}
+        {games.filter(g => g.result).length > 0 && (
+          <div style={{ marginTop: '10px' }}>
+            <p style={{ fontSize: '11px', fontWeight: '700', color: 'var(--gray-500)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '8px' }}>Past Games</p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {[...games].filter(g => g.result).sort((a, b) => (b.date || '').localeCompare(a.date || '')).map(g => (
+                <div key={g.id} style={{
+                  background: 'white', border: '1px solid var(--gray-200)', borderRadius: '12px',
+                  padding: '12px 14px', display: 'flex', alignItems: 'center', gap: '12px'
+                }}>
+                  <div style={{
+                    width: 44, height: 44, borderRadius: '10px', flexShrink: 0,
+                    background: g.result === 'W' ? '#DCFCE7' : '#FEE2E2',
+                    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center'
+                  }}>
+                    <div style={{ fontSize: '11px', fontWeight: '700', color: g.result === 'W' ? '#16A34A' : '#B91C1C', fontFamily: 'Oswald, sans-serif', letterSpacing: '0.5px' }}>
+                      {g.result === 'W' ? 'WIN' : 'LOSS'}
+                    </div>
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: '700', fontSize: '15px' }}>vs {g.opponent}</div>
+                    <div style={{ fontSize: '12px', color: 'var(--gray-500)', marginTop: '2px', display: 'flex', gap: '6px', alignItems: 'center' }}>
+                      {g.date && new Date(g.date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                      {g.score && <span style={{ fontFamily: 'Oswald, sans-serif', fontWeight: '700', color: 'var(--gray-700)' }}>{typeof g.score === 'object' ? `${g.score.us}–${g.score.them}` : g.score}</span>}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Game Picker Modal */}
