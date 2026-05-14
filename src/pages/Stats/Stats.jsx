@@ -72,6 +72,14 @@ export default function Stats() {
   const [expandedLogGame, setExpandedLogGame] = useState(null);
   const [sortCol, setSortCol] = useState('avg');
   const [sortDir, setSortDir] = useState('desc');
+  const [hgSortCol, setHgSortCol] = useState('avg');
+  const [hgSortDir, setHgSortDir] = useState('desc');
+  const [hpSortCol, setHpSortCol] = useState('avg');
+  const [hpSortDir, setHpSortDir] = useState('desc');
+  const [fgSortCol, setFgSortCol] = useState('errors');
+  const [fgSortDir, setFgSortDir] = useState('asc');
+  const [fpSortCol, setFpSortCol] = useState('errors');
+  const [fpSortDir, setFpSortDir] = useState('asc');
   const [chartStat, setChartStat] = useState('avg');
   const [chartPlayer, setChartPlayer] = useState(null);
   const [mainTab, setMainTab] = useState('hitting');   // hitting | fielding | zones | bestfit
@@ -560,8 +568,6 @@ export default function Stats() {
   );
 
   const HittingGameView = () => {
-    const [hgSortCol, setHgSortCol] = useState('avg');
-    const [hgSortDir, setHgSortDir] = useState('desc');
     if (!allGameKeys.length) return (
       <div className="empty-state" style={{ marginTop: '24px' }}>
         <p style={{ fontSize: '32px' }}>⚾</p>
@@ -661,8 +667,6 @@ export default function Stats() {
   };
 
   const FieldingGameView = () => {
-    const [fgSortCol, setFgSortCol] = useState('errors');
-    const [fgSortDir, setFgSortDir] = useState('asc');
     if (!allGameKeys.length) return (
       <div className="empty-state" style={{ marginTop: '24px' }}>
         <p style={{ fontSize: '32px' }}>🧤</p>
@@ -1133,8 +1137,6 @@ export default function Stats() {
   );
 
   const HittingPracticeView = () => {
-    const [hpSortCol, setHpSortCol] = useState('avg');
-    const [hpSortDir, setHpSortDir] = useState('desc');
     if (!practiceDates.length) return <PracticeEmptyState icon="🏋️" label="No practice stats yet" />;
     const HP_COLS = [
       { key: 'avg', label: 'AVG' }, { key: 'ab', label: 'AB' }, { key: 'h', label: 'H' },
@@ -1221,8 +1223,6 @@ export default function Stats() {
   };
 
   const FieldingPracticeView = () => {
-    const [fpSortCol, setFpSortCol] = useState('errors');
-    const [fpSortDir, setFpSortDir] = useState('asc');
     if (!practiceDates.length) return <PracticeEmptyState icon="🧤" label="No practice stats yet" />;
     const FP_COLS = [
       { key: 'innings', label: 'Inn' }, { key: 'putouts', label: 'PO' },
