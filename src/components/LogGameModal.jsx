@@ -154,6 +154,7 @@ export default function LogGameModal({ players, currentYear, games = [], initial
   const [zonesOpen, setZonesOpen] = useState(false);
   const [localLineups, setLocalLineups] = useState(inningLineups || {});
   const [showInningLineup, setShowInningLineup] = useState(false);
+  const [battingOrder, setBattingOrder] = useState(null);
 
   // Load existing saved stats whenever a game is selected (so re-opening mid-game works)
   useEffect(() => {
@@ -213,6 +214,13 @@ export default function LogGameModal({ players, currentYear, games = [], initial
     };
     load();
   }, [logGame?.id, logGame?.date]); // eslint-disable-line
+
+  useEffect(() => {
+    if (!logGame?.id) return;
+    getDoc(doc(db, 'battingOrders', logGame.id)).then(snap => {
+      setBattingOrder(snap.exists() && snap.data().order?.length ? snap.data().order : []);
+    });
+  }, [logGame?.id]); // eslint-disable-line
 
   const getEntry = (playerId) => logEntries[playerId] || { ...BLANK_BATTING, fieldingThisGame: [] };
 
@@ -553,7 +561,9 @@ export default function LogGameModal({ players, currentYear, games = [], initial
             vs {logGame.opponent} &middot; {logGame.date}
           </div>
           <div style={{ fontSize: '12px', color: 'var(--gray-500)', marginTop: '2px' }}>
-            Tap a player to enter their stats
+            {battingOrder?.length
+              ? `${battingOrder.map(id => players.find(p => p.id === id)).filter(Boolean).length} players in lineup · Tap to enter stats`
+              : 'Tap a player to enter their stats'}
           </div>
         </div>
 
@@ -573,26 +583,58 @@ export default function LogGameModal({ players, currentYear, games = [], initial
           </button>
         )}
 
-        {/* Player grid */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', marginBottom: '16px' }}>
-          {players.map(p => {
-            const logged = hasStats(p.id);
-            return (
-              <button key={p.id} onClick={() => { setActivePlayer(p.id); setPlayerTab('batting'); }}
-                style={{
-                  padding: '10px 6px', borderRadius: '10px', cursor: 'pointer', textAlign: 'center',
-                  border: `2px solid ${logged ? '#16A34A' : 'var(--gray-200)'}`,
-                  background: logged ? '#DCFCE7' : 'white', position: 'relative'
-                }}>
-                {logged && <div style={{ position: 'absolute', top: 4, right: 6, fontSize: '12px', color: '#16A34A', fontWeight: '700' }}>✓</div>}
-                <div style={{ fontFamily: 'Oswald, sans-serif', fontSize: '13px', fontWeight: '700', color: logged ? '#16A34A' : 'var(--black)', lineHeight: '1.2' }}>
-                  {getPlayerName(p)}
-                </div>
-                {p.jerseyNumber && <div style={{ fontSize: '10px', color: logged ? '#16A34A' : 'var(--gray-400)', marginTop: '2px' }}>#{p.jerseyNumber}</div>}
-              </button>
-            );
-          })}
-        </div>
+        {/* Player list — ordered by batting order if available, otherwise grid */}
+        {battingOrder?.length ? (() => {
+          const orderedPlayers = battingOrder.map(id => players.find(p => p.id === id)).filter(Boolean);
+          return (
+            <div style={{ marginBottom: '16px' }}>
+              {orderedPlayers.map((p, idx) => {
+                const logged = hasStats(p.id);
+                return (
+                  <button key={p.id} onClick={() => { setActivePlayer(p.id); setPlayerTab('batting'); }}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: '12px', width: '100%',
+                      padding: '10px 14px', marginBottom: '6px', borderRadius: '10px',
+                      textAlign: 'left', cursor: 'pointer',
+                      border: `2px solid ${logged ? '#16A34A' : 'var(--gray-200)'}`,
+                      background: logged ? '#DCFCE7' : 'white',
+                    }}>
+                    <span style={{ minWidth: '26px', fontFamily: 'Oswald, sans-serif', fontSize: '16px', fontWeight: '700', color: logged ? '#16A34A' : 'var(--red)' }}>
+                      {idx + 1}
+                    </span>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontFamily: 'Oswald, sans-serif', fontSize: '14px', fontWeight: '700', color: logged ? '#16A34A' : 'var(--black)' }}>
+                        {getPlayerName(p)}
+                      </div>
+                      {p.jerseyNumber && <div style={{ fontSize: '11px', color: logged ? '#16A34A' : 'var(--gray-400)' }}>#{p.jerseyNumber}</div>}
+                    </div>
+                    {logged && <span style={{ color: '#16A34A', fontWeight: '700', fontSize: '14px' }}>✓</span>}
+                  </button>
+                );
+              })}
+            </div>
+          );
+        })() : (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', marginBottom: '16px' }}>
+            {players.map(p => {
+              const logged = hasStats(p.id);
+              return (
+                <button key={p.id} onClick={() => { setActivePlayer(p.id); setPlayerTab('batting'); }}
+                  style={{
+                    padding: '10px 6px', borderRadius: '10px', cursor: 'pointer', textAlign: 'center',
+                    border: `2px solid ${logged ? '#16A34A' : 'var(--gray-200)'}`,
+                    background: logged ? '#DCFCE7' : 'white', position: 'relative'
+                  }}>
+                  {logged && <div style={{ position: 'absolute', top: 4, right: 6, fontSize: '12px', color: '#16A34A', fontWeight: '700' }}>✓</div>}
+                  <div style={{ fontFamily: 'Oswald, sans-serif', fontSize: '13px', fontWeight: '700', color: logged ? '#16A34A' : 'var(--black)', lineHeight: '1.2' }}>
+                    {getPlayerName(p)}
+                  </div>
+                  {p.jerseyNumber && <div style={{ fontSize: '10px', color: logged ? '#16A34A' : 'var(--gray-400)', marginTop: '2px' }}>#{p.jerseyNumber}</div>}
+                </button>
+              );
+            })}
+          </div>
+        )}
 
         {/* Hit Zones collapsible */}
         <div style={{ marginBottom: '12px', border: '1px solid var(--gray-200)', borderRadius: '12px', overflow: 'hidden' }}>
@@ -635,7 +677,7 @@ export default function LogGameModal({ players, currentYear, games = [], initial
     {showInningLineup && liveScore && (
       <InningLineupSheet
         inning={liveScore.inning}
-        players={players}
+        players={battingOrder?.length ? battingOrder.map(id => players.find(p => p.id === id)).filter(Boolean) : players}
         allLineups={localLineups}
         onSave={(lineup) => {
           const updated = { ...localLineups, [String(liveScore.inning)]: lineup };

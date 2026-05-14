@@ -40,6 +40,7 @@ export default function LiveScoring() {
   const [scoringInning, setScoringInning] = useState(1);
   const [showLineupSheet, setShowLineupSheet] = useState(false);
   const [inningLineups, setInningLineups] = useState({});
+  const [battingOrderIds, setBattingOrderIds] = useState(null);
 
   const DEFAULT_CHECKLIST = [
     { label: 'Lineup set', done: false },
@@ -150,6 +151,14 @@ export default function LiveScoring() {
     if (!gid) { setInningLineups({}); return; }
     getDoc(doc(db, 'liveLineups', gid)).then(snap => {
       setInningLineups(snap.exists() ? (snap.data().innings || {}) : {});
+    });
+  }, [scoreData.gameId]); // eslint-disable-line
+
+  // Load batting order for active game (to filter absent players from lineup sheet)
+  useEffect(() => {
+    if (!scoreData.gameId) { setBattingOrderIds(null); return; }
+    getDoc(doc(db, 'battingOrders', scoreData.gameId)).then(snap => {
+      setBattingOrderIds(snap.exists() && snap.data().order?.length ? snap.data().order : null);
     });
   }, [scoreData.gameId]); // eslint-disable-line
 
@@ -660,7 +669,7 @@ export default function LiveScoring() {
       {showLineupSheet && (
         <InningLineupSheet
           inning={scoringInning}
-          players={players}
+          players={battingOrderIds?.length ? players.filter(p => battingOrderIds.includes(p.id)) : players}
           allLineups={inningLineups}
           onSave={(lineup) => saveInningLineup(scoringInning, lineup)}
           onClose={() => setShowLineupSheet(false)}
