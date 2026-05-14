@@ -555,7 +555,7 @@ export default function Schedule() {
   // ──────────────────────────────────────────────────────────────
 
   const DateBadge = ({ date, result, postponed }) => {
-    const dateObj = new Date(date + 'T12:00:00');
+    const dateObj = date ? new Date(date + 'T12:00:00') : null;
     const bg = result ? (result === 'W' ? '#DCFCE7' : '#FEE2E2') : postponed ? '#FEF3C7' : 'var(--red)';
     const fg = result ? (result === 'W' ? '#16A34A' : '#B91C1C') : postponed ? '#92400E' : 'white';
     return (
@@ -564,10 +564,10 @@ export default function Schedule() {
         borderRadius: '10px', padding: '6px 10px', textAlign: 'center', minWidth: '52px', flexShrink: 0
       }}>
         <div style={{ fontSize: '10px', fontWeight: '600', textTransform: 'uppercase' }}>
-          {dateObj.toLocaleDateString('en-US', { month: 'short' })}
+          {dateObj ? dateObj.toLocaleDateString('en-US', { month: 'short' }) : '—'}
         </div>
         <div style={{ fontSize: '24px', fontWeight: '700', fontFamily: 'Oswald, sans-serif', lineHeight: 1 }}>
-          {dateObj.getDate()}
+          {dateObj ? dateObj.getDate() : '—'}
         </div>
         {result && <div style={{ fontSize: '14px', fontWeight: '700', fontFamily: 'Oswald, sans-serif' }}>{result}</div>}
       </div>

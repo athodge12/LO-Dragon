@@ -453,12 +453,12 @@ export default function LiveScoring() {
         )}
 
         {/* Past Games */}
-        {games.filter(g => g.result).length > 0 && (
+        {games.filter(g => g.result && g.date).length > 0 && (
           <div style={{ marginTop: '10px' }}>
             <div className="section-header" style={{ marginBottom: '10px' }}>
-              <span className="section-title">Past Games ({games.filter(g => g.result).length})</span>
+              <span className="section-title">Past Games ({games.filter(g => g.result && g.date).length})</span>
             </div>
-            {[...games].filter(g => g.result).sort((a, b) => (b.date || '').localeCompare(a.date || '')).map(g => {
+            {[...games].filter(g => g.result && g.date).sort((a, b) => b.date.localeCompare(a.date)).map(g => {
               const dateObj = new Date(g.date + 'T12:00:00');
               return (
                 <div key={g.id} className="card" style={{

@@ -1657,7 +1657,7 @@ export default function Stats() {
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
       <Header title="Stats" actions={canEdit && (
         <div style={{ display: 'flex', gap: '8px' }}>
-          <button onClick={() => { setShowLogGame(true); setLogStep(0); setLogGame(null); setLogEntries({}); }} style={{
+          <button onClick={() => setShowLogGame(true)} style={{
             background: 'rgba(255,255,255,0.2)', border: 'none', borderRadius: '8px',
             padding: '0 12px', height: 36, color: 'white', cursor: 'pointer',
             fontFamily: 'Oswald, sans-serif', fontSize: '13px', fontWeight: '600',
