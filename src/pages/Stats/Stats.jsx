@@ -26,7 +26,7 @@ const POSITION_OUT_PCT = {
 function fitScore(fieldingData, position) {
   const f = fieldingData?.[position];
   if (f && f.innings > 0) {
-    const playsPerInning = ((f.putouts || 0) * 0.55 + (f.assists || 0) * 0.45) / f.innings;
+    const playsPerInning = ((f.putouts || 0) * 0.60 + (f.assists || 0) * 0.40) / f.innings;
     const playScore    = Math.min(1.0, playsPerInning / 0.5);
     const rawScore     = 0.45 + playScore * 0.55;
     const errorPenalty = Math.max(0.05, 1 - (f.errors / f.innings) * 3.0);
@@ -974,7 +974,7 @@ export default function Stats() {
     return (
       <div style={{ marginTop: '14px' }}>
         <p style={{ fontSize: '12px', color: 'var(--gray-400)', marginBottom: '16px', textAlign: 'center' }}>
-          Combined games + practices · PO and assists boost score · errors heavily penalized
+          Combined games + practices · PO weighted higher than assists · errors heavily penalized
         </p>
 
         {ALL_POSITIONS.map(pos => {
