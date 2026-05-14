@@ -42,17 +42,6 @@ export default function LiveScoring() {
   const [inningLineups, setInningLineups] = useState({});
   const [battingOrderIds, setBattingOrderIds] = useState(null);
 
-  const DEFAULT_CHECKLIST = [
-    { label: 'Lineup set', done: false },
-    { label: 'Batting order locked', done: false },
-    { label: 'Equipment bag packed', done: false },
-    { label: 'Umpire notified', done: false },
-    { label: 'Snacks confirmed', done: false },
-  ];
-  const [checklist, setChecklist] = useState(DEFAULT_CHECKLIST);
-  const [checklistOpen, setChecklistOpen] = useState(true);
-  const [newCheckItem, setNewCheckItem] = useState('');
-
   const [players, setPlayers] = useState([]);
   const [season, setSeason] = useState(null);
   const [games, setGames] = useState([]);
@@ -75,9 +64,6 @@ export default function LiveScoring() {
       // upcoming + recent games for the picker
       onSnapshot(query(collection(db, 'games'), orderBy('date', 'desc')), snap => {
         setGames(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-      }),
-      onSnapshot(doc(db, 'settings', 'gameChecklist'), snap => {
-        if (snap.exists() && snap.data().items) setChecklist(snap.data().items);
       }),
     ];
     return () => unsubs.forEach(u => u());
@@ -107,31 +93,8 @@ export default function LiveScoring() {
       them: [0, 0, 0, 0, 0, 0, 0]
     };
     await setDoc(doc(db, 'settings', 'liveScore'), newScore);
-    // Reset checklist for new game
-    await setDoc(doc(db, 'settings', 'gameChecklist'), { items: DEFAULT_CHECKLIST });
     setShowGamePicker(false);
     setToast(`Loaded: vs ${game.opponent}`);
-  };
-
-  const toggleCheckItem = async (idx) => {
-    const updated = checklist.map((item, i) => i === idx ? { ...item, done: !item.done } : item);
-    setChecklist(updated);
-    await setDoc(doc(db, 'settings', 'gameChecklist'), { items: updated });
-  };
-
-  const addCheckItem = async () => {
-    const label = newCheckItem.trim();
-    if (!label) return;
-    const updated = [...checklist, { label, done: false }];
-    setChecklist(updated);
-    setNewCheckItem('');
-    await setDoc(doc(db, 'settings', 'gameChecklist'), { items: updated });
-  };
-
-  const removeCheckItem = async (idx) => {
-    const updated = checklist.filter((_, i) => i !== idx);
-    setChecklist(updated);
-    await setDoc(doc(db, 'settings', 'gameChecklist'), { items: updated });
   };
 
   // Record final W/L result back to the game document
@@ -286,63 +249,37 @@ export default function LiveScoring() {
           </button>
         )}
 
-        {/* Game Day Checklist — coaches only */}
+        {/* Game Prep — coaches only */}
         {isCoach && (
           <div className="card" style={{ marginBottom: '14px', padding: '12px 14px' }}>
-            <button onClick={() => setChecklistOpen(o => !o)} style={{
-              width: '100%', background: 'none', border: 'none', cursor: 'pointer',
-              display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: 0
-            }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span style={{ fontWeight: '700', fontSize: '14px', fontFamily: 'Oswald, sans-serif', textTransform: 'uppercase', letterSpacing: '0.3px' }}>
-                  Game Day Checklist
+            <div style={{ fontWeight: '700', fontSize: '14px', fontFamily: 'Oswald, sans-serif',
+              textTransform: 'uppercase', letterSpacing: '0.3px', marginBottom: '10px' }}>
+              Game Prep
+            </div>
+            {[
+              { label: 'Check Attendance', icon: '📋', path: '/attendance' },
+              { label: 'Starting Lineup',  icon: '⚾', path: '/batting-order' },
+            ].map((item, idx, arr) => (
+              <button
+                key={item.path}
+                onClick={() => navigate(item.path)}
+                style={{
+                  width: '100%', background: 'none', border: 'none', cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', gap: '12px',
+                  padding: '10px 0',
+                  borderBottom: idx < arr.length - 1 ? '1px solid var(--gray-100)' : 'none',
+                }}
+              >
+                <span style={{ fontSize: '20px' }}>{item.icon}</span>
+                <span style={{ flex: 1, fontSize: '14px', fontWeight: '600',
+                  color: 'var(--black)', textAlign: 'left' }}>
+                  {item.label}
                 </span>
-                <span style={{
-                  fontSize: '11px', fontWeight: '700', padding: '2px 8px', borderRadius: '10px',
-                  background: checklist.filter(i => i.done).length === checklist.length ? '#DCFCE7' : '#FEF3C7',
-                  color: checklist.filter(i => i.done).length === checklist.length ? '#16A34A' : '#92400E'
-                }}>
-                  {checklist.filter(i => i.done).length}/{checklist.length}
-                </span>
-              </div>
-              <span style={{ fontSize: '18px', color: 'var(--gray-400)', transform: checklistOpen ? 'rotate(90deg)' : 'none', transition: 'transform 0.2s' }}>›</span>
-            </button>
-
-            {checklistOpen && (
-              <div style={{ marginTop: '12px' }}>
-                {checklist.map((item, idx) => (
-                  <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '7px 0', borderBottom: idx < checklist.length - 1 ? '1px solid var(--gray-100)' : 'none' }}>
-                    <button onClick={() => toggleCheckItem(idx)} style={{
-                      width: 22, height: 22, borderRadius: '6px', flexShrink: 0, cursor: 'pointer',
-                      border: item.done ? 'none' : '2px solid var(--gray-300)',
-                      background: item.done ? 'var(--red)' : 'white',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center'
-                    }}>
-                      {item.done && <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 6l3 3 5-5" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>}
-                    </button>
-                    <span style={{ flex: 1, fontSize: '14px', color: item.done ? 'var(--gray-400)' : 'var(--black)', textDecoration: item.done ? 'line-through' : 'none' }}>
-                      {item.label}
-                    </span>
-                    <button onClick={() => removeCheckItem(idx)} style={{
-                      background: 'none', border: 'none', cursor: 'pointer', fontSize: '16px', color: 'var(--gray-300)', lineHeight: 1, padding: '0 2px'
-                    }}>×</button>
-                  </div>
-                ))}
-                <div style={{ display: 'flex', gap: '6px', marginTop: '10px' }}>
-                  <input
-                    value={newCheckItem}
-                    onChange={e => setNewCheckItem(e.target.value)}
-                    onKeyDown={e => e.key === 'Enter' && addCheckItem()}
-                    placeholder="Add item..."
-                    style={{ flex: 1, padding: '7px 10px', borderRadius: '8px', border: '1.5px solid var(--gray-200)', fontSize: '13px', outline: 'none' }}
-                  />
-                  <button onClick={addCheckItem} style={{
-                    padding: '7px 12px', borderRadius: '8px', border: 'none',
-                    background: 'var(--red)', color: 'white', fontWeight: '700', fontSize: '13px', cursor: 'pointer'
-                  }}>Add</button>
-                </div>
-              </div>
-            )}
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" strokeWidth="2">
+                  <path d="M9 18l6-6-6-6"/>
+                </svg>
+              </button>
+            ))}
           </div>
         )}
 
