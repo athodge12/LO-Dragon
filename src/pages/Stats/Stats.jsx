@@ -693,18 +693,23 @@ export default function Stats() {
               if (selectedGame) {
                 f = allStats[p.id]?.gameLogs?.[selectedGame]?.fielding?.[pos];
               } else {
-                const logs = Object.values(allStats[p.id]?.gameLogs || {});
-                const combined = logs.reduce((acc, l) => {
-                  const lf = l.fielding?.[pos];
-                  if (!lf) return acc;
-                  return {
-                    innings:  (acc.innings||0)  + (lf.innings||0),
-                    putouts:  (acc.putouts||0)  + (lf.putouts||0),
-                    assists:  (acc.assists||0)  + (lf.assists||0),
-                    errors:   (acc.errors||0)   + (lf.errors||0),
-                  };
-                }, {});
-                f = combined.innings > 0 ? combined : undefined;
+                const topLevel = allStats[p.id]?.fielding?.[pos];
+                if (topLevel && topLevel.innings > 0) {
+                  f = topLevel;
+                } else {
+                  const logs = Object.values(allStats[p.id]?.gameLogs || {});
+                  const combined = logs.reduce((acc, l) => {
+                    const lf = l.fielding?.[pos];
+                    if (!lf) return acc;
+                    return {
+                      innings:  (acc.innings||0)  + (lf.innings||0),
+                      putouts:  (acc.putouts||0)  + (lf.putouts||0),
+                      assists:  (acc.assists||0)  + (lf.assists||0),
+                      errors:   (acc.errors||0)   + (lf.errors||0),
+                    };
+                  }, {});
+                  f = combined.innings > 0 ? combined : undefined;
+                }
               }
               return { p, f };
             })
