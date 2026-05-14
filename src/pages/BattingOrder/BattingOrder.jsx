@@ -55,15 +55,21 @@ export default function BattingOrder() {
     setFieldLineup({});
     setAbsentIds(new Set());
     const load = async () => {
-      const fieldKey = selectedGame || 'default';
-      const [orderSnap, fieldSnap, attSnap] = await Promise.all([
+      const [defaultOrderSnap, gameOrderSnap, defaultFieldSnap, gameFieldSnap, attSnap] = await Promise.all([
         getDoc(doc(db, 'battingOrders', 'default')),
-        getDoc(doc(db, 'liveLineups', fieldKey)),
+        selectedGame ? getDoc(doc(db, 'battingOrders', selectedGame)) : Promise.resolve(null),
+        getDoc(doc(db, 'liveLineups', 'default')),
+        selectedGame ? getDoc(doc(db, 'liveLineups', selectedGame)) : Promise.resolve(null),
         selectedGame ? getDocs(query(collection(db, 'attendance'), where('sourceId', '==', selectedGame))) : Promise.resolve(null),
       ]);
+      // Use game-specific order if it exists, otherwise fall back to master
+      const orderSnap = (gameOrderSnap?.exists() && gameOrderSnap.data().order?.length) ? gameOrderSnap : defaultOrderSnap;
       setOrder(orderSnap.exists() && orderSnap.data().order?.length
         ? orderSnap.data().order
         : players.map(p => p.id));
+      // Use game-specific field positions if they exist, otherwise fall back to master
+      const fieldSnap = (gameFieldSnap?.exists() && Object.keys(gameFieldSnap.data().innings?.['1'] || {}).length)
+        ? gameFieldSnap : defaultFieldSnap;
       setFieldLineup(fieldSnap?.exists() ? (fieldSnap.data().innings?.['1'] || {}) : {});
       if (attSnap && !attSnap.empty) {
         const records = attSnap.docs[0].data().records || {};
@@ -107,19 +113,33 @@ export default function BattingOrder() {
   };
 
   const saveOrder = async () => {
-    await setDoc(doc(db, 'battingOrders', 'default'), {
-      order,
-      savedAt: new Date().toISOString()
-    });
-    if (Object.keys(fieldLineup).length > 0) {
-      const fieldKey = selectedGame || 'default';
-      const existingSnap = await getDoc(doc(db, 'liveLineups', fieldKey));
-      const existingInnings = existingSnap.exists() ? (existingSnap.data().innings || {}) : {};
-      await setDoc(doc(db, 'liveLineups', fieldKey), {
-        innings: { ...existingInnings, '1': fieldLineup }
-      }, { merge: true });
+    const now = new Date().toISOString();
+    if (!selectedGame) {
+      // === Master save — write to default and copy to every game ===
+      const saves = [
+        setDoc(doc(db, 'battingOrders', 'default'), { order, savedAt: now }),
+        ...games.map(g => setDoc(doc(db, 'battingOrders', g.id), { order, savedAt: now })),
+      ];
+      if (Object.keys(fieldLineup).length > 0) {
+        saves.push(setDoc(doc(db, 'liveLineups', 'default'), { innings: { '1': fieldLineup } }, { merge: true }));
+        saves.push(...games.map(g =>
+          setDoc(doc(db, 'liveLineups', g.id), { innings: { '1': fieldLineup } }, { merge: true })
+        ));
+      }
+      await Promise.all(saves);
+      setToast(`Master lineup saved & copied to ${games.length} game${games.length !== 1 ? 's' : ''}!`);
+    } else {
+      // === Game-specific save — only affects this game ===
+      await setDoc(doc(db, 'battingOrders', selectedGame), { order, savedAt: now });
+      if (Object.keys(fieldLineup).length > 0) {
+        const existingSnap = await getDoc(doc(db, 'liveLineups', selectedGame));
+        const existingInnings = existingSnap.exists() ? (existingSnap.data().innings || {}) : {};
+        await setDoc(doc(db, 'liveLineups', selectedGame), {
+          innings: { ...existingInnings, '1': fieldLineup }
+        }, { merge: true });
+      }
+      setToast('Game lineup saved!');
     }
-    setToast('Lineup saved!');
   };
 
   const moveUp = (index) => {
@@ -148,9 +168,9 @@ export default function BattingOrder() {
         {!isCoach && <div className="view-only-banner">👁 View Only</div>}
 
         <div className="form-group">
-          <label className="form-label">Select Game — shows absent players &amp; field positions</label>
+          <label className="form-label">Lineup</label>
           <select className="form-select" value={selectedGame} onChange={e => setSelectedGame(e.target.value)}>
-            <option value="">No game selected</option>
+            <option value="">Master Lineup</option>
             {games.filter(g => g.date).map(g => (
               <option key={g.id} value={g.id}>
                 {new Date(g.date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} vs {g.opponent}
@@ -350,7 +370,7 @@ export default function BattingOrder() {
 
         {isCoach && order.length > 0 && (
           <button className="btn-primary" onClick={saveOrder} style={{ marginTop: '8px' }}>
-            💾 Save Lineup
+            {selectedGame ? '💾 Save Game Lineup' : '💾 Save Master Lineup'}
           </button>
         )}
 
