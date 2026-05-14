@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { doc, onSnapshot, setDoc, collection, query, orderBy } from 'firebase/firestore';
+import { doc, onSnapshot, setDoc, getDoc, collection, query, orderBy } from 'firebase/firestore';
 import { db } from '../../firebase/config';
 import { useAuth } from '../../contexts/AuthContext';
 import Header from '../../components/Layout/Header';
@@ -15,6 +15,63 @@ function getYouTubeId(url) {
     /(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|live\/|embed\/|shorts\/))([a-zA-Z0-9_-]{11})/
   );
   return match ? match[1] : null;
+}
+
+const FIELDING_POSITIONS = ['Pitcher','Catcher','1st Base','2nd Base','3rd Base','Shortstop','Left Field','Left Center','Right Center','Right Field'];
+
+function InningLineupSheet({ inning, players, current, previous, onSave, onClose }) {
+  const [lineup, setLineup] = useState(() => {
+    const base = Object.keys(previous || {}).length > 0 && Object.keys(current || {}).length === 0
+      ? { ...previous }
+      : { ...current };
+    return base;
+  });
+
+  const hasPrevious = Object.keys(previous || {}).length > 0;
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-sheet" onClick={e => e.stopPropagation()} style={{ maxHeight: '85vh', overflowY: 'auto' }}>
+        <div className="modal-handle" />
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+          <h3 style={{ fontFamily: 'Oswald, sans-serif', fontSize: '18px', margin: 0, textTransform: 'uppercase' }}>
+            Inning {inning} Lineup
+          </h3>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: '20px', cursor: 'pointer', color: 'var(--gray-400)', padding: '0 4px', lineHeight: 1 }}>✕</button>
+        </div>
+
+        {hasPrevious && (
+          <button onClick={() => setLineup({ ...previous })} style={{
+            width: '100%', padding: '8px', marginBottom: '12px', borderRadius: '8px',
+            border: '1.5px dashed var(--gray-300)', background: 'none',
+            color: 'var(--gray-500)', cursor: 'pointer', fontSize: '13px', fontWeight: '600',
+          }}>↩ Copy from Inning {inning - 1}</button>
+        )}
+
+        {FIELDING_POSITIONS.map(pos => (
+          <div key={pos} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+            <span style={{ fontSize: '13px', fontWeight: '700', minWidth: '115px', color: 'var(--gray-700)' }}>{pos}</span>
+            <select
+              value={lineup[pos] || ''}
+              onChange={e => setLineup(l => ({ ...l, [pos]: e.target.value || undefined }))}
+              style={{ flex: 1, padding: '8px', borderRadius: '8px', border: '1.5px solid var(--gray-200)', fontSize: '13px', background: 'white', color: 'var(--black)' }}
+            >
+              <option value="">— Not playing —</option>
+              {players.map(p => (
+                <option key={p.id} value={p.id}>
+                  #{p.jerseyNumber || '—'} {p.firstName} {p.lastName}
+                </option>
+              ))}
+            </select>
+          </div>
+        ))}
+
+        <button className="btn-primary" onClick={() => { onSave(lineup); onClose(); }} style={{ marginTop: '12px' }}>
+          Save Lineup
+        </button>
+      </div>
+    </div>
+  );
 }
 
 export default function LiveScoring() {
@@ -37,6 +94,8 @@ export default function LiveScoring() {
   const [showGamePicker, setShowGamePicker] = useState(false);
   const [showEndGame, setShowEndGame] = useState(false);
   const [scoringInning, setScoringInning] = useState(1);
+  const [showLineupSheet, setShowLineupSheet] = useState(false);
+  const [inningLineups, setInningLineups] = useState({});
 
   const DEFAULT_CHECKLIST = [
     { label: 'Lineup set', done: false },
@@ -139,6 +198,23 @@ export default function LiveScoring() {
     }, { merge: true });
     setShowEndGame(false);
     setToast(`Result recorded — ${result === 'W' ? 'Win!' : 'Loss'} ${dragonsTotal}–${themTotal}`);
+  };
+
+  // Load existing inning lineups when the active game changes
+  useEffect(() => {
+    const gid = scoreData.gameId;
+    if (!gid) { setInningLineups({}); return; }
+    getDoc(doc(db, 'liveLineups', gid)).then(snap => {
+      setInningLineups(snap.exists() ? (snap.data().innings || {}) : {});
+    });
+  }, [scoreData.gameId]); // eslint-disable-line
+
+  const saveInningLineup = async (inning, lineup) => {
+    const gid = activeGame?.id;
+    if (!gid) return;
+    const updated = { ...inningLineups, [String(inning)]: lineup };
+    setInningLineups(updated);
+    await setDoc(doc(db, 'liveLineups', gid), { innings: updated }, { merge: true });
   };
 
   const resetScore = async () => {
@@ -395,6 +471,20 @@ export default function LiveScoring() {
             </div>
           )}
 
+          {/* Set lineup button */}
+          {canEdit && activeGame && (
+            <div style={{ display: 'flex', justifyContent: 'center', marginTop: '8px' }}>
+              <button onClick={() => setShowLineupSheet(true)} style={{
+                padding: '6px 16px', borderRadius: '8px', border: '1.5px solid var(--gray-600)',
+                background: inningLineups[String(scoringInning)] ? 'var(--gray-800)' : 'transparent',
+                color: inningLineups[String(scoringInning)] ? 'white' : 'var(--gray-400)',
+                cursor: 'pointer', fontSize: '12px', fontWeight: '700',
+              }}>
+                📋 {inningLineups[String(scoringInning)] ? '✓ ' : ''}Inning {scoringInning} Lineup
+              </button>
+            </div>
+          )}
+
           {/* Outs tracker */}
           <div style={{ marginTop: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '12px' }}>
             <span style={{ color: 'var(--gray-500)', fontSize: '12px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Outs</span>
@@ -623,6 +713,17 @@ export default function LiveScoring() {
         </div>
       )}
 
+      {showLineupSheet && (
+        <InningLineupSheet
+          inning={scoringInning}
+          players={players}
+          current={inningLineups[String(scoringInning)] || {}}
+          previous={inningLineups[String(scoringInning - 1)] || {}}
+          onSave={(lineup) => saveInningLineup(scoringInning, lineup)}
+          onClose={() => setShowLineupSheet(false)}
+        />
+      )}
+
       {showLogStats && (
         <LogGameModal
           players={players}
@@ -630,6 +731,7 @@ export default function LiveScoring() {
           games={[]}
           initialGame={activeGame}
           liveScore={{ dragons: dragonsTotal, them: themTotal, opponent: scoreData.opponent, outs: scoreData.outs || 0, inning: scoringInning }}
+          inningLineups={inningLineups}
           onScoreAdjust={(team, delta) => updateScore(team, scoringInning, delta)}
           onOutsChange={updateOuts}
           onInningChange={setScoringInning}

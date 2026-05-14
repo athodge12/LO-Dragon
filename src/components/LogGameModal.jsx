@@ -141,7 +141,7 @@ function LiveScoreBanner({ liveScore, onScoreAdjust, onOutsChange, onInningChang
   );
 }
 
-export default function LogGameModal({ players, currentYear, games = [], initialGame = null, liveScore = null, onScoreAdjust = null, onOutsChange = null, onInningChange = null, onClose, onSaved }) {
+export default function LogGameModal({ players, currentYear, games = [], initialGame = null, liveScore = null, inningLineups = null, onScoreAdjust = null, onOutsChange = null, onInningChange = null, onClose, onSaved }) {
   const [logGame, setLogGame] = useState(initialGame);
   const [manualGame, setManualGame] = useState({ opponent: '', date: new Date().toISOString().slice(0, 10) });
   const [logEntries, setLogEntries] = useState({});
@@ -158,21 +158,52 @@ export default function LogGameModal({ players, currentYear, games = [], initial
     const safeId = (logGame.id || 'manual_' + (logGame.date || Date.now())).replace(/[^a-zA-Z0-9_-]/g, '_');
     const gameKey = `${currentYear}_${safeId}`;
     const load = async () => {
+      // Compute innings per player per position from inning lineup data (live mode only)
+      const playerPositions = {};
+      if (liveScore && inningLineups) {
+        const currentInning = liveScore.inning || 1;
+        Object.entries(inningLineups).forEach(([inning, lineup]) => {
+          if (parseInt(inning) > currentInning) return;
+          Object.entries(lineup).forEach(([pos, playerId]) => {
+            if (!playerId) return;
+            if (!playerPositions[playerId]) playerPositions[playerId] = {};
+            playerPositions[playerId][pos] = (playerPositions[playerId][pos] || 0) + 1;
+          });
+        });
+      }
+
       const entries = {};
       await Promise.all(players.map(async (player) => {
         const snap = await getDoc(doc(db, 'playerStats', player.id));
-        if (!snap.exists()) return;
-        const gl = snap.data().gameLogs?.[gameKey];
-        if (!gl) return;
+        const gl = snap.exists() ? snap.data().gameLogs?.[gameKey] : null;
+        const savedFielding = Object.entries(gl?.fielding || {}).map(([pos, f]) => ({
+          pos, innings: f.innings || 0, putouts: f.putouts || 0, assists: f.assists || 0, errors: f.errors || 0,
+        }));
+        const rotPositions = playerPositions[player.id] || {};
+        const rotFielding = Object.entries(rotPositions)
+          .filter(([pos]) => !gl?.fielding?.[pos])
+          .map(([pos, innCount]) => ({ pos, innings: innCount, putouts: 0, assists: 0, errors: 0 }));
+
+        if (!gl && rotFielding.length === 0) return;
         entries[player.id] = {
-          ab: gl.ab || 0, singles: gl.singles || 0, doubles: gl.doubles || 0,
-          triples: gl.triples || 0, hr: gl.hr || 0, rbi: gl.rbi || 0,
-          k: gl.k || 0, bb: gl.bb || 0, runs: gl.runs || 0,
-          fieldingThisGame: Object.entries(gl.fielding || {}).map(([pos, f]) => ({
-            pos, innings: f.innings || 0, putouts: f.putouts || 0, assists: f.assists || 0, errors: f.errors || 0,
-          })),
+          ab: gl?.ab || 0, singles: gl?.singles || 0, doubles: gl?.doubles || 0,
+          triples: gl?.triples || 0, hr: gl?.hr || 0, rbi: gl?.rbi || 0,
+          k: gl?.k || 0, bb: gl?.bb || 0, runs: gl?.runs || 0,
+          fieldingThisGame: [...savedFielding, ...rotFielding],
         };
       }));
+
+      // Add entries for players in lineup but with no game log at all
+      Object.entries(playerPositions).forEach(([playerId, positions]) => {
+        if (entries[playerId]) return;
+        entries[playerId] = {
+          ...BLANK_BATTING,
+          fieldingThisGame: Object.entries(positions).map(([pos, innCount]) => ({
+            pos, innings: innCount, putouts: 0, assists: 0, errors: 0,
+          })),
+        };
+      });
+
       setLogEntries(entries);
       const zonesSnap = await getDoc(doc(db, 'settings', 'gameHitZones_' + gameKey));
       if (zonesSnap.exists()) setGameZones({ ...BLANK_ZONES, ...zonesSnap.data() });
