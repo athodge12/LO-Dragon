@@ -1367,43 +1367,70 @@ export default function Stats() {
   const GameZonesView = () => {
     const [gameZones, setGameZones] = useState(BLANK_ZONES);
     const [loading, setLoading] = useState(true);
-    const allGameKeys = [...new Set(players.flatMap(p => Object.keys(allStats[p.id]?.gameLogs || {})))];
+
     useEffect(() => {
-      Promise.all(allGameKeys.map(k => getDoc(doc(db, 'settings', 'gameHitZones_' + k)))).then(snaps => {
-        const t = { ...BLANK_ZONES };
-        snaps.forEach(s => { if (s.exists()) Object.keys(BLANK_ZONES).forEach(k => { t[k] = (t[k]||0)+(s.data()[k]||0); }); });
-        setGameZones(t); setLoading(false);
-      });
-    }, []); // eslint-disable-line
+      setLoading(true);
+      if (selectedGame) {
+        getDoc(doc(db, 'settings', 'gameHitZones_' + selectedGame)).then(snap => {
+          setGameZones(snap.exists() ? { ...BLANK_ZONES, ...snap.data() } : BLANK_ZONES);
+          setLoading(false);
+        });
+      } else {
+        if (!allGameKeys.length) { setGameZones(BLANK_ZONES); setLoading(false); return; }
+        Promise.all(allGameKeys.map(k => getDoc(doc(db, 'settings', 'gameHitZones_' + k)))).then(snaps => {
+          const t = { ...BLANK_ZONES };
+          snaps.forEach(s => { if (s.exists()) Object.keys(BLANK_ZONES).forEach(k => { t[k] = (t[k]||0)+(s.data()[k]||0); }); });
+          setGameZones(t); setLoading(false);
+        });
+      }
+    }, [selectedGame]); // eslint-disable-line
+
     const row0 = PRACTICE_HIT_ZONES.filter(z => z.row === 0);
     const row1 = PRACTICE_HIT_ZONES.filter(z => z.row === 1);
     const total = Object.values(gameZones).reduce((s, v) => s+v, 0);
-    if (loading) return <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--gray-400)' }}>Loading…</div>;
+    const meta = selectedGame ? gameKeyMeta[selectedGame] : null;
+    const title = meta
+      ? `vs ${meta.opponent || 'Game'}${meta.date ? ' · ' + new Date(meta.date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : ''}`
+      : 'All Games Combined';
+
+    if (!allGameKeys.length) return (
+      <div className="empty-state" style={{ marginTop: '24px' }}>
+        <p style={{ fontSize: '32px' }}>⚾</p>
+        <p>No games logged yet</p>
+        {canEdit && <p style={{ fontSize: '13px', color: 'var(--gray-400)', marginTop: '4px' }}>Tap Log Game in the header to start.</p>}
+      </div>
+    );
+
     return (
       <div style={{ marginTop: '14px' }}>
-        <div className="card">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-            <div style={{ fontFamily: 'Oswald, sans-serif', fontSize: '14px', fontWeight: '700', textTransform: 'uppercase' }}>All Games Combined</div>
-            <span style={{ fontSize: '12px', color: 'var(--gray-400)' }}>{total} total hits</span>
+        <GamePicker />
+        {loading ? (
+          <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--gray-400)' }}>Loading…</div>
+        ) : (
+          <div className="card">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+              <div style={{ fontFamily: 'Oswald, sans-serif', fontSize: '14px', fontWeight: '700', textTransform: 'uppercase' }}>{title}</div>
+              <span style={{ fontSize: '12px', color: 'var(--gray-400)' }}>{total} total hits</span>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '6px', marginBottom: '6px' }}>
+              {row0.map(z => (
+                <div key={z.key} style={{ padding: '10px 4px', borderRadius: '10px', textAlign: 'center', background: gameZones[z.key]>0?'#FEF2F2':'var(--gray-100)', borderBottom: `3px solid ${gameZones[z.key]>0?'var(--red)':'transparent'}` }}>
+                  <div style={{ fontSize: '10px', fontWeight: '700', color: 'var(--gray-500)', textTransform: 'uppercase' }}>{z.label}</div>
+                  <div style={{ fontFamily: 'Oswald, sans-serif', fontSize: '24px', fontWeight: '700', color: gameZones[z.key]>0?'var(--red)':'var(--gray-300)', lineHeight:1 }}>{gameZones[z.key]}</div>
+                </div>
+              ))}
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '6px' }}>
+              {row1.map(z => (
+                <div key={z.key} style={{ padding: '10px 4px', borderRadius: '10px', textAlign: 'center', background: gameZones[z.key]>0?'#FFF7ED':'var(--gray-100)', borderBottom: `3px solid ${gameZones[z.key]>0?'#F59E0B':'transparent'}` }}>
+                  <div style={{ fontSize: '10px', fontWeight: '700', color: 'var(--gray-500)', textTransform: 'uppercase' }}>{z.label}</div>
+                  <div style={{ fontFamily: 'Oswald, sans-serif', fontSize: '24px', fontWeight: '700', color: gameZones[z.key]>0?'#D97706':'var(--gray-300)', lineHeight:1 }}>{gameZones[z.key]}</div>
+                </div>
+              ))}
+            </div>
+            {total === 0 && <p style={{ fontSize: '12px', color: 'var(--gray-400)', textAlign: 'center', marginTop: '10px' }}>Log hit zones during Live Scoring to populate this chart.</p>}
           </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '6px', marginBottom: '6px' }}>
-            {row0.map(z => (
-              <div key={z.key} style={{ padding: '10px 4px', borderRadius: '10px', textAlign: 'center', background: gameZones[z.key]>0?'#FEF2F2':'var(--gray-100)', borderBottom: `3px solid ${gameZones[z.key]>0?'var(--red)':'transparent'}` }}>
-                <div style={{ fontSize: '10px', fontWeight: '700', color: 'var(--gray-500)', textTransform: 'uppercase' }}>{z.label}</div>
-                <div style={{ fontFamily: 'Oswald, sans-serif', fontSize: '24px', fontWeight: '700', color: gameZones[z.key]>0?'var(--red)':'var(--gray-300)', lineHeight:1 }}>{gameZones[z.key]}</div>
-              </div>
-            ))}
-          </div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '6px' }}>
-            {row1.map(z => (
-              <div key={z.key} style={{ padding: '10px 4px', borderRadius: '10px', textAlign: 'center', background: gameZones[z.key]>0?'#FFF7ED':'var(--gray-100)', borderBottom: `3px solid ${gameZones[z.key]>0?'#F59E0B':'transparent'}` }}>
-                <div style={{ fontSize: '10px', fontWeight: '700', color: 'var(--gray-500)', textTransform: 'uppercase' }}>{z.label}</div>
-                <div style={{ fontFamily: 'Oswald, sans-serif', fontSize: '24px', fontWeight: '700', color: gameZones[z.key]>0?'#D97706':'var(--gray-300)', lineHeight:1 }}>{gameZones[z.key]}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-        {total === 0 && <p style={{ fontSize: '12px', color: 'var(--gray-400)', textAlign: 'center', marginTop: '10px' }}>Log hit zones during Live Scoring to populate this chart.</p>}
+        )}
       </div>
     );
   };
