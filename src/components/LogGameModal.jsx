@@ -254,6 +254,22 @@ export default function LogGameModal({ players, currentYear, games = [], initial
     }));
   };
 
+  // Auto-add current inning position from lineup when a player is opened in live mode
+  useEffect(() => {
+    if (!liveScore || !activePlayer) return;
+    const lineup = localLineups[String(liveScore.inning)] || {};
+    const pos = Object.entries(lineup).find(([, pid]) => pid === activePlayer)?.[0];
+    if (!pos) return;
+    setLogEntries(prev => {
+      const e = prev[activePlayer] || { ...BLANK_BATTING, fieldingThisGame: [] };
+      if ((e.fieldingThisGame || []).find(f => f.pos === pos)) return prev;
+      return {
+        ...prev,
+        [activePlayer]: { ...e, fieldingThisGame: [...(e.fieldingThisGame || []), { pos, innings: 0, putouts: 0, assists: 0, errors: 0 }] }
+      };
+    });
+  }, [activePlayer, liveScore?.inning, localLineups]);
+
   const tapZone = (key) => { setGameZones(z => ({ ...z, [key]: (z[key]||0)+1 })); setLastZone(key); };
   const undoZone = () => { if (!lastZone) return; setGameZones(z => ({ ...z, [lastZone]: Math.max(0,(z[lastZone]||0)-1) })); setLastZone(null); };
 
@@ -484,8 +500,11 @@ export default function LogGameModal({ players, currentYear, games = [], initial
                     <span style={{ fontWeight: '700', fontSize: '13px', fontFamily: 'Oswald, sans-serif' }}>{POS_SHORT[f.pos]} — {f.pos}</span>
                     <button onClick={() => removeFieldingPos(activePlayer, f.pos)} style={{ background: 'none', border: 'none', color: 'var(--gray-400)', cursor: 'pointer', fontSize: '16px', lineHeight: 1 }}>×</button>
                   </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '8px' }}>
-                    {[{key:'innings',label:'Inn'},{key:'putouts',label:'PO'},{key:'assists',label:'A'},{key:'errors',label:'E'}].map(({ key, label }) => (
+                  <div style={{ display: 'grid', gridTemplateColumns: `repeat(${liveScore ? 3 : 4}, 1fr)`, gap: '8px' }}>
+                    {(liveScore
+                      ? [{key:'putouts',label:'PO'},{key:'assists',label:'A'},{key:'errors',label:'E'}]
+                      : [{key:'innings',label:'Inn'},{key:'putouts',label:'PO'},{key:'assists',label:'A'},{key:'errors',label:'E'}]
+                    ).map(({ key, label }) => (
                       <PlusMinus key={key} label={label}
                         value={f[key] || 0}
                         onInc={() => changeFielding(activePlayer, f.pos, key, 1)}
