@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { db } from '../firebase/config';
+import InningLineupSheet from './InningLineupSheet';
 
 const FIELDING_POSITIONS = ['Pitcher','Catcher','1st Base','2nd Base','3rd Base','Shortstop','Left Field','Left Center','Right Center','Right Field'];
 const POS_SHORT = { 'Pitcher':'P','Catcher':'C','1st Base':'1B','2nd Base':'2B','3rd Base':'3B','Shortstop':'SS','Left Field':'LF','Left Center':'LC','Right Center':'RC','Right Field':'RF' };
@@ -141,7 +142,7 @@ function LiveScoreBanner({ liveScore, onScoreAdjust, onOutsChange, onInningChang
   );
 }
 
-export default function LogGameModal({ players, currentYear, games = [], initialGame = null, liveScore = null, inningLineups = null, onScoreAdjust = null, onOutsChange = null, onInningChange = null, onClose, onSaved }) {
+export default function LogGameModal({ players, currentYear, games = [], initialGame = null, liveScore = null, inningLineups = null, onLineupSaved = null, onScoreAdjust = null, onOutsChange = null, onInningChange = null, onClose, onSaved }) {
   const [logGame, setLogGame] = useState(initialGame);
   const [manualGame, setManualGame] = useState({ opponent: '', date: new Date().toISOString().slice(0, 10) });
   const [logEntries, setLogEntries] = useState({});
@@ -151,6 +152,8 @@ export default function LogGameModal({ players, currentYear, games = [], initial
   const [gameZones, setGameZones] = useState(BLANK_ZONES);
   const [lastZone, setLastZone] = useState(null);
   const [zonesOpen, setZonesOpen] = useState(false);
+  const [localLineups, setLocalLineups] = useState(inningLineups || {});
+  const [showInningLineup, setShowInningLineup] = useState(false);
 
   // Load existing saved stats whenever a game is selected (so re-opening mid-game works)
   useEffect(() => {
@@ -522,6 +525,19 @@ export default function LogGameModal({ players, currentYear, games = [], initial
         {/* Live score banner */}
         {liveScore && <LiveScoreBanner liveScore={liveScore} onScoreAdjust={onScoreAdjust} onOutsChange={onOutsChange} onInningChange={onInningChange} />}
 
+        {/* Lineup button — only in live mode */}
+        {liveScore && (
+          <button onClick={() => setShowInningLineup(true)} style={{
+            width: '100%', padding: '8px 12px', marginBottom: '12px', borderRadius: '8px',
+            border: '1.5px solid var(--gray-600)',
+            background: localLineups[String(liveScore.inning)] ? 'var(--gray-800)' : 'transparent',
+            color: localLineups[String(liveScore.inning)] ? 'white' : 'var(--gray-400)',
+            cursor: 'pointer', fontSize: '12px', fontWeight: '700', textAlign: 'center',
+          }}>
+            📋 {localLineups[String(liveScore.inning)] ? '✓ ' : ''}Inning {liveScore.inning} Lineup
+          </button>
+        )}
+
         {/* Player grid */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', marginBottom: '16px' }}>
           {players.map(p => {
@@ -580,5 +596,19 @@ export default function LogGameModal({ players, currentYear, games = [], initial
         </button>
       </div>
     </div>
+
+    {showInningLineup && liveScore && (
+      <InningLineupSheet
+        inning={liveScore.inning}
+        players={players}
+        allLineups={localLineups}
+        onSave={(lineup) => {
+          const updated = { ...localLineups, [String(liveScore.inning)]: lineup };
+          setLocalLineups(updated);
+          if (onLineupSaved) onLineupSaved(liveScore.inning, lineup);
+        }}
+        onClose={() => setShowInningLineup(false)}
+      />
+    )}
   );
 }
