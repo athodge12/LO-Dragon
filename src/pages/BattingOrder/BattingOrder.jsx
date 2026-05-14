@@ -54,10 +54,9 @@ export default function BattingOrder() {
   useEffect(() => {
     setFieldLineup({});
     setAbsentIds(new Set());
-    const key = selectedGame || 'default';
     const load = async () => {
       const [orderSnap, fieldSnap, attSnap] = await Promise.all([
-        getDoc(doc(db, 'battingOrders', key)),
+        getDoc(doc(db, 'battingOrders', 'default')),
         selectedGame ? getDoc(doc(db, 'liveLineups', selectedGame)) : Promise.resolve(null),
         selectedGame ? getDocs(query(collection(db, 'attendance'), where('sourceId', '==', selectedGame))) : Promise.resolve(null),
       ]);
@@ -107,10 +106,8 @@ export default function BattingOrder() {
   };
 
   const saveOrder = async () => {
-    const key = selectedGame || 'default';
-    await setDoc(doc(db, 'battingOrders', key), {
+    await setDoc(doc(db, 'battingOrders', 'default'), {
       order,
-      gameId: selectedGame || null,
       savedAt: new Date().toISOString()
     });
     if (selectedGame && Object.keys(fieldLineup).length > 0) {
@@ -149,9 +146,9 @@ export default function BattingOrder() {
         {!isCoach && <div className="view-only-banner">👁 View Only</div>}
 
         <div className="form-group">
-          <label className="form-label">Game (optional)</label>
+          <label className="form-label">Select Game — shows absent players &amp; field positions</label>
           <select className="form-select" value={selectedGame} onChange={e => setSelectedGame(e.target.value)}>
-            <option value="">Default Order</option>
+            <option value="">No game selected</option>
             {games.filter(g => g.date).map(g => (
               <option key={g.id} value={g.id}>
                 {new Date(g.date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} vs {g.opponent}
