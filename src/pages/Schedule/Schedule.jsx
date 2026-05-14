@@ -229,7 +229,7 @@ export default function Schedule() {
 
   const allEvents = [...gameEvents, ...practiceEvents]
     .filter(e => e.date >= today || !!e.postponed)
-    .sort((a, b) => a.date.localeCompare(b.date));
+    .sort((a, b) => (a.date || '').localeCompare(b.date || ''));
 
   const pastPracticeEvents = practiceEvents
     .filter(e => e.date < today)

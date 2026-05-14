@@ -57,7 +57,7 @@ export default function Home() {
     const gamesQ = query(collection(db, 'games'), orderBy('date', 'desc'));
     unsubs.push(onSnapshot(gamesQ, snap => {
       const games = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-      const played = games.filter(g => g.result);
+      const played = games.filter(g => g.result && g.date);
       const recent = played.slice(0, 3);
       setRecentGames(recent);
       const wins = played.filter(g => g.result === 'W').length;
@@ -262,7 +262,7 @@ export default function Home() {
                     )}
                   </div>
                   <div style={{ fontSize: '11px', color: 'var(--gray-400)', marginTop: '6px' }}>
-                    {ann.authorName} · {new Date(ann.createdAt).toLocaleDateString()}
+                    {ann.authorName}{ann.createdAt ? ` · ${new Date(ann.createdAt).toLocaleDateString()}` : ''}
                   </div>
                 </div>
               ))}
@@ -355,7 +355,7 @@ export default function Home() {
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: '14px', fontWeight: '600' }}>vs {game.opponent}</div>
                     <div style={{ fontSize: '12px', color: 'var(--gray-400)' }}>
-                      {new Date(game.date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                      {game.date ? new Date(game.date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : ''}
                     </div>
                   </div>
                   {game.score && (
