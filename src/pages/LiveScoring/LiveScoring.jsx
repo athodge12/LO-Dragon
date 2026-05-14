@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect, useRef } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { doc, onSnapshot, setDoc, getDoc, collection, query, orderBy } from 'firebase/firestore';
 import { db } from '../../firebase/config';
 import { useAuth } from '../../contexts/AuthContext';
@@ -22,6 +22,8 @@ export default function LiveScoring() {
   const { isCoach, isBookkeeper } = useAuth();
   const canEdit = isCoach || isBookkeeper;
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const autoLoadedRef = useRef(false);
 
   const [scoreData, setScoreData] = useState({
     opponent: '', gameId: null, gameDate: null,
@@ -96,6 +98,18 @@ export default function LiveScoring() {
     setShowGamePicker(false);
     setToast(`Loaded: vs ${game.opponent}`);
   };
+
+  // Auto-load game when arriving from Schedule with a gameId param
+  useEffect(() => {
+    const gid = searchParams.get('gameId');
+    if (!gid || autoLoadedRef.current || !games.length) return;
+    if (scoreData.gameId === gid) { autoLoadedRef.current = true; return; }
+    const game = games.find(g => g.id === gid);
+    if (game) {
+      autoLoadedRef.current = true;
+      loadGame(game);
+    }
+  }, [games]); // eslint-disable-line
 
   // Record final W/L result back to the game document
   const recordResult = async (result) => {

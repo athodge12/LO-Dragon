@@ -613,7 +613,7 @@ export default function Schedule() {
               </div>
             )}
             {!game.result && !game.cancelled && (
-              <div style={{ display: 'flex', gap: '6px', marginTop: '10px' }}>
+              <div style={{ display: 'flex', gap: '6px', marginTop: '10px', flexWrap: 'wrap' }}>
                 {[
                   { key: 'yes', label: '✅ Going' },
                   { key: 'no', label: '❌ No' },
@@ -622,6 +622,15 @@ export default function Schedule() {
                   <button key={opt.key} className={`rsvp-btn ${opt.key} ${myRsvp === opt.key ? 'active' : ''}`}
                     onClick={() => handleRsvp(game.id, opt.key)}>{opt.label}</button>
                 ))}
+              </div>
+            )}
+            {canScore && !game.result && !game.cancelled && !game.postponed && (
+              <div style={{ marginTop: '8px' }}>
+                <button onClick={() => navigate(`/live?gameId=${game.id}`)} style={{
+                  padding: '6px 14px', borderRadius: '8px', border: 'none',
+                  background: 'var(--red)', color: 'white',
+                  fontSize: '12px', fontWeight: '700', cursor: 'pointer'
+                }}>⚾ Game Day</button>
               </div>
             )}
             {isPast && (
