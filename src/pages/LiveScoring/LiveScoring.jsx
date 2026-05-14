@@ -57,9 +57,9 @@ function InningLineupSheet({ inning, players, current, previous, onSave, onClose
               style={{ flex: 1, padding: '8px', borderRadius: '8px', border: '1.5px solid var(--gray-200)', fontSize: '13px', background: 'white', color: 'var(--black)' }}
             >
               <option value="">— Not playing —</option>
-              {players.map(p => (
+              {[...players].sort((a, b) => parseInt(a.jerseyNumber || 99) - parseInt(b.jerseyNumber || 99)).map(p => (
                 <option key={p.id} value={p.id}>
-                  #{p.jerseyNumber || '—'} {p.firstName} {p.lastName}
+                  #{p.jerseyNumber || '—'} {p.name}
                 </option>
               ))}
             </select>
