@@ -262,7 +262,7 @@ export default function LiveScoring() {
             ].map((item, idx, arr) => (
               <button
                 key={item.path}
-                onClick={() => navigate(item.path)}
+                onClick={() => navigate(scoreData.gameId ? `${item.path}?gameId=${scoreData.gameId}` : item.path)}
                 style={{
                   width: '100%', background: 'none', border: 'none', cursor: 'pointer',
                   display: 'flex', alignItems: 'center', gap: '12px',

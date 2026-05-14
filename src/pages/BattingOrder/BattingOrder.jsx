@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { collection, onSnapshot, doc, setDoc, getDoc, getDocs, query, where, orderBy } from 'firebase/firestore';
 import { db } from '../../firebase/config';
 import { useAuth } from '../../contexts/AuthContext';
@@ -29,9 +30,10 @@ function fitColor(score) {
 
 export default function BattingOrder() {
   const { isCoach } = useAuth();
+  const [searchParams] = useSearchParams();
   const [players, setPlayers] = useState([]);
   const [games, setGames] = useState([]);
-  const [selectedGame, setSelectedGame] = useState('');
+  const [selectedGame, setSelectedGame] = useState(searchParams.get('gameId') || '');
   const [order, setOrder] = useState([]);
   const [allStats, setAllStats] = useState({});
   const [fieldLineup, setFieldLineup] = useState({});

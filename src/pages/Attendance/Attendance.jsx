@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { collection, onSnapshot, addDoc, setDoc, doc, deleteDoc, query, orderBy } from 'firebase/firestore';
 import { db } from '../../firebase/config';
 import { useAuth } from '../../contexts/AuthContext';
@@ -28,6 +29,7 @@ function getUpcomingPracticeDates(slot, weeksAhead = 12) {
 export default function Attendance() {
   const { isCoach, isBookkeeper } = useAuth();
   const canEdit = isCoach || isBookkeeper;
+  const [searchParams] = useSearchParams();
   const [sessions, setSessions] = useState([]);
   const [players, setPlayers] = useState([]);
   const [activeSession, setActiveSession] = useState(null);
@@ -217,6 +219,14 @@ export default function Attendance() {
       setActiveSession(session);
     }
   };
+
+  // Auto-open session when arriving from Game Prep with a gameId param
+  useEffect(() => {
+    const gid = searchParams.get('gameId');
+    if (!gid || activeSession || !players.length || !games.length) return;
+    const existing = mergedSessions.find(s => s.sourceId === gid);
+    if (existing) handleSessionClick(existing);
+  }, [sessions, players, games]); // eslint-disable-line
 
   const playerSummary = players.map(player => {
     const total = sessions.length;
