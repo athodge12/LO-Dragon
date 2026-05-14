@@ -228,7 +228,7 @@ export default function Schedule() {
   const gameEvents = games.map(g => ({ ...g, type: 'game' }));
 
   const allEvents = [...gameEvents, ...practiceEvents]
-    .filter(e => e.date >= today || !!e.postponed)
+    .filter(e => e.date >= today || !!e.postponed || (e.type === 'game' && !e.result && !e.cancelled && !e.postponed))
     .sort((a, b) => (a.date || '').localeCompare(b.date || ''));
 
   const pastPracticeEvents = practiceEvents
@@ -576,12 +576,14 @@ export default function Schedule() {
 
   const GameCard = ({ game, isPast }) => {
     const myRsvp = rsvps[game.id];
+    const isActuallyPast = game.date < today;
+    const needsReschedule = isActuallyPast && !game.result && !game.cancelled && !game.postponed;
     return (
       <div className="card" style={{
         marginBottom: '10px',
         opacity: game.cancelled ? 0.6 : 1,
-        border: game.postponed && !game.cancelled ? '1px solid #FDE68A' : game.cancelled ? '1px solid #FECACA' : isPast ? '1px solid var(--gray-200)' : undefined,
-        background: game.postponed && !game.cancelled ? '#FFFBEB' : game.cancelled ? '#FFF5F5' : isPast ? 'var(--gray-50)' : undefined
+        border: game.postponed && !game.cancelled ? '1px solid #FDE68A' : game.cancelled ? '1px solid #FECACA' : needsReschedule ? '1px solid #FDE68A' : isPast ? '1px solid var(--gray-200)' : undefined,
+        background: game.postponed && !game.cancelled ? '#FFFBEB' : game.cancelled ? '#FFF5F5' : needsReschedule ? '#FFFBEB' : isPast ? 'var(--gray-50)' : undefined
       }}>
         <div style={{ display: 'flex', gap: '12px', alignItems: 'flex-start' }}>
           <DateBadge date={game.date} result={game.result} postponed={game.postponed && !game.cancelled} />
@@ -592,6 +594,8 @@ export default function Schedule() {
                 <span style={{ fontSize: '11px', fontWeight: '700', padding: '2px 7px', borderRadius: '10px', background: '#FEE2E2', color: '#B91C1C' }}>Cancelled</span>
               ) : game.postponed ? (
                 <span style={{ fontSize: '11px', fontWeight: '700', padding: '2px 7px', borderRadius: '10px', background: '#FEF3C7', color: '#92400E' }}>🔄 Postponed</span>
+              ) : needsReschedule ? (
+                <span style={{ fontSize: '11px', fontWeight: '700', padding: '2px 7px', borderRadius: '10px', background: '#FEF3C7', color: '#92400E' }}>⚠️ Not Played</span>
               ) : (
                 <span style={{
                   fontSize: '11px', fontWeight: '700', padding: '2px 7px', borderRadius: '10px',
@@ -612,7 +616,7 @@ export default function Schedule() {
                 {gameWeather[game.id].emoji} {gameWeather[game.id].temp}°F
               </div>
             )}
-            {!game.result && !game.cancelled && (
+            {!game.result && !game.cancelled && !isActuallyPast && (
               <div style={{ display: 'flex', gap: '6px', marginTop: '10px', flexWrap: 'wrap' }}>
                 {[
                   { key: 'yes', label: '✅ Going' },
@@ -624,13 +628,22 @@ export default function Schedule() {
                 ))}
               </div>
             )}
-            {canScore && !game.result && !game.cancelled && !game.postponed && (
+            {canScore && !game.result && !game.cancelled && !game.postponed && !isActuallyPast && (
               <div style={{ marginTop: '8px' }}>
                 <button onClick={() => navigate('/live-scoring', { state: { gameToLoad: game } })} style={{
                   padding: '6px 14px', borderRadius: '8px', border: 'none',
                   background: 'var(--red)', color: 'white',
                   fontSize: '12px', fontWeight: '700', cursor: 'pointer'
                 }}>⚾ Game Day</button>
+              </div>
+            )}
+            {isCoach && needsReschedule && (
+              <div style={{ display: 'flex', gap: '6px', marginTop: '10px' }}>
+                <button onClick={() => postponeGame(game)} style={{
+                  padding: '5px 10px', borderRadius: '8px', border: 'none',
+                  background: '#FEF3C7', color: '#92400E',
+                  fontSize: '12px', fontWeight: '600', cursor: 'pointer'
+                }}>🔄 Mark for Reschedule</button>
               </div>
             )}
             {isPast && (
@@ -644,13 +657,13 @@ export default function Schedule() {
             )}
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flexShrink: 0 }}>
-            {!game.cancelled && !game.postponed && (
+            {!game.cancelled && !game.postponed && !isActuallyPast && (
               <a href={googleCalUrl(game)} target="_blank" rel="noopener noreferrer" title="Add to Google Calendar" style={{
                 background: 'var(--gray-100)', border: 'none', borderRadius: '6px',
                 padding: '4px 8px', fontSize: '13px', cursor: 'pointer', textAlign: 'center', textDecoration: 'none', display: 'block'
               }}>📅</a>
             )}
-            {canScore && !game.result && !game.cancelled && !game.postponed && (
+            {canScore && !game.result && !game.cancelled && !game.postponed && !isActuallyPast && (
               <button onClick={() => { setScoreModal(game); setScore({ us: '', them: '', result: 'W' }); }} style={{
                 background: 'var(--gray-100)', border: 'none', borderRadius: '6px',
                 padding: '4px 8px', fontSize: '11px', cursor: 'pointer', fontWeight: '600', color: 'var(--gray-600)'
