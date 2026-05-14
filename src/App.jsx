@@ -1,9 +1,35 @@
+import { Component } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { useNotifications } from './hooks/useNotifications';
 import LoadingScreen from './components/UI/LoadingScreen';
 import BottomNav from './components/Layout/BottomNav';
 import './index.css';
+
+class ErrorBoundary extends Component {
+  state = { error: null };
+  static getDerivedStateFromError(err) { return { error: err }; }
+  render() {
+    if (this.state.error) {
+      return (
+        <div style={{ padding: '24px', fontFamily: 'monospace', fontSize: '13px', background: '#fff1f2', minHeight: '100vh' }}>
+          <div style={{ fontWeight: '700', fontSize: '16px', color: '#b91c1c', marginBottom: '12px' }}>
+            App Error — please screenshot and send to your developer:
+          </div>
+          <pre style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', color: '#1f2937', background: '#fff', padding: '12px', borderRadius: '8px', border: '1px solid #fecaca' }}>
+            {this.state.error?.toString()}
+            {'\n\n'}
+            {this.state.error?.stack}
+          </pre>
+          <button onClick={() => this.setState({ error: null })} style={{ marginTop: '16px', padding: '10px 20px', background: '#cc1b1b', color: 'white', border: 'none', borderRadius: '8px', fontSize: '14px', fontWeight: '700', cursor: 'pointer' }}>
+            Try Again
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 import Login from './pages/Auth/Login';
 import Register from './pages/Auth/Register';
@@ -70,10 +96,14 @@ function AppContent() {
 
 export default function App() {
   return (
-    <BrowserRouter>
-      <AuthProvider>
-        <AppContent />
-      </AuthProvider>
-    </BrowserRouter>
+    <ErrorBoundary>
+      <BrowserRouter>
+        <AuthProvider>
+          <ErrorBoundary>
+            <AppContent />
+          </ErrorBoundary>
+        </AuthProvider>
+      </BrowserRouter>
+    </ErrorBoundary>
   );
 }
