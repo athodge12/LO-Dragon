@@ -245,7 +245,7 @@ export default function Attendance() {
 
       {/* Detail view */}
       {activeSession ? (
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
           <div style={{
             background: 'white', borderBottom: '1px solid var(--gray-200)',
             padding: '12px 16px', display: 'flex', alignItems: 'center', gap: '12px'
@@ -285,7 +285,7 @@ export default function Attendance() {
             </div>
           </div>
 
-          <div style={{ flex: 1, overflowY: 'auto', padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          <div style={{ flex: 1, overflowY: 'auto', padding: '12px 16px', paddingBottom: 'calc(var(--bottom-nav-height) + env(safe-area-inset-bottom, 0px) + 12px)', display: 'flex', flexDirection: 'column', gap: '8px' }}>
             {players.map(player => {
               const status = activeSession.records?.[player.id];
               return (
