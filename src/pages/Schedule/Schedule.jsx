@@ -236,7 +236,7 @@ export default function Schedule() {
     .sort((a, b) => b.date.localeCompare(a.date))
     .slice(0, 8);
 
-  const completedGames = games.filter(g => g.result);
+  const completedGames = games.filter(g => g.result && g.date);
   const postponedGames = games.filter(g => g.postponed && !g.result && !g.cancelled);
 
   const visibleUpcoming = tab === 'all' ? allEvents
@@ -539,7 +539,7 @@ export default function Schedule() {
 
   function googleCalUrl(ev) {
     const times = parseTimeStr(ev.time);
-    const ds = ev.date.replace(/-/g, '');
+    const ds = (ev.date || '').replace(/-/g, '');
     const dates = times
       ? `${icsDateTime(ev.date, times.startH, times.startM)}/${icsDateTime(ev.date, times.endH, times.endM)}`
       : `${ds}/${ds}`;

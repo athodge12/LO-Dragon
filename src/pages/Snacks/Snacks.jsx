@@ -106,7 +106,7 @@ export default function Snacks() {
 
   const today = new Date().toISOString().split('T')[0];
   const upcoming = games.filter(g => !g.result && g.date >= today);
-  const past = games.filter(g => g.result || g.date < today).slice(-5).reverse();
+  const past = games.filter(g => g.date && (g.result || g.date < today)).slice(-5).reverse();
 
   const myId = currentUser?.uid;
   const myAssignments = Object.values(assignments).filter(a => a.familyId === myId);
