@@ -6,41 +6,89 @@ import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import Header from '../../components/Layout/Header';
 import Toast from '../../components/UI/Toast';
 
+const FIELDING_POSITIONS = ['Pitcher','Catcher','1st Base','2nd Base','3rd Base','Shortstop',
+  'Left Field','Left Center','Right Center','Right Field'];
+
+function fitScore(statsData, position) {
+  const f = statsData?.fielding?.[position];
+  if (!f || !f.innings) return 0;
+  const playsPerInning = ((f.putouts || 0) * 0.60 + (f.assists || 0) * 0.40) / f.innings;
+  const playScore    = Math.min(1.0, playsPerInning / 0.5);
+  const rawScore     = 0.45 + playScore * 0.55;
+  const errorPenalty = Math.max(0.05, 1 - (f.errors / f.innings) * 3.0);
+  const inningsMult  = Math.min(1.0, 0.50 + f.innings / 15);
+  return rawScore * errorPenalty * inningsMult;
+}
+
+function fitColor(score) {
+  if (score >= 0.60) return '#16A34A';
+  if (score >= 0.30) return '#D97706';
+  if (score >  0   ) return '#DC2626';
+  return 'var(--gray-300)';
+}
+
 export default function BattingOrder() {
   const { isCoach } = useAuth();
   const [players, setPlayers] = useState([]);
   const [games, setGames] = useState([]);
   const [selectedGame, setSelectedGame] = useState('');
   const [order, setOrder] = useState([]);
+  const [allStats, setAllStats] = useState({});
+  const [fieldLineup, setFieldLineup] = useState({});
   const [toast, setToast] = useState('');
+
+  const YEAR = new Date().getFullYear();
 
   useEffect(() => {
     const unsubs = [];
     unsubs.push(onSnapshot(query(collection(db, 'roster'), orderBy('createdAt')), snap => {
       setPlayers(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     }));
-    const gamesQ = query(collection(db, 'games'), orderBy('date'));
-    unsubs.push(onSnapshot(gamesQ, snap => {
+    unsubs.push(onSnapshot(query(collection(db, 'games'), orderBy('date')), snap => {
       setGames(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     }));
     return () => unsubs.forEach(u => u());
   }, []);
 
   useEffect(() => {
-    if (!selectedGame) { setOrder(players.map(p => p.id)); return; }
+    if (!selectedGame) { setOrder(players.map(p => p.id)); setFieldLineup({}); return; }
     const load = async () => {
-      const snap = await getDoc(doc(db, 'battingOrders', selectedGame));
-      if (snap.exists() && snap.data().order?.length) {
-        setOrder(snap.data().order);
-      } else {
-        setOrder(players.map(p => p.id));
-      }
+      const [orderSnap, fieldSnap] = await Promise.all([
+        getDoc(doc(db, 'battingOrders', selectedGame)),
+        getDoc(doc(db, 'liveLineups', selectedGame)),
+      ]);
+      setOrder(orderSnap.exists() && orderSnap.data().order?.length
+        ? orderSnap.data().order
+        : players.map(p => p.id));
+      setFieldLineup(fieldSnap.exists() ? (fieldSnap.data().innings?.['1'] || {}) : {});
     };
     load();
-  }, [selectedGame, players]);
+  }, [selectedGame, players]); // eslint-disable-line
+
+  useEffect(() => {
+    if (!players.length) return;
+    Promise.all(players.map(p =>
+      getDoc(doc(db, 'playerStats', p.id)).then(snap => ({ id: p.id, data: snap.exists() ? snap.data() : null }))
+    )).then(results => {
+      const stats = {};
+      results.forEach(r => { if (r.data) stats[r.id] = r.data; });
+      setAllStats(stats);
+    });
+  }, [players]); // eslint-disable-line
 
   const getPlayer = (id) => players.find(p => p.id === id);
   const getPlayerName = (p) => p?.name || p?.childName || `${p?.firstName || ''} ${p?.lastName || ''}`.trim() || 'Unknown';
+
+  const getStatLine = (playerId) => {
+    const s = allStats[playerId];
+    if (!s) return null;
+    const avg = s.seasons?.[YEAR]?.avg ?? s.career?.avg;
+    const obp = s.seasons?.[YEAR]?.obp ?? s.career?.obp;
+    if (avg == null && obp == null) return null;
+    const fmtAvg = avg != null ? `.${Math.round(avg * 1000).toString().padStart(3, '0')}` : null;
+    const fmtObp = obp != null ? `.${Math.round(obp * 1000).toString().padStart(3, '0')}` : null;
+    return [fmtAvg && `AVG ${fmtAvg}`, fmtObp && `OBP ${fmtObp}`].filter(Boolean).join('  ·  ');
+  };
 
   const onDragEnd = (result) => {
     if (!result.destination) return;
@@ -57,7 +105,14 @@ export default function BattingOrder() {
       gameId: selectedGame || null,
       savedAt: new Date().toISOString()
     });
-    setToast('Batting order saved!');
+    if (selectedGame && Object.keys(fieldLineup).length > 0) {
+      const existingSnap = await getDoc(doc(db, 'liveLineups', selectedGame));
+      const existingInnings = existingSnap.exists() ? (existingSnap.data().innings || {}) : {};
+      await setDoc(doc(db, 'liveLineups', selectedGame), {
+        innings: { ...existingInnings, '1': fieldLineup }
+      }, { merge: true });
+    }
+    setToast('Lineup saved!');
   };
 
   const moveUp = (index) => {
@@ -74,9 +129,13 @@ export default function BattingOrder() {
     setOrder(newOrder);
   };
 
+  const sortedPlayers = [...players].sort((a, b) =>
+    parseInt(a.jerseyNumber || 99) - parseInt(b.jerseyNumber || 99)
+  );
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
-      <Header title="Batting Order" back="/" />
+      <Header title="Starting Lineup" back="/" />
 
       <div className="page-content">
         {!isCoach && <div className="view-only-banner">👁 View Only</div>}
@@ -93,6 +152,12 @@ export default function BattingOrder() {
           </select>
         </div>
 
+        {/* Batting Order */}
+        <div style={{ fontFamily: 'Oswald, sans-serif', fontSize: '16px', fontWeight: '700',
+          textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '10px' }}>
+          Batting Order
+        </div>
+
         {order.length === 0 ? (
           <div className="empty-state">
             <p>No players on roster yet.</p>
@@ -105,6 +170,7 @@ export default function BattingOrder() {
                   {order.map((playerId, index) => {
                     const player = getPlayer(playerId);
                     if (!player) return null;
+                    const statLine = getStatLine(playerId);
                     return (
                       <Draggable key={playerId} draggableId={playerId} index={index}>
                         {(provided, snapshot) => (
@@ -135,6 +201,11 @@ export default function BattingOrder() {
                                 {player.position && `${player.position}`}
                                 {player.jerseyNumber && ` · #${player.jerseyNumber}`}
                               </div>
+                              {statLine && (
+                                <div style={{ fontSize: '11px', color: 'var(--gray-500)', marginTop: '2px', fontWeight: '600' }}>
+                                  {statLine}
+                                </div>
+                              )}
                             </div>
 
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
@@ -172,6 +243,7 @@ export default function BattingOrder() {
             {order.map((playerId, index) => {
               const player = getPlayer(playerId);
               if (!player) return null;
+              const statLine = getStatLine(playerId);
               return (
                 <div key={playerId} style={{
                   background: 'white', border: '1px solid var(--gray-200)',
@@ -188,6 +260,11 @@ export default function BattingOrder() {
                     <div style={{ fontSize: '12px', color: 'var(--gray-400)' }}>
                       {player.position}{player.jerseyNumber ? ` · #${player.jerseyNumber}` : ''}
                     </div>
+                    {statLine && (
+                      <div style={{ fontSize: '11px', color: 'var(--gray-500)', marginTop: '2px', fontWeight: '600' }}>
+                        {statLine}
+                      </div>
+                    )}
                   </div>
                 </div>
               );
@@ -195,9 +272,59 @@ export default function BattingOrder() {
           </div>
         )}
 
+        {/* Starting Field Positions */}
+        <div style={{ marginTop: '24px', marginBottom: '16px' }}>
+          <div style={{ fontFamily: 'Oswald, sans-serif', fontSize: '16px', fontWeight: '700',
+            textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '4px' }}>
+            Starting Field Positions
+          </div>
+          <div style={{ fontSize: '12px', color: 'var(--gray-500)', marginBottom: '12px' }}>
+            Dot color = best fit at that position · green = strong · amber = ok · red = weak
+          </div>
+
+          {FIELDING_POSITIONS.map(pos => {
+            const assignedId = fieldLineup[pos] || '';
+            const score = assignedId ? fitScore(allStats[assignedId], pos) : 0;
+            const color  = assignedId ? fitColor(score) : 'var(--gray-200)';
+            return (
+              <div key={pos} style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                <div style={{
+                  width: 10, height: 10, borderRadius: '50%',
+                  background: color, flexShrink: 0
+                }} />
+                <span style={{ fontSize: '13px', fontWeight: '700', minWidth: '110px', color: 'var(--gray-700)' }}>
+                  {pos}
+                </span>
+                <select
+                  disabled={!isCoach}
+                  value={assignedId}
+                  onChange={e => setFieldLineup(fl => {
+                    const next = { ...fl };
+                    if (e.target.value) next[pos] = e.target.value;
+                    else delete next[pos];
+                    return next;
+                  })}
+                  style={{
+                    flex: 1, padding: '8px', borderRadius: '8px',
+                    border: `1.5px solid ${color}`, fontSize: '13px',
+                    background: 'white', color: 'var(--black)'
+                  }}
+                >
+                  <option value="">— Not playing —</option>
+                  {sortedPlayers.map(p => (
+                    <option key={p.id} value={p.id}>
+                      #{p.jerseyNumber || '—'} {getPlayerName(p)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            );
+          })}
+        </div>
+
         {isCoach && order.length > 0 && (
-          <button className="btn-primary" onClick={saveOrder} style={{ marginTop: '16px' }}>
-            💾 Save Batting Order
+          <button className="btn-primary" onClick={saveOrder} style={{ marginTop: '8px' }}>
+            💾 Save Lineup
           </button>
         )}
 

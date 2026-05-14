@@ -423,6 +423,7 @@ export default function Home() {
             {[
               { label: '📋 Practice', path: '/practice' },
               { label: '🏟️ Games', path: '/live-scoring' },
+              { label: '⚾ Starting Lineup', path: '/batting-order' },
               { label: '🥤 Team Drinks Sign Up', path: '/snacks' },
               { label: '⭐ Awards', path: '/awards' },
               { label: '📋 Attendance', path: '/attendance' }
