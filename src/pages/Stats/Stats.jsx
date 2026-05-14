@@ -532,20 +532,22 @@ export default function Stats() {
     );
   };
 
-  // Build a sorted list of unique game keys across all players
-  const allGameKeys = [...new Set(
-    Object.values(allStats).flatMap(s => Object.keys(s.gameLogs || {}))
-  )].sort((a, b) => {
-    const dateA = Object.values(allStats).find(s => s.gameLogs?.[a])?.gameLogs?.[a]?.date || '';
-    const dateB = Object.values(allStats).find(s => s.gameLogs?.[b])?.gameLogs?.[b]?.date || '';
-    return dateB.localeCompare(dateA);
-  });
-
+  // Build game key metadata using stored log data, then override dates with live
+  // game data so rescheduled games show the correct (updated) date.
   const gameKeyMeta = {};
-  allGameKeys.forEach(key => {
+  [...new Set(Object.values(allStats).flatMap(s => Object.keys(s.gameLogs || {})))].forEach(key => {
     const e = Object.values(allStats).find(s => s.gameLogs?.[key])?.gameLogs?.[key];
     if (e) gameKeyMeta[key] = { date: e.date || '', opponent: e.opponent || 'Game' };
   });
+  games.forEach(g => {
+    const safeId = (g.id || '').replace(/[^a-zA-Z0-9_-]/g, '_');
+    const match = Object.keys(gameKeyMeta).find(k => k.endsWith('_' + safeId));
+    if (match && g.date) gameKeyMeta[match] = { ...gameKeyMeta[match], date: g.date };
+  });
+
+  const allGameKeys = Object.keys(gameKeyMeta).sort((a, b) =>
+    (gameKeyMeta[b]?.date || '').localeCompare(gameKeyMeta[a]?.date || '')
+  );
 
   const GamePicker = () => (
     <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '16px' }}>
