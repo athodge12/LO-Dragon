@@ -27,19 +27,17 @@ function fitScore(fieldingData, position) {
   const base = POSITION_OUT_PCT[position] ?? 0.3;
   const f = fieldingData?.[position];
   if (f && f.innings > 0) {
-    const errorMult   = Math.max(0.05, 1 - (f.errors / f.innings) * 2.0);
-    const expectedPO  = f.innings * base;
-    const putoutBoost = Math.min(1.0, (f.putouts || 0) / Math.max(1, expectedPO));
-    const assistBoost = Math.min(1.0, (f.assists || 0) / Math.max(1, f.innings * 0.5));
-    const qualityMult = errorMult * Math.min(1.0, 0.10 + 0.55 * putoutBoost + 0.45 * assistBoost);
-    return { score: base * qualityMult, label: f.innings >= 3 ? 'solid data' : 'limited data', innings: f.innings, putouts: f.putouts || 0, assists: f.assists || 0, errors: f.errors };
+    const playsPerInning = ((f.putouts || 0) * 0.55 + (f.assists || 0) * 0.45) / f.innings;
+    const playScore = Math.min(1.0, playsPerInning / 0.5);
+    const errorPenalty = Math.max(0.05, 1 - (f.errors / f.innings) * 3.0);
+    return { score: playScore * errorPenalty, label: f.innings >= 3 ? 'solid data' : 'limited data', innings: f.innings, putouts: f.putouts || 0, assists: f.assists || 0, errors: f.errors };
   }
-  return { score: base * 0.65, label: 'no data', innings: 0, putouts: 0, assists: 0, errors: 0 };
+  return { score: 0, label: 'no data', innings: 0, putouts: 0, assists: 0, errors: 0 };
 }
 
 function scoreColor(score) {
   if (score >= 0.60) return { bg: '#DCFCE7', text: '#16A34A' };
-  if (score >= 0.35) return { bg: '#FEF9C3', text: '#92400E' };
+  if (score >= 0.30) return { bg: '#FEF9C3', text: '#92400E' };
   return { bg: '#FEE2E2', text: '#B91C1C' };
 }
 
