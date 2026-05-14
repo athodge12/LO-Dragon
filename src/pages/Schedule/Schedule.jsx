@@ -626,7 +626,7 @@ export default function Schedule() {
             )}
             {canScore && !game.result && !game.cancelled && !game.postponed && (
               <div style={{ marginTop: '8px' }}>
-                <button onClick={() => navigate('/live', { state: { gameToLoad: game } })} style={{
+                <button onClick={() => navigate('/live-scoring', { state: { gameToLoad: game } })} style={{
                   padding: '6px 14px', borderRadius: '8px', border: 'none',
                   background: 'var(--red)', color: 'white',
                   fontSize: '12px', fontWeight: '700', cursor: 'pointer'
