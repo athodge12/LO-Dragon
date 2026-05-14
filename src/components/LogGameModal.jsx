@@ -166,7 +166,7 @@ export default function LogGameModal({ players, currentYear, games = [], initial
       if (liveScore && inningLineups) {
         const currentInning = liveScore.inning || 1;
         Object.entries(inningLineups).forEach(([inning, lineup]) => {
-          if (parseInt(inning) > currentInning) return;
+          if (parseInt(inning) >= currentInning) return;
           Object.entries(lineup).forEach(([pos, playerId]) => {
             if (!playerId) return;
             if (!playerPositions[playerId]) playerPositions[playerId] = {};
@@ -283,8 +283,23 @@ export default function LogGameModal({ players, currentYear, games = [], initial
       const runs    = parseInt(e.runs)    || 0;
       const hits    = singles + doubles + triples + hr;
 
+      // Add current (last) inning on save — it was excluded from pre-fill display
+      let fieldingForSave = [...(e.fieldingThisGame || [])];
+      if (liveScore && inningLineups) {
+        const currentLineup = inningLineups[String(liveScore.inning)] || {};
+        Object.entries(currentLineup).forEach(([pos, pid]) => {
+          if (pid !== player.id) return;
+          const existing = fieldingForSave.find(f => f.pos === pos);
+          if (existing) {
+            existing.innings = (existing.innings || 0) + 1;
+          } else {
+            fieldingForSave.push({ pos, innings: 1, putouts: 0, assists: 0, errors: 0 });
+          }
+        });
+      }
+
       const fieldingMap = {};
-      (e.fieldingThisGame || []).forEach(f => {
+      fieldingForSave.forEach(f => {
         fieldingMap[f.pos] = {
           innings: parseInt(f.innings) || 0,
           putouts: parseInt(f.putouts) || 0,
