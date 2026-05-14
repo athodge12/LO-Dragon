@@ -55,9 +55,10 @@ export default function BattingOrder() {
     setFieldLineup({});
     setAbsentIds(new Set());
     const load = async () => {
+      const fieldKey = selectedGame || 'default';
       const [orderSnap, fieldSnap, attSnap] = await Promise.all([
         getDoc(doc(db, 'battingOrders', 'default')),
-        selectedGame ? getDoc(doc(db, 'liveLineups', selectedGame)) : Promise.resolve(null),
+        getDoc(doc(db, 'liveLineups', fieldKey)),
         selectedGame ? getDocs(query(collection(db, 'attendance'), where('sourceId', '==', selectedGame))) : Promise.resolve(null),
       ]);
       setOrder(orderSnap.exists() && orderSnap.data().order?.length
@@ -110,10 +111,11 @@ export default function BattingOrder() {
       order,
       savedAt: new Date().toISOString()
     });
-    if (selectedGame && Object.keys(fieldLineup).length > 0) {
-      const existingSnap = await getDoc(doc(db, 'liveLineups', selectedGame));
+    if (Object.keys(fieldLineup).length > 0) {
+      const fieldKey = selectedGame || 'default';
+      const existingSnap = await getDoc(doc(db, 'liveLineups', fieldKey));
       const existingInnings = existingSnap.exists() ? (existingSnap.data().innings || {}) : {};
-      await setDoc(doc(db, 'liveLineups', selectedGame), {
+      await setDoc(doc(db, 'liveLineups', fieldKey), {
         innings: { ...existingInnings, '1': fieldLineup }
       }, { merge: true });
     }
