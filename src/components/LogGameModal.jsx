@@ -503,6 +503,7 @@ export default function LogGameModal({ players, currentYear, games = [], initial
 
   // ── Screen B: Player grid ──────────────────────────────────────────
   return (
+    <>
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-sheet" onClick={e => e.stopPropagation()} style={{ maxHeight: '92vh', overflowY: 'auto' }}>
         <div className="modal-handle" />
@@ -610,5 +611,6 @@ export default function LogGameModal({ players, currentYear, games = [], initial
         onClose={() => setShowInningLineup(false)}
       />
     )}
+    </>
   );
 }
