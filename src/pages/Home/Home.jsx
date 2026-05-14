@@ -360,7 +360,7 @@ export default function Home() {
                   </div>
                   {game.score && (
                     <span style={{ fontFamily: 'Oswald, sans-serif', fontWeight: '700', fontSize: '16px', color: 'var(--gray-700)' }}>
-                      {game.score}
+                      {typeof game.score === 'object' ? `${game.score.us}-${game.score.them}` : game.score}
                     </span>
                   )}
                 </div>
