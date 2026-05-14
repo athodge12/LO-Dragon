@@ -52,22 +52,22 @@ export default function BattingOrder() {
   }, []);
 
   useEffect(() => {
-    if (!selectedGame) { setOrder(players.map(p => p.id)); setFieldLineup({}); setAbsentIds(new Set()); return; }
+    setFieldLineup({});
+    setAbsentIds(new Set());
+    const key = selectedGame || 'default';
     const load = async () => {
       const [orderSnap, fieldSnap, attSnap] = await Promise.all([
-        getDoc(doc(db, 'battingOrders', selectedGame)),
-        getDoc(doc(db, 'liveLineups', selectedGame)),
-        getDocs(query(collection(db, 'attendance'), where('sourceId', '==', selectedGame))),
+        getDoc(doc(db, 'battingOrders', key)),
+        selectedGame ? getDoc(doc(db, 'liveLineups', selectedGame)) : Promise.resolve(null),
+        selectedGame ? getDocs(query(collection(db, 'attendance'), where('sourceId', '==', selectedGame))) : Promise.resolve(null),
       ]);
       setOrder(orderSnap.exists() && orderSnap.data().order?.length
         ? orderSnap.data().order
         : players.map(p => p.id));
-      setFieldLineup(fieldSnap.exists() ? (fieldSnap.data().innings?.['1'] || {}) : {});
-      if (!attSnap.empty) {
+      setFieldLineup(fieldSnap?.exists() ? (fieldSnap.data().innings?.['1'] || {}) : {});
+      if (attSnap && !attSnap.empty) {
         const records = attSnap.docs[0].data().records || {};
         setAbsentIds(new Set(Object.entries(records).filter(([, v]) => v === 'absent').map(([id]) => id)));
-      } else {
-        setAbsentIds(new Set());
       }
     };
     load();
