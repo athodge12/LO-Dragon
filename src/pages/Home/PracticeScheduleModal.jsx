@@ -173,6 +173,9 @@ export default function PracticeScheduleModal({ current, onSave, onClose }) {
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-sheet" onClick={e => e.stopPropagation()} style={{ maxHeight: '85vh', overflowY: 'auto' }}>
         <div className="modal-handle" />
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '-8px' }}>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '22px', color: 'var(--gray-400)', padding: '0 4px', lineHeight: 1 }}>✕</button>
+        </div>
         <h3 style={{ fontFamily: 'Oswald, sans-serif', fontSize: '20px', marginBottom: '4px', textTransform: 'uppercase' }}>
           Edit Practice Schedule
         </h3>
