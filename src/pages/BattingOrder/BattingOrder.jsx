@@ -173,7 +173,7 @@ export default function BattingOrder() {
           <label className="form-label">Lineup</label>
           <select className="form-select" value={selectedGame} onChange={e => setSelectedGame(e.target.value)}>
             <option value="">Master Lineup</option>
-            {games.filter(g => g.date).map(g => (
+            {games.filter(g => g.date && g.date >= new Date().toISOString().slice(0, 10)).map(g => (
               <option key={g.id} value={g.id}>
                 {new Date(g.date + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} vs {g.opponent}
               </option>
