@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { collection, onSnapshot, doc, setDoc, getDoc, query, orderBy } from 'firebase/firestore';
+import { collection, onSnapshot, doc, setDoc, getDoc, getDocs, query, where, orderBy } from 'firebase/firestore';
 import { db } from '../../firebase/config';
 import { useAuth } from '../../contexts/AuthContext';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
@@ -35,6 +35,7 @@ export default function BattingOrder() {
   const [order, setOrder] = useState([]);
   const [allStats, setAllStats] = useState({});
   const [fieldLineup, setFieldLineup] = useState({});
+  const [absentIds, setAbsentIds] = useState(new Set());
   const [toast, setToast] = useState('');
 
   const YEAR = new Date().getFullYear();
@@ -51,16 +52,23 @@ export default function BattingOrder() {
   }, []);
 
   useEffect(() => {
-    if (!selectedGame) { setOrder(players.map(p => p.id)); setFieldLineup({}); return; }
+    if (!selectedGame) { setOrder(players.map(p => p.id)); setFieldLineup({}); setAbsentIds(new Set()); return; }
     const load = async () => {
-      const [orderSnap, fieldSnap] = await Promise.all([
+      const [orderSnap, fieldSnap, attSnap] = await Promise.all([
         getDoc(doc(db, 'battingOrders', selectedGame)),
         getDoc(doc(db, 'liveLineups', selectedGame)),
+        getDocs(query(collection(db, 'attendance'), where('sourceId', '==', selectedGame))),
       ]);
       setOrder(orderSnap.exists() && orderSnap.data().order?.length
         ? orderSnap.data().order
         : players.map(p => p.id));
       setFieldLineup(fieldSnap.exists() ? (fieldSnap.data().innings?.['1'] || {}) : {});
+      if (!attSnap.empty) {
+        const records = attSnap.docs[0].data().records || {};
+        setAbsentIds(new Set(Object.entries(records).filter(([, v]) => v === 'absent').map(([id]) => id)));
+      } else {
+        setAbsentIds(new Set());
+      }
     };
     load();
   }, [selectedGame, players]); // eslint-disable-line
@@ -171,6 +179,7 @@ export default function BattingOrder() {
                     const player = getPlayer(playerId);
                     if (!player) return null;
                     const statLine = getStatLine(playerId);
+                    const isAbsent = absentIds.has(playerId);
                     return (
                       <Draggable key={playerId} draggableId={playerId} index={index}>
                         {(provided, snapshot) => (
@@ -179,8 +188,8 @@ export default function BattingOrder() {
                             {...provided.draggableProps}
                             style={{
                               ...provided.draggableProps.style,
-                              background: snapshot.isDragging ? '#FFF5F5' : 'white',
-                              border: `1px solid ${snapshot.isDragging ? 'var(--red)' : 'var(--gray-200)'}`,
+                              background: snapshot.isDragging ? '#FFF5F5' : isAbsent ? '#FFF5F5' : 'white',
+                              border: `1px solid ${snapshot.isDragging ? 'var(--red)' : isAbsent ? '#FECACA' : 'var(--gray-200)'}`,
                               borderRadius: '10px', padding: '12px 14px',
                               marginBottom: '8px', display: 'flex',
                               alignItems: 'center', gap: '12px',
@@ -207,6 +216,13 @@ export default function BattingOrder() {
                                 </div>
                               )}
                             </div>
+
+                            {isAbsent && (
+                              <span style={{ fontSize: '10px', fontWeight: '700', padding: '2px 6px',
+                                borderRadius: '6px', background: '#FEE2E2', color: '#DC2626', flexShrink: 0 }}>
+                                ⚠️ Absent
+                              </span>
+                            )}
 
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
                               <button onClick={() => moveUp(index)} style={{
@@ -244,9 +260,11 @@ export default function BattingOrder() {
               const player = getPlayer(playerId);
               if (!player) return null;
               const statLine = getStatLine(playerId);
+              const isAbsent = absentIds.has(playerId);
               return (
                 <div key={playerId} style={{
-                  background: 'white', border: '1px solid var(--gray-200)',
+                  background: isAbsent ? '#FFF5F5' : 'white',
+                  border: `1px solid ${isAbsent ? '#FECACA' : 'var(--gray-200)'}`,
                   borderRadius: '10px', padding: '12px 14px',
                   display: 'flex', alignItems: 'center', gap: '12px'
                 }}>
@@ -255,7 +273,7 @@ export default function BattingOrder() {
                     color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center',
                     fontFamily: 'Oswald, sans-serif', fontWeight: '700', fontSize: '16px', flexShrink: 0
                   }}>{index + 1}</div>
-                  <div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontWeight: '700', fontSize: '15px' }}>{getPlayerName(player)}</div>
                     <div style={{ fontSize: '12px', color: 'var(--gray-400)' }}>
                       {player.position}{player.jerseyNumber ? ` · #${player.jerseyNumber}` : ''}
@@ -266,6 +284,12 @@ export default function BattingOrder() {
                       </div>
                     )}
                   </div>
+                  {isAbsent && (
+                    <span style={{ fontSize: '10px', fontWeight: '700', padding: '2px 6px',
+                      borderRadius: '6px', background: '#FEE2E2', color: '#DC2626', flexShrink: 0 }}>
+                      ⚠️ Absent
+                    </span>
+                  )}
                 </div>
               );
             })}
@@ -292,6 +316,9 @@ export default function BattingOrder() {
                   width: 10, height: 10, borderRadius: '50%',
                   background: color, flexShrink: 0
                 }} />
+                {assignedId && absentIds.has(assignedId) && (
+                  <span style={{ fontSize: '11px', color: '#DC2626', fontWeight: '700', flexShrink: 0 }}>⚠️</span>
+                )}
                 <span style={{ fontSize: '13px', fontWeight: '700', minWidth: '110px', color: 'var(--gray-700)' }}>
                   {pos}
                 </span>
