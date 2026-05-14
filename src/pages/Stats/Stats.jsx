@@ -24,13 +24,14 @@ const POSITION_OUT_PCT = {
 };
 
 function fitScore(fieldingData, position) {
-  const base = POSITION_OUT_PCT[position] ?? 0.3;
   const f = fieldingData?.[position];
   if (f && f.innings > 0) {
     const playsPerInning = ((f.putouts || 0) * 0.55 + (f.assists || 0) * 0.45) / f.innings;
-    const playScore = Math.min(1.0, playsPerInning / 0.5);
+    const playScore    = Math.min(1.0, playsPerInning / 0.5);
+    const rawScore     = 0.45 + playScore * 0.55;
     const errorPenalty = Math.max(0.05, 1 - (f.errors / f.innings) * 3.0);
-    return { score: playScore * errorPenalty, label: f.innings >= 3 ? 'solid data' : 'limited data', innings: f.innings, putouts: f.putouts || 0, assists: f.assists || 0, errors: f.errors };
+    const inningsMult  = Math.min(1.0, 0.50 + f.innings / 15);
+    return { score: rawScore * errorPenalty * inningsMult, label: f.innings >= 3 ? 'solid data' : 'limited data', innings: f.innings, putouts: f.putouts || 0, assists: f.assists || 0, errors: f.errors };
   }
   return { score: 0, label: 'no data', innings: 0, putouts: 0, assists: 0, errors: 0 };
 }
@@ -977,7 +978,6 @@ export default function Stats() {
         </p>
 
         {ALL_POSITIONS.map(pos => {
-          const basePct = Math.round((POSITION_OUT_PCT[pos] ?? 0) * 100);
           const ranked = players
             .map(p => ({ p, ...fitScore(getFieldingFor(p.id), pos) }))
             .sort((a, b) => b.score - a.score);
@@ -986,9 +986,8 @@ export default function Stats() {
 
           return (
             <div key={pos} style={{ marginBottom: '18px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+              <div style={{ marginBottom: '8px' }}>
                 <span style={{ fontFamily: 'Oswald, sans-serif', fontSize: '15px', fontWeight: '700', textTransform: 'uppercase', letterSpacing: '0.3px' }}>{pos}</span>
-                <span style={{ fontSize: '11px', background: 'var(--gray-100)', borderRadius: '6px', padding: '2px 8px', color: 'var(--gray-500)', fontWeight: '700' }}>Base: {basePct}% out</span>
               </div>
               <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
