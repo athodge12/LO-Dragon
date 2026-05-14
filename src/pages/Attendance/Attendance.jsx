@@ -146,17 +146,19 @@ export default function Attendance() {
         if (pid) records[pid] = 'present';
       });
 
-    await addDoc(collection(db, 'attendance'), {
+    const createdAt = new Date().toISOString();
+    const ref = await addDoc(collection(db, 'attendance'), {
       date: event.date,
       type: event.type,
       label: event.label,
       records,
       sourceId: event.id,
-      createdAt: new Date().toISOString()
+      createdAt
     });
     setShowNewModal(false);
     const preCount = Object.keys(records).length;
     setToast(preCount > 0 ? `Session created – ${preCount} player${preCount !== 1 ? 's' : ''} pre-marked from RSVPs` : 'Session created!');
+    return { id: ref.id, date: event.date, type: event.type, label: event.label, records, sourceId: event.id, createdAt };
   };
 
   const toggleAttendance = async (session, playerId) => {
@@ -183,6 +185,38 @@ export default function Attendance() {
     Object.values(session.records || {}).filter(v => v === 'present').length;
   const absentCount = (session) =>
     Object.values(session.records || {}).filter(v => v === 'absent').length;
+
+  // Virtual sessions for games that don't have an attendance doc yet
+  const virtualGames = games
+    .filter(g => g.date && !g.cancelled && !sessionedIds.has(g.id))
+    .map(g => ({
+      _virtual: true,
+      id: `virtual-${g.id}`,
+      sourceId: g.id,
+      type: 'Game',
+      date: g.date,
+      label: `vs ${g.opponent || 'TBD'}`,
+      time: g.time,
+      records: {},
+    }));
+
+  const mergedSessions = [...sessions, ...virtualGames]
+    .sort((a, b) => b.date.localeCompare(a.date));
+
+  const handleSessionClick = async (session) => {
+    if (session._virtual) {
+      if (!canEdit) return;
+      const game = games.find(g => g.id === session.sourceId);
+      if (!game) return;
+      const newSession = await createSessionFromEvent({
+        id: game.id, type: 'Game', date: game.date,
+        label: `vs ${game.opponent || 'TBD'}`, time: game.time,
+      });
+      setActiveSession(newSession);
+    } else {
+      setActiveSession(session);
+    }
+  };
 
   const playerSummary = players.map(player => {
     const total = sessions.length;
@@ -359,45 +393,58 @@ export default function Attendance() {
           </div>
 
           {viewTab === 'sessions' ? (
-            sessions.length === 0 ? (
+            mergedSessions.length === 0 ? (
               <div className="empty-state">
                 <p style={{ fontSize: '32px' }}>📋</p>
                 <p>No sessions yet.{canEdit ? ' Tap + to add one.' : ''}</p>
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {sessions.map(session => {
+                {mergedSessions.map(session => {
                   const p = presentCount(session);
                   const pct = players.length > 0 ? Math.round((p / players.length) * 100) : 0;
+                  const isVirtual = session._virtual;
                   return (
                     <div
                       key={session.id}
-                      onClick={() => setActiveSession(session)}
+                      onClick={() => handleSessionClick(session)}
                       style={{
-                        background: 'white', border: '1px solid var(--gray-200)',
+                        background: isVirtual ? 'var(--gray-50)' : 'white',
+                        border: `1px solid ${isVirtual ? 'var(--gray-200)' : 'var(--gray-200)'}`,
                         borderRadius: '10px', padding: '12px 14px',
-                        display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer'
+                        display: 'flex', alignItems: 'center', gap: '12px',
+                        cursor: isVirtual && !canEdit ? 'default' : 'pointer',
+                        opacity: isVirtual ? 0.75 : 1,
                       }}
                     >
                       <div style={{
                         width: 44, height: 44, borderRadius: '10px',
                         background: session.type === 'Game' ? 'var(--red)' : '#1D4ED8',
                         color: 'white', display: 'flex', alignItems: 'center',
-                        justifyContent: 'center', fontSize: '20px', flexShrink: 0
+                        justifyContent: 'center', fontSize: '20px', flexShrink: 0,
+                        opacity: isVirtual ? 0.6 : 1,
                       }}>
                         {session.type === 'Game' ? '⚾' : '🏋️'}
                       </div>
                       <div style={{ flex: 1 }}>
-                        <div style={{ fontWeight: '700', fontSize: '15px' }}>{session.label}</div>
+                        <div style={{ fontWeight: '700', fontSize: '15px', color: isVirtual ? 'var(--gray-500)' : 'var(--black)' }}>
+                          {session.label}
+                        </div>
                         <div style={{ fontSize: '12px', color: 'var(--gray-500)', marginTop: '2px' }}>
                           {formatDate(session.date)}
                         </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '6px' }}>
-                          <div style={{ flex: 1, background: 'var(--gray-200)', borderRadius: '4px', height: '4px', overflow: 'hidden' }}>
-                            <div style={{ width: `${pct}%`, height: '100%', background: '#16A34A', borderRadius: '4px', transition: 'width 0.3s' }} />
+                        {isVirtual ? (
+                          <div style={{ fontSize: '11px', color: 'var(--gray-400)', marginTop: '4px', fontStyle: 'italic' }}>
+                            Tap to start tracking attendance
                           </div>
-                          <span style={{ fontSize: '11px', color: 'var(--gray-500)', flexShrink: 0 }}>{p}/{players.length}</span>
-                        </div>
+                        ) : (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '6px' }}>
+                            <div style={{ flex: 1, background: 'var(--gray-200)', borderRadius: '4px', height: '4px', overflow: 'hidden' }}>
+                              <div style={{ width: `${pct}%`, height: '100%', background: '#16A34A', borderRadius: '4px', transition: 'width 0.3s' }} />
+                            </div>
+                            <span style={{ fontSize: '11px', color: 'var(--gray-500)', flexShrink: 0 }}>{p}/{players.length}</span>
+                          </div>
+                        )}
                       </div>
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" strokeWidth="2">
                         <path d="M9 18l6-6-6-6"/>
