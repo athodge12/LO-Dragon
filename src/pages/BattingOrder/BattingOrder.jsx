@@ -112,33 +112,35 @@ export default function BattingOrder() {
     setOrder(newOrder);
   };
 
-  const saveOrder = async () => {
+  const saveBattingOrder = async () => {
     const now = new Date().toISOString();
     if (!selectedGame) {
-      // === Master save — write to default and copy to every game ===
-      const saves = [
+      await Promise.all([
         setDoc(doc(db, 'battingOrders', 'default'), { order, savedAt: now }),
         ...games.map(g => setDoc(doc(db, 'battingOrders', g.id), { order, savedAt: now })),
-      ];
-      if (Object.keys(fieldLineup).length > 0) {
-        saves.push(setDoc(doc(db, 'liveLineups', 'default'), { innings: { '1': fieldLineup } }, { merge: true }));
-        saves.push(...games.map(g =>
-          setDoc(doc(db, 'liveLineups', g.id), { innings: { '1': fieldLineup } }, { merge: true })
-        ));
-      }
-      await Promise.all(saves);
-      setToast(`Master lineup saved & copied to ${games.length} game${games.length !== 1 ? 's' : ''}!`);
+      ]);
+      setToast(`Batting order saved & copied to ${games.length} game${games.length !== 1 ? 's' : ''}!`);
     } else {
-      // === Game-specific save — only affects this game ===
       await setDoc(doc(db, 'battingOrders', selectedGame), { order, savedAt: now });
-      if (Object.keys(fieldLineup).length > 0) {
-        const existingSnap = await getDoc(doc(db, 'liveLineups', selectedGame));
-        const existingInnings = existingSnap.exists() ? (existingSnap.data().innings || {}) : {};
-        await setDoc(doc(db, 'liveLineups', selectedGame), {
-          innings: { ...existingInnings, '1': fieldLineup }
-        }, { merge: true });
-      }
-      setToast('Game lineup saved!');
+      setToast('Batting order saved!');
+    }
+  };
+
+  const saveFieldPositions = async () => {
+    const now = new Date().toISOString();
+    if (!selectedGame) {
+      await Promise.all([
+        setDoc(doc(db, 'liveLineups', 'default'), { innings: { '1': fieldLineup } }, { merge: true }),
+        ...games.map(g => setDoc(doc(db, 'liveLineups', g.id), { innings: { '1': fieldLineup } }, { merge: true })),
+      ]);
+      setToast(`Field positions saved & copied to ${games.length} game${games.length !== 1 ? 's' : ''}!`);
+    } else {
+      const existingSnap = await getDoc(doc(db, 'liveLineups', selectedGame));
+      const existingInnings = existingSnap.exists() ? (existingSnap.data().innings || {}) : {};
+      await setDoc(doc(db, 'liveLineups', selectedGame), {
+        innings: { ...existingInnings, '1': fieldLineup }
+      }, { merge: true });
+      setToast('Field positions saved!');
     }
   };
 
@@ -315,6 +317,12 @@ export default function BattingOrder() {
           </div>
         )}
 
+        {isCoach && order.length > 0 && (
+          <button className="btn-primary" onClick={saveBattingOrder} style={{ marginTop: '10px' }}>
+            {selectedGame ? '💾 Save Batting Order' : '💾 Save Master Batting Order'}
+          </button>
+        )}
+
         {/* Starting Field Positions */}
         <div style={{ marginTop: '24px', marginBottom: '16px' }}>
           <div style={{ fontFamily: 'Oswald, sans-serif', fontSize: '16px', fontWeight: '700',
@@ -368,9 +376,9 @@ export default function BattingOrder() {
           })}
         </div>
 
-        {isCoach && order.length > 0 && (
-          <button className="btn-primary" onClick={saveOrder} style={{ marginTop: '8px' }}>
-            {selectedGame ? '💾 Save Game Lineup' : '💾 Save Master Lineup'}
+        {isCoach && (
+          <button className="btn-primary" onClick={saveFieldPositions} style={{ marginTop: '8px' }}>
+            {selectedGame ? '💾 Save Field Positions' : '💾 Save Master Field Positions'}
           </button>
         )}
 
