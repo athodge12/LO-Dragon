@@ -1114,16 +1114,51 @@ export default function Schedule() {
             <h3 style={{ fontFamily: 'Oswald, sans-serif', fontSize: '20px', marginBottom: '4px', textTransform: 'uppercase' }}>
               📅 Sync Schedule
             </h3>
-            <p style={{ color: 'var(--gray-500)', fontSize: '14px', marginBottom: '4px' }}>
+            <p style={{ color: 'var(--gray-500)', fontSize: '14px', marginBottom: '16px' }}>
               Add all upcoming games &amp; practices to your calendar app.
             </p>
-            <div style={{ background: '#FEF9C3', border: '1px solid #FDE047', borderRadius: '8px', padding: '10px 12px', marginBottom: '16px' }}>
-              <p style={{ fontSize: '12px', color: '#854D0E', lineHeight: '1.5', margin: 0 }}>
-                <strong>Heads up:</strong> This is a one-time export (snapshot). If game times or locations change, you'll need to re-export and re-import to get the updates.
+
+            {/* Live subscription — auto-updates */}
+            <div style={{ background: '#F0FDF4', border: '1px solid #86EFAC', borderRadius: '12px', padding: '14px', marginBottom: '16px' }}>
+              <div style={{ fontWeight: '700', fontSize: '13px', color: '#166534', marginBottom: '6px' }}>
+                ✅ Live Feed — Auto-updates when schedule changes
+              </div>
+              <p style={{ fontSize: '12px', color: '#15803D', lineHeight: '1.5', margin: '0 0 10px' }}>
+                Subscribe once and your calendar stays in sync automatically.
+              </p>
+              <a
+                href={`webcal://${window.location.host}/api/schedule`}
+                style={{
+                  display: 'block', width: '100%', padding: '12px', borderRadius: '10px',
+                  background: '#16A34A', color: 'white', textAlign: 'center',
+                  fontWeight: '700', fontSize: '14px', textDecoration: 'none',
+                  boxSizing: 'border-box', marginBottom: '8px'
+                }}
+              >
+                🍎 Subscribe in Apple Calendar
+              </a>
+              <button
+                onClick={() => {
+                  const url = `${window.location.origin}/api/schedule`;
+                  navigator.clipboard?.writeText(url).then(() => setToast('Feed URL copied!')).catch(() => setToast(url));
+                }}
+                style={{
+                  width: '100%', padding: '10px', borderRadius: '10px', cursor: 'pointer',
+                  fontWeight: '600', fontSize: '13px', border: '1.5px solid #86EFAC',
+                  background: 'white', color: '#166534'
+                }}
+              >
+                📋 Copy Feed URL (for Google Calendar / Outlook)
+              </button>
+              <p style={{ fontSize: '11px', color: '#4ADE80', marginTop: '6px', textAlign: 'center' }}>
+                Google Calendar: Settings → Add calendar → From URL → paste the link
               </p>
             </div>
 
             {/* Share / Copy as text */}
+            <div style={{ borderTop: '1px solid var(--gray-100)', paddingTop: '14px', marginBottom: '10px' }}>
+              <p style={{ fontWeight: '700', fontSize: '13px', color: 'var(--gray-700)', marginBottom: '10px' }}>SHARE WITH PARENTS:</p>
+            </div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '10px' }}>
               <button onClick={shareSchedule} style={{
                 padding: '14px', borderRadius: '12px', cursor: 'pointer',
@@ -1144,49 +1179,22 @@ export default function Schedule() {
               Share or copy to paste in a text / email to parents
             </p>
 
-            <div style={{ borderTop: '1px solid var(--gray-100)', paddingTop: '16px', marginBottom: '16px' }}>
-              <p style={{ fontWeight: '700', fontSize: '13px', color: 'var(--gray-700)', marginBottom: '10px' }}>ADD TO CALENDAR APP:</p>
+            {/* One-time download */}
+            <div style={{ borderTop: '1px solid var(--gray-100)', paddingTop: '14px', marginBottom: '10px' }}>
+              <p style={{ fontWeight: '700', fontSize: '13px', color: 'var(--gray-700)', marginBottom: '10px' }}>ONE-TIME DOWNLOAD:</p>
             </div>
-
-            {/* ICS download */}
             <button onClick={downloadICS} style={{
               width: '100%', padding: '14px', borderRadius: '12px', cursor: 'pointer',
               fontWeight: '700', fontSize: '15px', border: 'none',
-              background: 'var(--red)', color: 'white', marginBottom: '10px'
+              background: 'var(--red)', color: 'white', marginBottom: '6px'
             }}>
               ⬇️ Download .ics File
             </button>
-            <p style={{ fontSize: '12px', color: 'var(--gray-400)', textAlign: 'center', marginBottom: '18px' }}>
-              Works with Apple Calendar, Outlook, and most calendar apps
+            <p style={{ fontSize: '12px', color: 'var(--gray-400)', textAlign: 'center', marginBottom: '8px' }}>
+              Snapshot only — won't update if schedule changes
             </p>
 
-            {/* Platform instructions */}
-            <div style={{ borderTop: '1px solid var(--gray-100)', paddingTop: '16px' }}>
-              <p style={{ fontWeight: '700', fontSize: '13px', color: 'var(--gray-700)', marginBottom: '10px' }}>HOW TO IMPORT:</p>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                <div style={{ background: 'var(--gray-50)', borderRadius: '10px', padding: '12px' }}>
-                  <p style={{ fontWeight: '700', fontSize: '13px', marginBottom: '4px' }}>🍎 Apple Calendar (iPhone/Mac)</p>
-                  <p style={{ fontSize: '12px', color: 'var(--gray-500)', lineHeight: '1.5' }}>
-                    Download the .ics file → tap it in Files/Downloads → "Add All" to import into Calendar.
-                  </p>
-                </div>
-                <div style={{ background: 'var(--gray-50)', borderRadius: '10px', padding: '12px' }}>
-                  <p style={{ fontWeight: '700', fontSize: '13px', marginBottom: '4px' }}>📆 Google Calendar</p>
-                  <p style={{ fontSize: '12px', color: 'var(--gray-500)', lineHeight: '1.5' }}>
-                    Download the .ics file → open Google Calendar on desktop → Settings → Import → choose the file.
-                    <br/>Or tap 📅 next to any game to add it directly.
-                  </p>
-                </div>
-                <div style={{ background: 'var(--gray-50)', borderRadius: '10px', padding: '12px' }}>
-                  <p style={{ fontWeight: '700', fontSize: '13px', marginBottom: '4px' }}>📧 Outlook</p>
-                  <p style={{ fontSize: '12px', color: 'var(--gray-500)', lineHeight: '1.5' }}>
-                    Download the .ics file → double-click it (desktop) or go to Calendar → Import.
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <button className="btn-secondary" onClick={() => setShowCalSync(false)} style={{ marginTop: '16px' }}>
+            <button className="btn-secondary" onClick={() => setShowCalSync(false)} style={{ marginTop: '8px' }}>
               Close
             </button>
           </div>
