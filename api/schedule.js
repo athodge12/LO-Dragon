@@ -103,15 +103,21 @@ function icsEscape(str) {
   return (str || '').replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\n/g, '\\n');
 }
 
+function nextDay(dateStr) {
+  const d = new Date(dateStr + 'T12:00:00');
+  d.setDate(d.getDate() + 1);
+  return d.toISOString().split('T')[0].replace(/-/g, '');
+}
+
 function generateICS(games, practices) {
   const today = new Date().toISOString().split('T')[0];
+  const dtstamp = new Date().toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
   const lines = [
     'BEGIN:VCALENDAR', 'VERSION:2.0',
     'PRODID:-//Dragons Baseball//EN',
     'CALSCALE:GREGORIAN', 'METHOD:PUBLISH',
     'X-WR-CALNAME:Dragons Baseball',
-    'X-WR-CALDESC:Dragons Baseball schedule — auto-updating',
-    'REFRESH-INTERVAL;VALUE=DURATION:PT6H',
+    'X-WR-CALDESC:Dragons Baseball Schedule',
     'X-PUBLISHED-TTL:PT6H',
   ];
 
@@ -130,6 +136,7 @@ function generateICS(games, practices) {
     const uid = ev.id ? `${ev.id}@dragons-baseball` : `${ev.evType}-${ds}@dragons-baseball`;
     lines.push('BEGIN:VEVENT');
     lines.push(`UID:${uid}`);
+    lines.push(`DTSTAMP:${dtstamp}`);
     if (ev.evType === 'game') {
       lines.push(`SUMMARY:Dragons vs ${icsEscape(ev.opponent)}`);
       lines.push(`DESCRIPTION:${icsEscape(ev.homeAway || 'Home')} game vs ${icsEscape(ev.opponent)}`);
@@ -142,7 +149,7 @@ function generateICS(games, practices) {
       lines.push(`DTEND:${icsDateTime(ev.date, times.endH, times.endM)}`);
     } else {
       lines.push(`DTSTART;VALUE=DATE:${ds}`);
-      lines.push(`DTEND;VALUE=DATE:${ds}`);
+      lines.push(`DTEND;VALUE=DATE:${nextDay(ev.date)}`);
     }
     if (ev.location) lines.push(`LOCATION:${icsEscape(ev.location)}`);
     lines.push('END:VEVENT');
@@ -212,8 +219,8 @@ export default async function handler(req, res) {
     const ics = generateICS(games, practices);
 
     res.setHeader('Content-Type', 'text/calendar; charset=utf-8');
-    res.setHeader('Content-Disposition', 'attachment; filename="dragons-baseball.ics"');
     res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.setHeader('Access-Control-Allow-Origin', '*');
     res.status(200).send(ics);
   } catch (err) {
     res.status(500).send('Failed to generate calendar');
