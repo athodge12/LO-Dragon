@@ -1124,34 +1124,30 @@ export default function Schedule() {
                 ✅ Live Feed — Auto-updates when schedule changes
               </div>
               <p style={{ fontSize: '12px', color: '#15803D', lineHeight: '1.5', margin: '0 0 10px' }}>
-                Subscribe once and your calendar stays in sync automatically.
+                Subscribe once — new games appear automatically. No re-importing needed.
               </p>
-              <a
-                href={`webcal://${window.location.host}/api/schedule`}
-                style={{
-                  display: 'block', width: '100%', padding: '12px', borderRadius: '10px',
-                  background: '#16A34A', color: 'white', textAlign: 'center',
-                  fontWeight: '700', fontSize: '14px', textDecoration: 'none',
-                  boxSizing: 'border-box', marginBottom: '8px'
-                }}
-              >
-                🍎 Subscribe in Apple Calendar
-              </a>
+              <p style={{ fontSize: '12px', fontWeight: '700', color: '#166534', margin: '0 0 6px' }}>
+                On iPhone: Copy the URL below, open Calendar app → Calendars → Add Calendar → Add Subscription Calendar → paste URL
+              </p>
               <button
                 onClick={() => {
                   const url = `${window.location.origin}/api/schedule`;
-                  navigator.clipboard?.writeText(url).then(() => setToast('Feed URL copied!')).catch(() => setToast(url));
+                  if (navigator.clipboard?.writeText) {
+                    navigator.clipboard.writeText(url).then(() => setToast('Feed URL copied! Paste it in Calendar app.')).catch(() => setToast(url));
+                  } else {
+                    setToast(url);
+                  }
                 }}
                 style={{
-                  width: '100%', padding: '10px', borderRadius: '10px', cursor: 'pointer',
-                  fontWeight: '600', fontSize: '13px', border: '1.5px solid #86EFAC',
-                  background: 'white', color: '#166534'
+                  width: '100%', padding: '12px', borderRadius: '10px', cursor: 'pointer',
+                  fontWeight: '700', fontSize: '14px', border: 'none',
+                  background: '#16A34A', color: 'white', marginBottom: '8px'
                 }}
               >
-                📋 Copy Feed URL (for Google Calendar / Outlook)
+                📋 Copy Subscription URL
               </button>
-              <p style={{ fontSize: '11px', color: '#4ADE80', marginTop: '6px', textAlign: 'center' }}>
-                Google Calendar: Settings → Add calendar → From URL → paste the link
+              <p style={{ fontSize: '11px', color: '#166534', marginTop: '4px', textAlign: 'center' }}>
+                Google Calendar: Settings → Add calendar → From URL → paste
               </p>
             </div>
 

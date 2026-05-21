@@ -159,9 +159,18 @@ function generateICS(games, practices) {
   return lines.join('\r\n');
 }
 
+const EMPTY_ICS = 'BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Dragons Baseball//EN\r\nCALSCALE:GREGORIAN\r\nMETHOD:PUBLISH\r\nX-WR-CALNAME:Dragons Baseball\r\nEND:VCALENDAR\r\n';
+
+function sendICS(res, body) {
+  res.setHeader('Content-Type', 'text/calendar; charset=utf-8');
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.status(200).send(body);
+}
+
 export default async function handler(req, res) {
   const saRaw = process.env.FIREBASE_SERVICE_ACCOUNT;
-  if (!saRaw) return res.status(500).send('Server misconfigured');
+  if (!saRaw) return sendICS(res, EMPTY_ICS);
 
   try {
     const sa = JSON.parse(saRaw);
@@ -216,13 +225,9 @@ export default async function handler(req, res) {
       }
     });
 
-    const ics = generateICS(games, practices);
-
-    res.setHeader('Content-Type', 'text/calendar; charset=utf-8');
-    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.status(200).send(ics);
+    sendICS(res, generateICS(games, practices));
   } catch (err) {
-    res.status(500).send('Failed to generate calendar');
+    console.error('schedule.ics error:', err?.message || err);
+    sendICS(res, EMPTY_ICS);
   }
 }
