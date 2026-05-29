@@ -336,8 +336,38 @@ export default function LogGameModal({ players, currentYear, games = [], initial
       const snap = await getDoc(ref);
       const current = snap.exists() ? snap.data() : {};
 
-      const gameEntry = { gameId: safeId, date: game.date, opponent: game.opponent, year, ab, singles, doubles, triples, hr, hits, rbi, k, bb, runs };
-      if (Object.keys(fieldingMap).length > 0) gameEntry.fielding = fieldingMap;
+      // Merge with existing saved stats — take max so re-saving a partial inning
+      // never wipes out stats already accumulated from earlier innings
+      const saved = (current.gameLogs || {})[gameKey] || {};
+      const mx = (key, val) => Math.max(val, parseInt(saved[key]) || 0);
+
+      const gameEntry = { gameId: safeId, date: game.date, opponent: game.opponent, year,
+        ab:      mx('ab', ab),
+        singles: mx('singles', singles),
+        doubles: mx('doubles', doubles),
+        triples: mx('triples', triples),
+        hr:      mx('hr', hr),
+        rbi:     mx('rbi', rbi),
+        k:       mx('k', k),
+        bb:      mx('bb', bb),
+        runs:    mx('runs', runs),
+      };
+      gameEntry.hits = gameEntry.singles + gameEntry.doubles + gameEntry.triples + gameEntry.hr;
+
+      // Merge fielding — take max per position per stat
+      if (Object.keys(fieldingMap).length > 0 || saved.fielding) {
+        const mergedFM = { ...(saved.fielding || {}) };
+        Object.entries(fieldingMap).forEach(([pos, f]) => {
+          const s = mergedFM[pos] || {};
+          mergedFM[pos] = {
+            innings: Math.max(f.innings || 0, s.innings || 0),
+            putouts: Math.max(f.putouts || 0, s.putouts || 0),
+            assists: Math.max(f.assists || 0, s.assists || 0),
+            errors:  Math.max(f.errors  || 0, s.errors  || 0),
+          };
+        });
+        if (Object.keys(mergedFM).length > 0) gameEntry.fielding = mergedFM;
+      }
 
       const updatedLogs    = { ...(current.gameLogs || {}), [gameKey]: gameEntry };
       const updatedSeasons = recalcBattingFromLogs(updatedLogs, year, current.seasons || {});
@@ -365,7 +395,13 @@ export default function LogGameModal({ players, currentYear, games = [], initial
 
     const totalZoneHits = Object.values(gameZones).reduce((s, v) => s + v, 0);
     if (totalZoneHits > 0) {
-      await setDoc(doc(db, 'settings', 'gameHitZones_' + gameKey), gameZones);
+      const savedZonesSnap = await getDoc(doc(db, 'settings', 'gameHitZones_' + gameKey));
+      const savedZones = savedZonesSnap.exists() ? savedZonesSnap.data() : {};
+      const mergedZones = {};
+      Object.keys(gameZones).forEach(k => {
+        mergedZones[k] = Math.max(gameZones[k] || 0, savedZones[k] || 0);
+      });
+      await setDoc(doc(db, 'settings', 'gameHitZones_' + gameKey), mergedZones);
     }
     setIsSaving(false);
     onSaved(`Game vs ${game.opponent} logged for ${players.length} players!`);
