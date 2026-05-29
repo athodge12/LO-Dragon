@@ -169,8 +169,12 @@ function sendICS(res, body) {
 }
 
 export default async function handler(req, res) {
+  const debug = req.query?.debug === '1';
   const saRaw = process.env.FIREBASE_SERVICE_ACCOUNT;
-  if (!saRaw) return sendICS(res, EMPTY_ICS);
+  if (!saRaw) {
+    if (debug) return res.status(200).json({ error: 'FIREBASE_SERVICE_ACCOUNT not set' });
+    return sendICS(res, EMPTY_ICS);
+  }
 
   try {
     const sa = JSON.parse(saRaw);
@@ -183,6 +187,7 @@ export default async function handler(req, res) {
     do {
       const url = `https://firestore.googleapis.com/v1/projects/${pid}/databases/(default)/documents/games?pageSize=200${pageToken ? `&pageToken=${pageToken}` : ''}`;
       const data = await (await fetch(url, { headers: { authorization: `Bearer ${token}` } })).json();
+      if (debug && data.error) return res.status(200).json({ error: 'Firestore error', details: data.error });
       for (const doc of data.documents || []) {
         const f = doc.fields || {};
         games.push({
@@ -225,9 +230,23 @@ export default async function handler(req, res) {
       }
     });
 
+    if (debug) {
+      const today = new Date().toISOString().split('T')[0];
+      const visibleGames = games.filter(g => g.date >= today && !g.result && !g.cancelled && !g.postponed);
+      return res.status(200).json({
+        ok: true,
+        serverDate: today,
+        totalGames: games.length,
+        visibleGames: visibleGames.length,
+        games: games.map(g => ({ id: g.id, date: g.date, opponent: g.opponent, result: g.result, cancelled: g.cancelled, postponed: g.postponed })),
+        practices: practices.length,
+      });
+    }
+
     sendICS(res, generateICS(games, practices));
   } catch (err) {
     console.error('schedule.ics error:', err?.message || err);
+    if (debug) return res.status(200).json({ error: err?.message || String(err) });
     sendICS(res, EMPTY_ICS);
   }
 }
