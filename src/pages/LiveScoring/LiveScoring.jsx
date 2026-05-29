@@ -86,6 +86,11 @@ export default function LiveScoring() {
 
   // Load a game from the schedule onto the scoreboard
   const loadGame = async (game) => {
+    // If this game is already loaded, don't wipe the current scores
+    if (scoreData.gameId === game.id) {
+      setShowGamePicker(false);
+      return;
+    }
     const newScore = {
       opponent: game.opponent,
       gameId: game.id,
@@ -102,6 +107,8 @@ export default function LiveScoring() {
   useEffect(() => {
     const game = location.state?.gameToLoad;
     if (!game) return;
+    // Don't wipe scores if this game is already on the board
+    if (scoreData.gameId === game.id) return;
     loadGame(game);
   }, [location.key]); // eslint-disable-line
 
