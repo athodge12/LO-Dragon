@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { doc, onSnapshot, setDoc, getDoc, collection, query, orderBy } from 'firebase/firestore';
 import { db } from '../../firebase/config';
@@ -29,6 +29,7 @@ export default function LiveScoring() {
     dragons: [0, 0, 0, 0, 0, 0, 0],
     them: [0, 0, 0, 0, 0, 0, 0]
   });
+  const activeGameIdRef = useRef(null);
   const [liveStream, setLiveStream] = useState(null);
   const [streamModal, setStreamModal] = useState(false);
   const [streamUrl, setStreamUrl] = useState('');
@@ -51,7 +52,11 @@ export default function LiveScoring() {
     const today = new Date().toISOString().slice(0, 10);
     const unsubs = [
       onSnapshot(doc(db, 'settings', 'liveScore'), snap => {
-        if (snap.exists()) setScoreData(snap.data());
+        if (snap.exists()) {
+          const data = snap.data();
+          activeGameIdRef.current = data.gameId || null;
+          setScoreData(data);
+        }
       }),
       onSnapshot(doc(db, 'settings', 'liveStream'), snap => {
         setLiveStream(snap.exists() ? snap.data() : null);
@@ -86,8 +91,8 @@ export default function LiveScoring() {
 
   // Load a game from the schedule onto the scoreboard
   const loadGame = async (game) => {
-    // If this game is already loaded, don't wipe the current scores
-    if (scoreData.gameId === game.id) {
+    // Use ref so the check is never stale regardless of render timing
+    if (activeGameIdRef.current === game.id) {
       setShowGamePicker(false);
       return;
     }
@@ -107,8 +112,7 @@ export default function LiveScoring() {
   useEffect(() => {
     const game = location.state?.gameToLoad;
     if (!game) return;
-    // Don't wipe scores if this game is already on the board
-    if (scoreData.gameId === game.id) return;
+    if (activeGameIdRef.current === game.id) return;
     loadGame(game);
   }, [location.key]); // eslint-disable-line
 
