@@ -168,7 +168,7 @@ function sendICS(res, body) {
 
 export default async function handler(req, res) {
   const debug = req.query?.debug === '1';
-  const saRaw = process.env.FIREBASE_SERVICE_ACCOUNT || process.env.FIREBASE_SERVICE_ACCOUNTS;
+  const saRaw = process.env.FIREBASE_SERVICE_ACCOUNTS || process.env.FIREBASE_SERVICE_ACCOUNT;
 
   if (!saRaw) {
     if (debug) return res.status(200).json({ error: 'FIREBASE_SERVICE_ACCOUNT not set' });
