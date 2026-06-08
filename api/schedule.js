@@ -185,7 +185,7 @@ export default async function handler(req, res) {
     do {
       const url = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/games?pageSize=200${pageToken ? `&pageToken=${pageToken}` : ''}`;
       const data = await (await fetch(url, { headers: { authorization: `Bearer ${token}` } })).json();
-      if (debug && data.error) return res.status(200).json({ error: 'Firestore games error', details: data.error });
+      if (debug && data.error) return res.status(200).json({ error: 'Firestore games error', serviceAccountProject: sa.project_id, serviceAccountEmail: sa.client_email, details: data.error });
       for (const doc of data.documents || []) {
         const f = doc.fields || {};
         games.push({
