@@ -176,7 +176,16 @@ export default async function handler(req, res) {
   }
 
   try {
-    const sa = JSON.parse(saRaw);
+    // Pasting JSON into Vercel sometimes turns \n into real newlines inside the private key.
+    // Try plain parse first; if it fails, re-escape newlines inside string values.
+    let sa;
+    try {
+      sa = JSON.parse(saRaw);
+    } catch {
+      const fixed = saRaw.replace(/"((?:[^"\\]|\\.)*)"/gs,
+        (_, inner) => `"${inner.replace(/\n/g, '\\n')}"`);
+      sa = JSON.parse(fixed);
+    }
     const token = await getAccessToken(sa);
 
     // Fetch games (paginated) — always use the correct project ID
