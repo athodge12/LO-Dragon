@@ -180,20 +180,23 @@ export default function LogGameModal({ players, currentYear, games = [], initial
       await Promise.all(players.map(async (player) => {
         const snap = await getDoc(doc(db, 'playerStats', player.id));
         const gl = snap.exists() ? snap.data().gameLogs?.[gameKey] : null;
-        const savedFielding = Object.entries(gl?.fielding || {}).map(([pos, f]) => ({
-          pos, innings: f.innings || 0, putouts: f.putouts || 0, assists: f.assists || 0, errors: f.errors || 0,
-        }));
         const rotPositions = playerPositions[player.id] || {};
-        const rotFielding = Object.entries(rotPositions)
-          .filter(([pos]) => !gl?.fielding?.[pos])
-          .map(([pos, innCount]) => ({ pos, innings: innCount, putouts: 0, assists: 0, errors: 0 }));
+        // Rotation data is the source of truth for innings; preserve saved putouts/assists/errors
+        const rotFielding = Object.entries(rotPositions).map(([pos, innCount]) => {
+          const s = gl?.fielding?.[pos];
+          return { pos, innings: innCount, putouts: s?.putouts || 0, assists: s?.assists || 0, errors: s?.errors || 0 };
+        });
+        // Keep saved positions that have no rotation data (e.g. manual entries)
+        const savedOnlyFielding = Object.entries(gl?.fielding || {})
+          .filter(([pos]) => !rotPositions[pos])
+          .map(([pos, f]) => ({ pos, innings: f.innings || 0, putouts: f.putouts || 0, assists: f.assists || 0, errors: f.errors || 0 }));
 
         if (!gl && rotFielding.length === 0) return;
         entries[player.id] = {
           ab: gl?.ab || 0, singles: gl?.singles || 0, doubles: gl?.doubles || 0,
           triples: gl?.triples || 0, hr: gl?.hr || 0, rbi: gl?.rbi || 0,
           k: gl?.k || 0, bb: gl?.bb || 0, runs: gl?.runs || 0,
-          fieldingThisGame: [...savedFielding, ...rotFielding],
+          fieldingThisGame: [...savedOnlyFielding, ...rotFielding],
         };
       }));
 
