@@ -1,44 +1,43 @@
 /**
  * Vercel serverless function — serves a live ICS calendar feed.
- * Uses the public Firebase API key (same one embedded in the client app).
- * No service account or environment variables required.
+ * Requires FIREBASE_SERVICE_ACCOUNT env var (Firebase service account JSON for the dragonslo project).
  */
+import { createSign } from 'node:crypto';
 
 const PROJECT_ID = 'dragonslo';
-const API_KEY    = 'AIzaSyA-qE5_CAep-pyJWxG6S6cQpgEiOoXJ6WE';
-
 const DAY_MAP = { Sunday:0, Monday:1, Tuesday:2, Wednesday:3, Thursday:4, Friday:5, Saturday:6 };
 
-async function fsGet(path) {
-  const url = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/${path}?key=${API_KEY}`;
-  const res = await fetch(url);
-  return res.ok ? res.json() : null;
+function base64url(str) {
+  return Buffer.from(str).toString('base64')
+    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
 }
 
-async function fetchGames() {
-  const games = [];
-  let pageToken = null;
-  do {
-    const url = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/games?pageSize=200${pageToken ? `&pageToken=${pageToken}` : ''}&key=${API_KEY}`;
-    const res  = await fetch(url);
-    const data = await res.json();
-    for (const docObj of data.documents || []) {
-      const f = docObj.fields || {};
-      games.push({
-        id:        docObj.name.split('/').pop(),
-        date:      strVal(f.date),
-        opponent:  strVal(f.opponent),
-        time:      strVal(f.time),
-        location:  strVal(f.location),
-        homeAway:  strVal(f.homeAway) || 'Home',
-        cancelled: boolVal(f.cancelled),
-        postponed: boolVal(f.postponed),
-        result:    strVal(f.result),
-      });
-    }
-    pageToken = data.nextPageToken || null;
-  } while (pageToken);
-  return games;
+async function getAccessToken(sa) {
+  const now = Math.floor(Date.now() / 1000);
+  const header  = base64url(JSON.stringify({ alg: 'RS256', typ: 'JWT' }));
+  const payload = base64url(JSON.stringify({
+    iss: sa.client_email, sub: sa.client_email,
+    aud: 'https://oauth2.googleapis.com/token',
+    iat: now, exp: now + 3600,
+    scope: 'https://www.googleapis.com/auth/datastore',
+  }));
+  const sign = createSign('RSA-SHA256');
+  sign.update(`${header}.${payload}`);
+  const sig = sign.sign(sa.private_key, 'base64')
+    .replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+  const jwt = `${header}.${payload}.${sig}`;
+  const res  = await fetch('https://oauth2.googleapis.com/token', {
+    method: 'POST',
+    headers: { 'content-type': 'application/x-www-form-urlencoded' },
+    body: `grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Ajwt-bearer&assertion=${jwt}`,
+  });
+  return (await res.json()).access_token;
+}
+
+async function fsGet(path, token) {
+  const url = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/${path}`;
+  const res = await fetch(url, { headers: { authorization: `Bearer ${token}` } });
+  return res.ok ? res.json() : null;
 }
 
 function strVal(f) { return f?.stringValue || ''; }
@@ -169,12 +168,43 @@ function sendICS(res, body) {
 
 export default async function handler(req, res) {
   const debug = req.query?.debug === '1';
+  const saRaw = process.env.FIREBASE_SERVICE_ACCOUNT;
+
+  if (!saRaw) {
+    if (debug) return res.status(200).json({ error: 'FIREBASE_SERVICE_ACCOUNT not set' });
+    return sendICS(res, EMPTY_ICS);
+  }
 
   try {
-    const games = await fetchGames();
+    const sa = JSON.parse(saRaw);
+    const token = await getAccessToken(sa);
 
-    const practiceDoc    = await fsGet('settings/practiceSchedule');
-    const cancelledDoc   = await fsGet('settings/cancelledPractices');
+    // Fetch games (paginated) — always use the correct project ID
+    const games = [];
+    let pageToken = null;
+    do {
+      const url = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents/games?pageSize=200${pageToken ? `&pageToken=${pageToken}` : ''}`;
+      const data = await (await fetch(url, { headers: { authorization: `Bearer ${token}` } })).json();
+      if (debug && data.error) return res.status(200).json({ error: 'Firestore games error', details: data.error });
+      for (const doc of data.documents || []) {
+        const f = doc.fields || {};
+        games.push({
+          id:        doc.name.split('/').pop(),
+          date:      strVal(f.date),
+          opponent:  strVal(f.opponent),
+          time:      strVal(f.time),
+          location:  strVal(f.location),
+          homeAway:  strVal(f.homeAway) || 'Home',
+          cancelled: boolVal(f.cancelled),
+          postponed: boolVal(f.postponed),
+          result:    strVal(f.result),
+        });
+      }
+      pageToken = data.nextPageToken || null;
+    } while (pageToken);
+
+    const practiceDoc  = await fsGet('settings/practiceSchedule', token);
+    const cancelledDoc = await fsGet('settings/cancelledPractices', token);
 
     const cancelledSlots = {};
     if (cancelledDoc?.fields) {
@@ -203,6 +233,7 @@ export default async function handler(req, res) {
       return res.status(200).json({
         ok: true,
         serverDate: today,
+        serviceAccountProject: sa.project_id,
         totalGames: games.length,
         visibleGames: visibleGames.length,
         games: games.map(g => ({ id: g.id, date: g.date, opponent: g.opponent, result: g.result, cancelled: g.cancelled, postponed: g.postponed })),
