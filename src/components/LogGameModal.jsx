@@ -310,17 +310,25 @@ export default function LogGameModal({ players, currentYear, games = [], initial
       const runs    = parseInt(e.runs)    || 0;
       const hits    = singles + doubles + triples + hr;
 
-      // Add current (last) inning on save — it was excluded from pre-fill display
+      // Build complete innings from ALL lineup data — rotation is authoritative for innings.
+      // This ensures every player in any inning lineup gets fielding captured regardless
+      // of whether they were manually interacted with in the modal.
       let fieldingForSave = [...(e.fieldingThisGame || [])];
       if (liveScore && inningLineups) {
-        const currentLineup = inningLineups[String(liveScore.inning)] || {};
-        Object.entries(currentLineup).forEach(([pos, pid]) => {
-          if (pid !== player.id) return;
+        const rotTotals = {};
+        Object.entries(inningLineups).forEach(([, lineup]) => {
+          Object.entries(lineup).forEach(([pos, pid]) => {
+            if (pid !== player.id || !pos) return;
+            rotTotals[pos] = (rotTotals[pos] || 0) + 1;
+          });
+        });
+        Object.entries(rotTotals).forEach(([pos, innCount]) => {
           const existing = fieldingForSave.find(f => f.pos === pos);
           if (existing) {
-            existing.innings = (existing.innings || 0) + 1;
+            existing.innings = innCount;
           } else {
-            fieldingForSave.push({ pos, innings: 1, putouts: 0, assists: 0, errors: 0 });
+            const savedPos = saved?.fielding?.[pos];
+            fieldingForSave.push({ pos, innings: innCount, putouts: savedPos?.putouts || 0, assists: savedPos?.assists || 0, errors: savedPos?.errors || 0 });
           }
         });
       }
