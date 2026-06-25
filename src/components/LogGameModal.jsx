@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '../firebase/config';
 import InningLineupSheet from './InningLineupSheet';
 
@@ -155,6 +155,8 @@ export default function LogGameModal({ players, currentYear, games = [], initial
   const [localLineups, setLocalLineups] = useState(inningLineups || {});
   const [showInningLineup, setShowInningLineup] = useState(false);
   const [battingOrder, setBattingOrder] = useState(null);
+  const [confirmReset, setConfirmReset] = useState(false);
+  const [isResetting, setIsResetting] = useState(false);
 
   // Load existing saved stats whenever a game is selected (so re-opening mid-game works)
   useEffect(() => {
@@ -417,6 +419,75 @@ export default function LogGameModal({ players, currentYear, games = [], initial
     setIsSaving(false);
     onSaved(`Game vs ${game.opponent} logged for ${players.length} players!`);
     onClose();
+  };
+
+  const handleReset = async () => {
+    setIsResetting(true);
+    const safeId = (logGame.id || 'manual_' + (logGame.date || Date.now())).replace(/[^a-zA-Z0-9_-]/g, '_');
+    const gameKey = `${currentYear}_${safeId}`;
+
+    for (const player of players) {
+      const ref = doc(db, 'playerStats', player.id);
+      const snap = await getDoc(ref);
+      if (!snap.exists()) continue;
+      const current = snap.data();
+      const gameLogs = { ...(current.gameLogs || {}) };
+      delete gameLogs[gameKey];
+
+      // Recalculate season stats for the current year from remaining logs
+      const updatedSeasons = { ...(current.seasons || {}) };
+      const yearLogs = Object.values(gameLogs).filter(g => g.year === currentYear);
+      if (yearLogs.length === 0) {
+        delete updatedSeasons[currentYear];
+      } else {
+        const t = yearLogs.reduce((a, g) => ({
+          ab:      (a.ab      || 0) + (g.ab      || 0),
+          singles: (a.singles || 0) + (g.singles || 0),
+          doubles: (a.doubles || 0) + (g.doubles || 0),
+          triples: (a.triples || 0) + (g.triples || 0),
+          hr:      (a.hr      || 0) + (g.hr      || 0),
+          hits:    (a.hits    || 0) + (g.hits    || 0),
+          rbi:     (a.rbi     || 0) + (g.rbi     || 0),
+          k:       (a.k       || 0) + (g.k       || 0),
+          bb:      (a.bb      || 0) + (g.bb      || 0),
+          runs:    (a.runs    || 0) + (g.runs    || 0),
+        }), {});
+        t.avg = t.ab > 0 ? t.hits / t.ab : 0;
+        t.obp = calcOBP(t.hits || 0, t.bb || 0, t.ab || 0);
+        updatedSeasons[currentYear] = t;
+      }
+
+      const career = Object.values(updatedSeasons).reduce((acc, s) => ({
+        ab:      (acc.ab      || 0) + (s.ab      || 0),
+        hits:    (acc.hits    || 0) + (s.hits    || 0),
+        singles: (acc.singles || 0) + (s.singles || 0),
+        doubles: (acc.doubles || 0) + (s.doubles || 0),
+        triples: (acc.triples || 0) + (s.triples || 0),
+        hr:      (acc.hr      || 0) + (s.hr      || 0),
+        rbi:     (acc.rbi     || 0) + (s.rbi     || 0),
+        k:       (acc.k       || 0) + (s.k       || 0),
+        bb:      (acc.bb      || 0) + (s.bb      || 0),
+        runs:    (acc.runs    || 0) + (s.runs    || 0),
+      }), {});
+      career.avg = career.ab > 0 ? career.hits / career.ab : 0;
+      career.obp = calcOBP(career.hits || 0, career.bb || 0, career.ab || 0);
+
+      // Fielding: recalc from all remaining logs (not merged with old, since we're wiping this game)
+      const logFielding = recalcFieldingFromLogs(gameLogs);
+
+      await setDoc(ref, { ...current, gameLogs, seasons: updatedSeasons, career, fielding: logFielding });
+    }
+
+    // Delete hit zones for this game
+    const zonesRef = doc(db, 'settings', 'gameHitZones_' + gameKey);
+    const zonesSnap = await getDoc(zonesRef);
+    if (zonesSnap.exists()) await deleteDoc(zonesRef);
+
+    setLogEntries({});
+    setGameZones(BLANK_ZONES);
+    setLastZone(null);
+    setIsResetting(false);
+    setConfirmReset(false);
   };
 
   const getPlayerName = (p) => p?.name || p?.childName || `${p?.firstName||''} ${p?.lastName||''}`.trim() || 'Unknown';
@@ -718,6 +789,41 @@ export default function LogGameModal({ players, currentYear, games = [], initial
         }}>
           {isSaving ? 'Saving...' : `Save Game Log (${Object.keys(logEntries).filter(id => hasStats(id)).length} players logged)`}
         </button>
+
+        {!confirmReset ? (
+          <button onClick={() => setConfirmReset(true)} disabled={isSaving || isResetting} style={{
+            width: '100%', marginTop: '8px', padding: '10px', borderRadius: '10px',
+            border: '1.5px solid var(--gray-300)', background: 'white',
+            color: 'var(--gray-500)', fontWeight: '600', fontSize: '13px', cursor: 'pointer',
+          }}>
+            Reset All Stats for This Game
+          </button>
+        ) : (
+          <div style={{ marginTop: '8px', padding: '14px', borderRadius: '10px', border: '1.5px solid #DC2626', background: '#FEF2F2' }}>
+            <div style={{ fontWeight: '700', fontSize: '13px', color: '#DC2626', marginBottom: '6px', textAlign: 'center' }}>
+              Erase all stats for vs {logGame.opponent}?
+            </div>
+            <div style={{ fontSize: '12px', color: 'var(--gray-500)', textAlign: 'center', marginBottom: '12px' }}>
+              This removes batting, fielding, and hit zones for all players. This cannot be undone.
+            </div>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button onClick={() => setConfirmReset(false)} disabled={isResetting} style={{
+                flex: 1, padding: '10px', borderRadius: '8px',
+                border: '1.5px solid var(--gray-300)', background: 'white',
+                fontWeight: '700', fontSize: '13px', cursor: 'pointer',
+              }}>
+                Cancel
+              </button>
+              <button onClick={handleReset} disabled={isResetting} style={{
+                flex: 1, padding: '10px', borderRadius: '8px', border: 'none',
+                background: '#DC2626', color: 'white',
+                fontWeight: '700', fontSize: '13px', cursor: 'pointer',
+              }}>
+                {isResetting ? 'Resetting...' : 'Yes, Reset'}
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
 
