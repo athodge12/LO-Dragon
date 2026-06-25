@@ -157,6 +157,7 @@ export default function LogGameModal({ players, currentYear, games = [], initial
   const [battingOrder, setBattingOrder] = useState(null);
   const [confirmReset, setConfirmReset] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
+  const [saveError, setSaveError] = useState('');
 
   // Load existing saved stats whenever a game is selected (so re-opening mid-game works)
   useEffect(() => {
@@ -294,10 +295,12 @@ export default function LogGameModal({ players, currentYear, games = [], initial
 
   const handleFinish = async () => {
     setIsSaving(true);
+    setSaveError('');
     const game = logGame;
     const year = currentYear;
     const safeId = (game.id || 'manual_' + (game.date || Date.now())).replace(/[^a-zA-Z0-9_-]/g, '_');
     const gameKey = `${year}_${safeId}`;
+    try {
 
     for (const player of players) {
       const e = getEntry(player.id);
@@ -419,12 +422,19 @@ export default function LogGameModal({ players, currentYear, games = [], initial
     setIsSaving(false);
     onSaved(`Game vs ${game.opponent} logged for ${players.length} players!`);
     onClose();
+    } catch (err) {
+      console.error('handleFinish error:', err);
+      setSaveError('Save failed — check your connection and try again.');
+      setIsSaving(false);
+    }
   };
 
   const handleReset = async () => {
     setIsResetting(true);
+    setSaveError('');
     const safeId = (logGame.id || 'manual_' + (logGame.date || Date.now())).replace(/[^a-zA-Z0-9_-]/g, '_');
     const gameKey = `${currentYear}_${safeId}`;
+    try {
 
     for (const player of players) {
       const ref = doc(db, 'playerStats', player.id);
@@ -488,6 +498,12 @@ export default function LogGameModal({ players, currentYear, games = [], initial
     setLastZone(null);
     setIsResetting(false);
     setConfirmReset(false);
+    } catch (err) {
+      console.error('handleReset error:', err);
+      setSaveError('Reset failed — check your connection and try again.');
+      setIsResetting(false);
+      setConfirmReset(false);
+    }
   };
 
   const getPlayerName = (p) => p?.name || p?.childName || `${p?.firstName||''} ${p?.lastName||''}`.trim() || 'Unknown';
@@ -783,6 +799,11 @@ export default function LogGameModal({ players, currentYear, games = [], initial
           )}
         </div>
 
+        {saveError && (
+          <div style={{ marginBottom: '8px', padding: '10px 14px', borderRadius: '8px', background: '#FEF2F2', border: '1px solid #FCA5A5', color: '#DC2626', fontSize: '13px', fontWeight: '600', textAlign: 'center' }}>
+            {saveError}
+          </div>
+        )}
         <button disabled={isSaving} onClick={handleFinish} style={{
           width: '100%', padding: '14px', borderRadius: '10px', border: 'none',
           background: 'var(--red)', color: 'white', fontWeight: '700', fontSize: '15px', cursor: 'pointer'
