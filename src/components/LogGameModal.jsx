@@ -310,6 +310,14 @@ export default function LogGameModal({ players, currentYear, games = [], initial
       const runs    = parseInt(e.runs)    || 0;
       const hits    = singles + doubles + triples + hr;
 
+      const ref = doc(db, 'playerStats', player.id);
+      const snap = await getDoc(ref);
+      const current = snap.exists() ? snap.data() : {};
+
+      // Must be declared before fielding rotation code so saved.fielding is accessible
+      const saved = (current.gameLogs || {})[gameKey] || {};
+      const mx = (key, val) => Math.max(val, parseInt(saved[key]) || 0);
+
       // Build complete innings from ALL lineup data — rotation is authoritative for innings.
       // This ensures every player in any inning lineup gets fielding captured regardless
       // of whether they were manually interacted with in the modal.
@@ -317,6 +325,7 @@ export default function LogGameModal({ players, currentYear, games = [], initial
       if (liveScore && inningLineups) {
         const rotTotals = {};
         Object.entries(inningLineups).forEach(([, lineup]) => {
+          if (!lineup) return;
           Object.entries(lineup).forEach(([pos, pid]) => {
             if (pid !== player.id || !pos) return;
             rotTotals[pos] = (rotTotals[pos] || 0) + 1;
@@ -327,7 +336,7 @@ export default function LogGameModal({ players, currentYear, games = [], initial
           if (existing) {
             existing.innings = innCount;
           } else {
-            const savedPos = saved?.fielding?.[pos];
+            const savedPos = saved.fielding?.[pos];
             fieldingForSave.push({ pos, innings: innCount, putouts: savedPos?.putouts || 0, assists: savedPos?.assists || 0, errors: savedPos?.errors || 0 });
           }
         });
@@ -342,15 +351,6 @@ export default function LogGameModal({ players, currentYear, games = [], initial
           errors:  parseInt(f.errors)  || 0,
         };
       });
-
-      const ref = doc(db, 'playerStats', player.id);
-      const snap = await getDoc(ref);
-      const current = snap.exists() ? snap.data() : {};
-
-      // Merge with existing saved stats — take max so re-saving a partial inning
-      // never wipes out stats already accumulated from earlier innings
-      const saved = (current.gameLogs || {})[gameKey] || {};
-      const mx = (key, val) => Math.max(val, parseInt(saved[key]) || 0);
 
       const gameEntry = { gameId: safeId, date: game.date, opponent: game.opponent, year,
         ab:      mx('ab', ab),
