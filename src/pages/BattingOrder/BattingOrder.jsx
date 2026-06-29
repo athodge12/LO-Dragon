@@ -13,12 +13,12 @@ const FIELDING_POSITIONS = ['Pitcher','Catcher','1st Base','2nd Base','3rd Base'
 function fitScore(statsData, position) {
   const f = statsData?.fielding?.[position];
   if (!f || !f.innings) return 0;
-  const playsPerInning = ((f.putouts || 0) * 0.60 + (f.assists || 0) * 0.40) / f.innings;
-  const playScore    = Math.min(1.0, playsPerInning / 0.5);
-  const rawScore     = 0.45 + playScore * 0.55;
-  const errorPenalty = Math.max(0.05, 1 - (f.errors / f.innings) * 3.0);
-  const inningsMult  = Math.min(1.0, 0.50 + f.innings / 15);
-  return rawScore * errorPenalty * inningsMult;
+  const playsPerGame  = ((f.putouts || 0) * 0.60 + (f.assists || 0) * 0.40) / f.innings;
+  const playScore     = Math.min(1.0, playsPerGame / 2.0);
+  const rawScore      = 0.45 + playScore * 0.55;
+  const errorPenalty  = Math.max(0.05, 1 - (f.errors / f.innings));
+  const gamesMult     = Math.min(1.0, 0.50 + f.innings / 10);
+  return rawScore * errorPenalty * gamesMult;
 }
 
 function fitColor(score) {

@@ -165,7 +165,8 @@ export default function LogGameModal({ players, currentYear, games = [], initial
     const safeId = (logGame.id || 'manual_' + (logGame.date || Date.now())).replace(/[^a-zA-Z0-9_-]/g, '_');
     const gameKey = `${currentYear}_${safeId}`;
     const load = async () => {
-      // Compute innings per player per position from inning lineup data (live mode only)
+      // Collect positions played per player from lineup data (live mode only).
+      // Uses a Set — only care whether a player appeared at a position, not how many innings.
       const playerPositions = {};
       if (liveScore && inningLineups) {
         const currentInning = liveScore.inning || 1;
@@ -173,8 +174,8 @@ export default function LogGameModal({ players, currentYear, games = [], initial
           if (parseInt(inning) >= currentInning) return;
           Object.entries(lineup).forEach(([pos, playerId]) => {
             if (!playerId) return;
-            if (!playerPositions[playerId]) playerPositions[playerId] = {};
-            playerPositions[playerId][pos] = (playerPositions[playerId][pos] || 0) + 1;
+            if (!playerPositions[playerId]) playerPositions[playerId] = new Set();
+            playerPositions[playerId].add(pos);
           });
         });
       }
@@ -183,15 +184,15 @@ export default function LogGameModal({ players, currentYear, games = [], initial
       await Promise.all(players.map(async (player) => {
         const snap = await getDoc(doc(db, 'playerStats', player.id));
         const gl = snap.exists() ? snap.data().gameLogs?.[gameKey] : null;
-        const rotPositions = playerPositions[player.id] || {};
-        // Rotation data is the source of truth for innings; preserve saved putouts/assists/errors
-        const rotFielding = Object.entries(rotPositions).map(([pos, innCount]) => {
+        const rotPositions = playerPositions[player.id] || new Set();
+        // 1 game played per position — preserve any saved putouts/assists/errors
+        const rotFielding = [...rotPositions].map(pos => {
           const s = gl?.fielding?.[pos];
-          return { pos, innings: innCount, putouts: s?.putouts || 0, assists: s?.assists || 0, errors: s?.errors || 0 };
+          return { pos, innings: 1, putouts: s?.putouts || 0, assists: s?.assists || 0, errors: s?.errors || 0 };
         });
         // Keep saved positions that have no rotation data (e.g. manual entries)
         const savedOnlyFielding = Object.entries(gl?.fielding || {})
-          .filter(([pos]) => !rotPositions[pos])
+          .filter(([pos]) => !rotPositions.has(pos))
           .map(([pos, f]) => ({ pos, innings: f.innings || 0, putouts: f.putouts || 0, assists: f.assists || 0, errors: f.errors || 0 }));
 
         if (!gl && rotFielding.length === 0) return;
@@ -208,8 +209,8 @@ export default function LogGameModal({ players, currentYear, games = [], initial
         if (entries[playerId]) return;
         entries[playerId] = {
           ...BLANK_BATTING,
-          fieldingThisGame: Object.entries(positions).map(([pos, innCount]) => ({
-            pos, innings: innCount, putouts: 0, assists: 0, errors: 0,
+          fieldingThisGame: [...positions].map(pos => ({
+            pos, innings: 1, putouts: 0, assists: 0, errors: 0,
           })),
         };
       });
@@ -323,26 +324,25 @@ export default function LogGameModal({ players, currentYear, games = [], initial
       const saved = (current.gameLogs || {})[gameKey] || {};
       const mx = (key, val) => Math.max(val, parseInt(saved[key]) || 0);
 
-      // Build complete innings from ALL lineup data — rotation is authoritative for innings.
-      // This ensures every player in any inning lineup gets fielding captured regardless
-      // of whether they were manually interacted with in the modal.
+      // Build fielding from ALL lineup data — any position a player appeared in counts as 1 game.
+      // Uses a Set so multiple lineup entries for the same position still count as 1.
       let fieldingForSave = [...(e.fieldingThisGame || [])];
       if (liveScore && inningLineups) {
-        const rotTotals = {};
+        const rotPositions = new Set();
         Object.entries(inningLineups).forEach(([, lineup]) => {
           if (!lineup) return;
           Object.entries(lineup).forEach(([pos, pid]) => {
             if (pid !== player.id || !pos) return;
-            rotTotals[pos] = (rotTotals[pos] || 0) + 1;
+            rotPositions.add(pos);
           });
         });
-        Object.entries(rotTotals).forEach(([pos, innCount]) => {
+        rotPositions.forEach(pos => {
           const existing = fieldingForSave.find(f => f.pos === pos);
           if (existing) {
-            existing.innings = innCount;
+            existing.innings = 1;
           } else {
             const savedPos = saved.fielding?.[pos];
-            fieldingForSave.push({ pos, innings: innCount, putouts: savedPos?.putouts || 0, assists: savedPos?.assists || 0, errors: savedPos?.errors || 0 });
+            fieldingForSave.push({ pos, innings: 1, putouts: savedPos?.putouts || 0, assists: savedPos?.assists || 0, errors: savedPos?.errors || 0 });
           }
         });
       }
@@ -370,13 +370,13 @@ export default function LogGameModal({ players, currentYear, games = [], initial
       };
       gameEntry.hits = gameEntry.singles + gameEntry.doubles + gameEntry.triples + gameEntry.hr;
 
-      // Merge fielding — take max per position per stat
+      // Merge fielding — innings is always 1 per game (authoritative); take max for PO/A/E
       if (Object.keys(fieldingMap).length > 0 || saved.fielding) {
         const mergedFM = { ...(saved.fielding || {}) };
         Object.entries(fieldingMap).forEach(([pos, f]) => {
           const s = mergedFM[pos] || {};
           mergedFM[pos] = {
-            innings: Math.max(f.innings || 0, s.innings || 0),
+            innings: f.innings || 1,
             putouts: Math.max(f.putouts || 0, s.putouts || 0),
             assists: Math.max(f.assists || 0, s.assists || 0),
             errors:  Math.max(f.errors  || 0, s.errors  || 0),
@@ -645,7 +645,7 @@ export default function LogGameModal({ players, currentYear, games = [], initial
                   <div style={{ display: 'grid', gridTemplateColumns: `repeat(${liveScore ? 3 : 4}, 1fr)`, gap: '8px' }}>
                     {(liveScore
                       ? [{key:'putouts',label:'PO'},{key:'assists',label:'A'},{key:'errors',label:'E'}]
-                      : [{key:'innings',label:'Inn'},{key:'putouts',label:'PO'},{key:'assists',label:'A'},{key:'errors',label:'E'}]
+                      : [{key:'innings',label:'G'},{key:'putouts',label:'PO'},{key:'assists',label:'A'},{key:'errors',label:'E'}]
                     ).map(({ key, label }) => (
                       <PlusMinus key={key} label={label}
                         value={f[key] || 0}

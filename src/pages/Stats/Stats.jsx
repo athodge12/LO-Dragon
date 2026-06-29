@@ -26,12 +26,12 @@ const POSITION_OUT_PCT = {
 function fitScore(fieldingData, position) {
   const f = fieldingData?.[position];
   if (f && f.innings > 0) {
-    const playsPerInning = ((f.putouts || 0) * 0.60 + (f.assists || 0) * 0.40) / f.innings;
-    const playScore    = Math.min(1.0, playsPerInning / 0.5);
-    const rawScore     = 0.45 + playScore * 0.55;
-    const errorPenalty = Math.max(0.05, 1 - (f.errors / f.innings) * 3.0);
-    const inningsMult  = Math.min(1.0, 0.50 + f.innings / 15);
-    return { score: rawScore * errorPenalty * inningsMult, label: f.innings >= 3 ? 'solid data' : 'limited data', innings: f.innings, putouts: f.putouts || 0, assists: f.assists || 0, errors: f.errors };
+    const playsPerGame  = ((f.putouts || 0) * 0.60 + (f.assists || 0) * 0.40) / f.innings;
+    const playScore     = Math.min(1.0, playsPerGame / 2.0);
+    const rawScore      = 0.45 + playScore * 0.55;
+    const errorPenalty  = Math.max(0.05, 1 - (f.errors / f.innings));
+    const gamesMult     = Math.min(1.0, 0.50 + f.innings / 10);
+    return { score: rawScore * errorPenalty * gamesMult, label: f.innings >= 2 ? 'solid data' : 'limited data', innings: f.innings, putouts: f.putouts || 0, assists: f.assists || 0, errors: f.errors };
   }
   return { score: 0, label: 'no data', innings: 0, putouts: 0, assists: 0, errors: 0 };
 }
@@ -436,7 +436,7 @@ export default function Stats() {
                               borderRadius: '6px', padding: '3px 4px',
                               fontSize: '10px', fontWeight: '700', lineHeight: '1.3'
                             }}>
-                                <div>{pf.innings}inn</div>
+                                <div>{pf.innings}G</div>
                               <div>{(pf.putouts||0)+(pf.assists||0)}outs</div>
                               <div>{pf.errors}E</div>
                             </div>
@@ -675,7 +675,7 @@ export default function Stats() {
       </div>
     );
     const FG_COLS = [
-      { key: 'innings', label: 'Inn' }, { key: 'putouts', label: 'PO' },
+      { key: 'innings', label: 'G' }, { key: 'putouts', label: 'PO' },
       { key: 'assists', label: 'A' }, { key: 'errors', label: 'E' },
     ];
     const handleFgSort = (key) => {
@@ -993,7 +993,7 @@ export default function Stats() {
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
                   <thead>
                     <tr style={{ background: 'var(--gray-50)' }}>
-                      {['#','Player','Fit','Inn','PO','A','E','Data'].map(h => (
+                      {['#','Player','Fit','G','PO','A','E','Data'].map(h => (
                         <th key={h} style={{ padding: '6px 8px', fontWeight: '700', color: 'var(--gray-500)', fontSize: '11px', textTransform: 'uppercase', textAlign: h === 'Player' ? 'left' : 'center', borderBottom: '1px solid var(--gray-200)' }}>{h}</th>
                       ))}
                     </tr>
@@ -1227,7 +1227,7 @@ export default function Stats() {
   const FieldingPracticeView = () => {
     if (!practiceDates.length) return <PracticeEmptyState icon="🧤" label="No practice stats yet" />;
     const FP_COLS = [
-      { key: 'innings', label: 'Inn' }, { key: 'putouts', label: 'PO' },
+      { key: 'innings', label: 'G' }, { key: 'putouts', label: 'PO' },
       { key: 'assists', label: 'A' }, { key: 'errors', label: 'E' },
     ];
     const handleFpSort = (key) => {
@@ -1657,7 +1657,7 @@ export default function Stats() {
                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
                   <thead>
                     <tr style={{ background: 'var(--gray-50)' }}>
-                      {['Player','Inn','PO','A','E'].map(h => (
+                      {['Player','G','PO','A','E'].map(h => (
                         <th key={h} style={{ padding: '6px 8px', fontWeight: '700', color: 'var(--gray-500)', fontSize: '11px', textTransform: 'uppercase', textAlign: h === 'Player' ? 'left' : 'center', borderBottom: '1px solid var(--gray-200)' }}>{h}</th>
                       ))}
                     </tr>
@@ -1792,7 +1792,7 @@ export default function Stats() {
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
               {[
-                { abbr: 'Inn', name: 'Innings',        desc: 'Total innings played at that position across all games.' },
+                { abbr: 'G',   name: 'Games',           desc: 'Number of games played at that position.' },
                 { abbr: 'PO',  name: 'Putout',         desc: 'The player directly made the out — catching a fly ball, catching a throw at a base, or tagging a runner.' },
                 { abbr: 'A',   name: 'Assist',         desc: 'The player fielded the ball and threw it to another player who made the out.' },
                 { abbr: 'E',   name: 'Errors',         desc: 'Any play that should have resulted in an out but didn\'t — misplaying the ball, dropping a catch, or taking too long to throw.' },
@@ -1907,7 +1907,7 @@ export default function Stats() {
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
                   {[
-                    { key: 'innings', label: 'Innings Played',    hint: 'How many innings at this spot' },
+                    { key: 'innings', label: 'Games Played',       hint: 'How many games at this position' },
                     { key: 'putouts', label: 'Putouts (PO)',       hint: 'Outs they directly made — fly ball catch, tag, catch at base' },
                     { key: 'assists', label: 'Assists (A)',        hint: 'Threw to another player who made the out' },
                     { key: 'errors',  label: 'Errors (E)',         hint: 'Play should have been an out but wasn\'t' },
